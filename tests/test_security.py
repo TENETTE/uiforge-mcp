@@ -3,8 +3,8 @@ import json
 
 import pytest
 
-from game_ui_mcp import server as s
-from game_ui_mcp.store import Store
+from uiforge_mcp import server as s
+from uiforge_mcp.store import Store
 
 
 @pytest.fixture()
@@ -27,11 +27,11 @@ def test_engine_paths_cannot_inject_code(ws, kwargs):
 def test_roblox_ids_must_be_numeric(ws):
     out = ws / "out"
     out.mkdir()
-    (out / "game_ui_manifest.json").write_text(json.dumps({"assets": {"btn": {"files": []}}}), encoding="utf-8")
+    (out / "uiforge_manifest.json").write_text(json.dumps({"assets": {"btn": {"files": []}}}), encoding="utf-8")
     with pytest.raises(ValueError, match="numeric"):
         s.write_engine_helpers("roblox", str(out), roblox_ids={"btn": '1"; game:Shutdown() --'})
     result = s.write_engine_helpers("roblox", str(out), roblox_ids={"btn": "rbxassetid://123"})
-    manifest = json.loads((out / "game_ui_manifest.json").read_text(encoding="utf-8"))
+    manifest = json.loads((out / "uiforge_manifest.json").read_text(encoding="utf-8"))
     assert manifest["assets"]["btn"]["roblox_id"] == "123" and result["assets_without_id"] == []
 
 

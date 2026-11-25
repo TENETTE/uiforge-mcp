@@ -1,13 +1,13 @@
 ---
-name: game-ui-mcp
-description: Oyun, C#/.NET (WPF, Avalonia, WinUI), C++ (Qt QML, Dear ImGui), mobil ve web/React arayüzleri (menü, HUD, buton, panel, bar, gösterge, ikon, form, kaydırılabilir liste, ekran görüntüsünden düzenleme) tasarlarken, canlandırırken ve teslim ederken game-ui-mcp server'ını kullanır. Seçilebilir kalite seviyeleri (simple/standard/advanced/aaa) ve 9 stil profili (kids, cartoon, stylized, minimal, web_saas, scifi, dark_fantasy, realistic, photorealistic), Cook-Torrance PBR + HDR/EXR IBL, 9 prosedürel çerçeve, yerel Input/Scroll bileşenleri, dotLottie v2 durum makinesi, Unity/Unreal/Godot/Roblox + WPF/Avalonia/WinUI/Qt/ImGui + React TSX/Tailwind çıktıları.
+name: uiforge-mcp
+description: Oyun, C#/.NET (WPF, Avalonia, WinUI), C++ (Qt QML, Dear ImGui), mobil ve web/React arayüzleri (menü, HUD, buton, panel, bar, gösterge, ikon, form, kaydırılabilir liste, ekran görüntüsünden düzenleme) tasarlarken, canlandırırken ve teslim ederken uiforge-mcp server'ını kullanır. Seçilebilir kalite seviyeleri (simple/standard/advanced/aaa) ve 9 stil profili (kids, cartoon, stylized, minimal, web_saas, scifi, dark_fantasy, realistic, photorealistic), Cook-Torrance PBR + HDR/EXR IBL, 9 prosedürel çerçeve, yerel Input/Scroll bileşenleri, dotLottie v2 durum makinesi, Unity/Unreal/Godot/Roblox + WPF/Avalonia/WinUI/Qt/ImGui + React TSX/Tailwind çıktıları.
 ---
 
-# game-ui-mcp ile arayüz tasarlamak
+# uiforge-mcp ile arayüz tasarlamak
 
-`game-ui-mcp` görsel üreten bir difüzyon modeli değildir: her piksel senin çağırdığın deterministik vektör şekil, yazı, PBR materyal, widget ve keyframe'lerden çizilir. Kalite, baştan doğru **kalite seviyesi + stil profili** seçmene, `batch` ile temiz kurmana ve `preview` + `review_canvas` ile gerçekten bakıp düzeltmene bağlıdır.
+`uiforge-mcp` görsel üreten bir difüzyon modeli değildir: her piksel senin çağırdığın deterministik vektör şekil, yazı, PBR materyal, widget ve keyframe'lerden çizilir. Kalite, baştan doğru **kalite seviyesi + stil profili** seçmene, `batch` ile temiz kurmana ve `preview` + `review_canvas` ile gerçekten bakıp düzeltmene bağlıdır.
 
-Tool'lar listede yoksa (`create_canvas`, `preview` görünmüyorsa) server bağlı değildir: kullanıcıya `game-ui-mcp setup <istemci> --write` ile bağlamasını söyle, çizmiş gibi davranma. İlk kez kullanacağın her özellik için `guide(topic)` oku (`fills`, `shader`, `style`, `design`, `layers`, `geometry`, `text`, `reuse`, `review`, `animation`, `export`).
+Tool'lar listede yoksa (`create_canvas`, `preview` görünmüyorsa) server bağlı değildir: kullanıcıya `uiforge-mcp setup <istemci> --write` ile bağlamasını söyle, çizmiş gibi davranma. İlk kez kullanacağın her özellik için `guide(topic)` oku (`fills`, `shader`, `style`, `design`, `layers`, `geometry`, `text`, `reuse`, `review`, `animation`, `export`).
 
 ## 1. Kalite ve Stil Seçimi (Zorunlu İlk Karar)
 
@@ -325,10 +325,10 @@ Hazır dolgular yetmiyorsa formülü kendin yaz: `{"type":"shader","code":"...",
 | Video / dotLottie / Animasyon | `export_animation(format="dotlottie" | "lottie" | "mp4" | "webm" | "spritesheet" | "json")` (`animation="all"` ile çoklu `.lottie`) |
 
 **Motor ayrıntıları:**
-- **Roblox:** `export_asset(engine="roblox", scales=[2])` → kullanıcı PNG'leri Studio'da yükler → `write_engine_helpers("roblox", out_dir, roblox_ids={...})` → `GameUi.apply(label, "ad")`. Boyutta `Scale` + `UIAspectRatioConstraint`, yazı `TextLabel`, hover / press `TweenService`. Arka plan bulanıklığı yoktur; camı daha opak yap.
+- **Roblox:** `export_asset(engine="roblox", scales=[2])` → kullanıcı PNG'leri Studio'da yükler → `write_engine_helpers("roblox", out_dir, roblox_ids={...})` → `UiForge.apply(label, "ad")`. Boyutta `Scale` + `UIAspectRatioConstraint`, yazı `TextLabel`, hover / press `TweenService`. Arka plan bulanıklığı yoktur; camı daha opak yap.
 - **Unity:** `write_engine_helpers("unity", "<Proje>/Assets/Editor")` → `export_asset(engine="unity", out_dir=...)`. uGUI'de `Image.type = Sliced`, UI Toolkit'te `-unity-slice-*`. Yazı TextMeshPro. İbre: `RectTransform.pivot` + `localEulerAngles.z = -açı`; dolan yay `Image.type = Filled`, `Radial360`.
-- **Unreal:** `export_asset(engine="unreal")` → `write_engine_helpers("unreal", ...)` → editörde Python ile `import_game_ui.py`. Brush `Draw As: Box` ve margin'ler log'da. İbre `SetRenderTransformAngle`, cam için `BackgroundBlur`.
-- **Godot 4:** `export_asset(engine="godot")` → `write_engine_helpers("godot", ..., godot_res_path=...)` → her 9-slice için `.stylebox.tres`; `NinePatchRect` için `.gameui.json` içindeki `margins_LTRB`.
+- **Unreal:** `export_asset(engine="unreal")` → `write_engine_helpers("unreal", ...)` → editörde Python ile `import_uiforge.py`. Brush `Draw As: Box` ve margin'ler log'da. İbre `SetRenderTransformAngle`, cam için `BackgroundBlur`.
+- **Godot 4:** `export_asset(engine="godot")` → `write_engine_helpers("godot", ..., godot_res_path=...)` → her 9-slice için `.stylebox.tres`; `NinePatchRect` için `.uiforge.json` içindeki `margins_LTRB`.
 - Hareketli parçayı export etmeden önce dinlenme haline getir (ibre `rotation: 0`, sağa bakar); motor döndürsün. Clip'li gölge / ışık katmanları `export_layers`'ta tabana gömülür (motor multiply / screen uygulayamaz).
 
 ## Kontrol turu (her asset için)

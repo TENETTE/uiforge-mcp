@@ -6,8 +6,8 @@ import xml.etree.ElementTree as ET
 import numpy as np
 import pytest
 
-from game_ui_mcp import server as s
-from game_ui_mcp.store import Store
+from uiforge_mcp import server as s
+from uiforge_mcp.store import Store
 
 
 @pytest.fixture()
@@ -164,7 +164,7 @@ def test_text_truncation_and_decoration(ws):
     r = st.renderer(st.get("c"))
     box = r.element_box(st.find(st.get("c"), "name"))
     assert box[2] - box[0] <= 121
-    from game_ui_mcp.render import TextLayout, resolve_style
+    from uiforge_mcp.render import TextLayout, resolve_style
     el = st.find(st.get("c"), "name")
     assert TextLayout(el, resolve_style(el.get("style"), st.theme), st.fonts, 1.0).lines[0][0].endswith("…")
     with_line = np.asarray(r.render(include_background=False))[..., 3].astype(int).sum()

@@ -5,8 +5,8 @@ import json
 import numpy as np
 import pytest
 
-from game_ui_mcp import server as s
-from game_ui_mcp.store import Store
+from uiforge_mcp import server as s
+from uiforge_mcp.store import Store
 
 
 @pytest.fixture()
@@ -37,7 +37,7 @@ def test_diamond_gradient_and_spring_ease(ws):
     s.add_rect("c", 0, 0, 40, 40, style={"fill": {"type": "diamond", "stops": [[0, "#ffffff"], [1, "#000000"]]}})
     px = img()
     assert px[20, 20, 0] > 230 and px[20, 1, 0] < 60 and px[1, 1, 0] < 30
-    from game_ui_mcp.animation import ease
+    from uiforge_mcp.animation import ease
     vals = [ease("spring-out", t / 20) for t in range(21)]
     assert vals[0] == 0 and abs(vals[-1] - 1) < 1e-9 and max(vals) > 1.0
 
@@ -89,7 +89,7 @@ def test_simplify_case_note_focus(ws):
     after = s.store().find(s.store().get("c"), "q")["d"].count("L")
     assert after < before / 2
     s.add_text("c", "istanbul ışık", x=0, y=0, id="t", case="tr-upper")
-    from game_ui_mcp.render import TextLayout, resolve_style
+    from uiforge_mcp.render import TextLayout, resolve_style
     st = s.store()
     el = st.find(st.get("c"), "t")
     assert TextLayout(el, {}, st.fonts, 1.0).lines[0][0] == "İSTANBUL IŞIK"

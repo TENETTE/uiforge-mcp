@@ -21,7 +21,7 @@ from .render import backdrop
 
 _HTML = r"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>game-ui-mcp · Live Preview</title>
+<title>uiforge-mcp · Live Preview</title>
 <style>
 *{box-sizing:border-box}html,body{margin:0;height:100%;background:#0d0f14;color:#e5e7eb;font:13px/1.4 system-ui,-apple-system,sans-serif;overflow:hidden}
 .bar{height:44px;padding:0 14px;display:flex;align-items:center;gap:10px;background:#141720;border-bottom:1px solid #242938}
@@ -38,7 +38,7 @@ button.on{background:#7c5cff;border-color:#7c5cff;color:#fff}
 .tip{position:fixed;bottom:14px;left:16px;background:#141720dd;border:1px solid #2a3042;border-radius:6px;padding:5px 10px;font-size:12px;color:#cbd5e1}
 </style></head><body>
 <div class="bar">
-  <span class="brand">game-ui-mcp</span>
+  <span class="brand">uiforge-mcp</span>
   <select id="cid"></select>
   <select id="bg"><option value="checker">Checker</option><option value="dark">Dark</option><option value="light">Light</option><option value="game">Game</option></select>
   <button id="ids" type="button">IDs</button>
@@ -234,7 +234,7 @@ class LiveStudio:
         srv.daemon_threads = True
         self.port = srv.server_address[1]
         self._server = srv
-        self._thread = threading.Thread(target=srv.serve_forever, daemon=True, name="game-ui-live")
+        self._thread = threading.Thread(target=srv.serve_forever, daemon=True, name="uiforge-live")
         self._thread.start()
         return {"running": True, "url": self.url, "active": self._last_canvas}
 

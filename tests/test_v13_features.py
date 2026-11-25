@@ -12,10 +12,10 @@ import numpy as np
 import pytest
 from PIL import Image
 
-from game_ui_mcp import frames, gpu, gpu_wgpu, pbr, render, shader
-from game_ui_mcp import server as s
-from game_ui_mcp import tools_delivery as td
-from game_ui_mcp.store import Store
+from uiforge_mcp import frames, gpu, gpu_wgpu, pbr, render, shader
+from uiforge_mcp import server as s
+from uiforge_mcp import tools_delivery as td
+from uiforge_mcp.store import Store
 
 
 @pytest.fixture()
@@ -270,7 +270,7 @@ def test_import_screenshot_reconstructs_editable_canvas(ws, tmp_path):
 
 
 def test_quality_tiers_style_presets_and_named_material_style(ws):
-    from game_ui_mcp import profiles
+    from uiforge_mcp import profiles
     assert len(profiles.QUALITY_LEVELS) == 4 and len(profiles.STYLE_PRESETS) == 9
 
     res_k = s.set_theme(replace=True, style_preset="kids", quality="simple")
@@ -292,7 +292,7 @@ def test_quality_tiers_style_presets_and_named_material_style(ws):
 
 
 def test_gpu_architecture_cli_and_multi_ide_setup(ws, tmp_path):
-    from game_ui_mcp import cli
+    from uiforge_mcp import cli
     doc = cli.doctor_report()
     assert "hardware" in doc and "active_backend" in doc
     for arch in ("nvidia", "amd", "intel", "apple", "cpu"):
@@ -321,7 +321,7 @@ def test_gpu_architecture_cli_and_multi_ide_setup(ws, tmp_path):
     merged_spec = dict(cli.client_config("claude"), path=str(target_json))
     cli.write_client_config(merged_spec)
     saved = json.loads(target_json.read_text(encoding="utf-8"))
-    assert "other" in saved["mcpServers"] and "game-ui" in saved["mcpServers"]
+    assert "other" in saved["mcpServers"] and "uiforge" in saved["mcpServers"]
 
 
 def test_godot_smoothness_and_unreal_pbr_importer(ws, tmp_path):

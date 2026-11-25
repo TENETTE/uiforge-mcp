@@ -199,8 +199,8 @@ def write_json(path: Path, data: dict) -> None:
 
 
 def update_manifest(out_dir: Path, name: str, entry: dict) -> Path:
-    """Maintain ``game_ui_manifest.json`` in the export folder (one entry per asset)."""
-    path = out_dir / "game_ui_manifest.json"
+    """Maintain ``uiforge_manifest.json`` in the export folder (one entry per asset)."""
+    path = out_dir / "uiforge_manifest.json"
     data: dict = {"assets": {}}
     if path.is_file():
         try:

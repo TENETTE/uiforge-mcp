@@ -1,7 +1,7 @@
 """Errors that reach the model must say what went wrong and how to recover, never an empty message."""
 import pytest
 
-from game_ui_mcp import server as s
+from uiforge_mcp import server as s
 
 
 def _wrapped(fn):
@@ -20,7 +20,7 @@ def test_errors_carry_tool_name_and_a_recovery_hint():
         return {}["radius"]
 
     for fn, needles in ((probe_value, ["probe_value", "width must be > 0", "call probe_value again"]),
-                        (probe_bug, ["unexpected ZeroDivisionError", "likely a game-ui-mcp bug", "Do not repeat"]),
+                        (probe_bug, ["unexpected ZeroDivisionError", "likely a uiforge-mcp bug", "Do not repeat"]),
                         (probe_key, ["missing key 'radius'"])):
         wrapper = _wrapped(fn)
         if wrapper is None:

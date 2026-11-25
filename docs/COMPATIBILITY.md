@@ -22,11 +22,11 @@ This matrix documents official API verification performed via live documentation
 
 | AI Client / IDE | Config File Path | Top-Level Schema Key | Transport | Auto-Setup CLI |
 | --- | --- | --- | --- | --- |
-| **OpenCode v2** | `opencode.json` / `~/.config/opencode/opencode.json` | `mcp.servers.<name>` (`type: "local"`, `command: [...]`) | stdio | `game-ui-mcp setup opencode --write` |
-| **Claude Code** | `.mcp.json` / `~/.claude.json` | `mcpServers.<name>` | stdio | `game-ui-mcp setup claude --write` |
-| **Visual Studio 2022 (17.14+) / 2026** | `%USERPROFILE%\.mcp.json` or `<repo>\.mcp.json` | `servers.<name>` (`type: "stdio"`) | stdio | `game-ui-mcp setup visualstudio --write` |
-| **VS Code (2026 Copilot)** | `<repo>\.mcp.json` (native) / `.vscode/mcp.json` (legacy) | `mcpServers` (native) / `servers` (legacy) | stdio | `game-ui-mcp setup vscode --write` |
-| **Google Antigravity** | `~/.gemini/antigravity/mcp_config.json` | `mcpServers.<name>` | stdio | `game-ui-mcp setup antigravity --write` |
-| **Cursor** | `~/.cursor/mcp.json` or `.cursor/mcp.json` | `mcpServers.<name>` | stdio | `game-ui-mcp setup cursor --write` |
-| **Windsurf** | `~/.codeium/windsurf/mcp_config.json` | `mcpServers.<name>` | stdio | `game-ui-mcp setup windsurf --write` |
-| **ChatGPT (Apps / Connectors)** | Streamable HTTP endpoint | `http://127.0.0.1:8765/mcp` (+ HTTPS tunnel for web) | Streamable HTTP | `game-ui-mcp serve --transport http --port 8765` |
+| **OpenCode v2** | `opencode.json` / `~/.config/opencode/opencode.json` | `mcp.servers.<name>` (`type: "local"`, `command: [...]`) | stdio | `uiforge-mcp setup opencode --write` |
+| **Claude Code** | `.mcp.json` / `~/.claude.json` | `mcpServers.<name>` | stdio | `uiforge-mcp setup claude --write` |
+| **Visual Studio 2022 (17.14+) / 2026** | `%USERPROFILE%\.mcp.json` or `<repo>\.mcp.json` | `servers.<name>` (`type: "stdio"`) | stdio | `uiforge-mcp setup visualstudio --write` |
+| **VS Code (2026 Copilot)** | `<repo>\.mcp.json` (native) / `.vscode/mcp.json` (legacy) | `mcpServers` (native) / `servers` (legacy) | stdio | `uiforge-mcp setup vscode --write` |
+| **Google Antigravity** | `~/.gemini/antigravity/mcp_config.json` | `mcpServers.<name>` | stdio | `uiforge-mcp setup antigravity --write` |
+| **Cursor** | `~/.cursor/mcp.json` or `.cursor/mcp.json` | `mcpServers.<name>` | stdio | `uiforge-mcp setup cursor --write` |
+| **Windsurf** | `~/.codeium/windsurf/mcp_config.json` | `mcpServers.<name>` | stdio | `uiforge-mcp setup windsurf --write` |
+| **ChatGPT (Apps / Connectors)** | Streamable HTTP endpoint | `http://127.0.0.1:8765/mcp` (+ HTTPS tunnel for web) | Streamable HTTP | `uiforge-mcp serve --transport http --port 8765` |

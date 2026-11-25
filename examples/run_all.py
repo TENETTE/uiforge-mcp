@@ -2,7 +2,7 @@
 import asyncio, pathlib, runpy, sys, time
 
 here = pathlib.Path(__file__).parent
-from game_ui_mcp import server as s
+from uiforge_mcp import server as s
 
 tools = asyncio.run(s.mcp.list_tools())
 print(f"== {len(tools)} tool ==")

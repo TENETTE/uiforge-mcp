@@ -11,8 +11,8 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw
 
-from game_ui_mcp import server as ui
-from game_ui_mcp.store import Store
+from uiforge_mcp import server as ui
+from uiforge_mcp.store import Store
 
 HERE = Path(__file__).resolve().parent
 TMP = Path(tempfile.mkdtemp())

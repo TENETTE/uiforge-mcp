@@ -2,8 +2,8 @@
 import numpy as np
 import pytest
 
-from game_ui_mcp import server as s
-from game_ui_mcp.store import Store
+from uiforge_mcp import server as s
+from uiforge_mcp.store import Store
 
 
 @pytest.fixture()
@@ -28,8 +28,8 @@ def test_instructions_fit_clients_and_guide_has_the_rest():
 
 def test_palette_is_ordered_keeps_base_and_reports_contrast(ws):
     res = s.make_palette("#3b82f6", name="brand", apply=True)
-    from game_ui_mcp.tools_design import _luminance
-    from game_ui_mcp.colors import parse_color
+    from uiforge_mcp.tools_design import _luminance
+    from uiforge_mcp.colors import parse_color
     lum = [_luminance(parse_color(v)) for v in res["scale"].values()]
     assert lum == sorted(lum, reverse=True)
     assert "#3b82f6" in res["scale"].values()

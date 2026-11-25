@@ -5,8 +5,8 @@ Thanks for helping. Bug reports, examples and pull requests are welcome.
 ## Setup
 
 ```bash
-git clone https://github.com/TENETTE/game-ui-mcp
-cd game-ui-mcp
+git clone https://github.com/TENETTE/uiforge-mcp
+cd uiforge-mcp
 uv venv && uv pip install -e ".[dev]"
 uv run pytest
 ```
@@ -24,7 +24,7 @@ Plain `python -m venv .venv` + `pip install -e ".[dev]"` works too (Python 3.10+
 - Only add fonts or images you have the right to share under an open licence, and include the licence
   file next to them.
 - If a change affects how the model should use a tool, update its docstring, `docs/GUIDE.md` and
-  `skill/game-ui-mcp/SKILL.md`.
+  `skill/uiforge-mcp/SKILL.md`.
 
 ## Reporting bugs
 

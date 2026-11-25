@@ -1,4 +1,4 @@
-# game-ui-mcp — ayrıntılı kılavuz
+# uiforge-mcp — ayrıntılı kılavuz
 
 Kısa tanıtım ve kurulum için [README.tr.md](../README.tr.md) (English: [README.md](../README.md)).
 
@@ -23,12 +23,12 @@ Kısa tanıtım ve kurulum için [README.tr.md](../README.tr.md) (English: [READ
 - **Öz denetim:** `review_canvas` kesilen gölgeyi, düşük WCAG kontrastını, küçük yazıyı, eksik glifi, yarım pikseli, bozuk hizalamayı ve token dışı renkleri bulur; `inspect_pixels` tam renk okur; `view_image` referans görseli ve baskın paletini verir; `fit_canvas` kenar payını ayarlar.
 - **Yazı ve yerelleştirme:** 10 gömülü OFL font + sistem/çalışma klasörü fontları, Arapça/İbranice/Hintçe/Tayca/CJK için HarfBuzz + python-bidi şekillendirme ve gömülü Noto yedeği, renkli emoji, OpenType özellikleri (`tnum`, `smcp`), değişken eksenler, çember/yol üstü yazı, `uppercase: "tr"`, `set_strings` dil tabloları ve `pseudo` / `pseudo-long` / `pseudo-rtl` stres testi.
 - **Animasyon ve video:** keyframe + ease (`spring-out`, `back-out`, cubic-bezier) + yol üstü hareket (`motion`) + hareket bulanıklığı (`motion_blur`). Statik katman ön-pişirme + paralel iş parçacıklarıyla hızlı render. Çıktı: vektör Lottie JSON, doğrudan `ffmpeg` akışıyla MP4 / saydam WebM, sprite sheet, kare dizisi, GIF / APNG / WebP, DOTween ve Roblox TweenService JSON.
-- **Teslim ve motor sahneleri:** Unity (9-slice + `GameUiImporter.cs`, UI Toolkit `.uxml`/`.uss` + `Controller.cs`, **uGUI C# Builder** `unity-ugui`), Godot 4 (`.tscn` + gamepad/veri/SFX'li `_controller.gd` + `.stylebox.tres`), Unreal (Box brush + Python importer), Roblox (`LocalScript` + `GameUiAssets.luau`), **React (`css="css"` veya `"tailwind"`)**, responsive Web sitesi, düzenlenebilir SVG, **PackBits RLE sıkıştırmalı katmanlı PSD**, çok sayfalı vektör PDF, iOS/Android/Web boyut setleri, ICO, BMFont, spec ve prototip.
+- **Teslim ve motor sahneleri:** Unity (9-slice + `UiForgeImporter.cs`, UI Toolkit `.uxml`/`.uss` + `Controller.cs`, **uGUI C# Builder** `unity-ugui`), Godot 4 (`.tscn` + gamepad/veri/SFX'li `_controller.gd` + `.stylebox.tres`), Unreal (Box brush + Python importer), Roblox (`LocalScript` + `UiForgeAssets.luau`), **React (`css="css"` veya `"tailwind"`)**, responsive Web sitesi, düzenlenebilir SVG, **PackBits RLE sıkıştırmalı katmanlı PSD**, çok sayfalı vektör PDF, iOS/Android/Web boyut setleri, ICO, BMFont, spec ve prototip.
 
 ## Dosyalar nereye gidiyor
 
-- Proje kökünde `.gameui/` klasörü varsa server **otomatik olarak** orayı kullanır (Git dostu, anahtarları sıralı JSON).
-- Yoksa varsayılan çalışma klasörü `~/GameUI` (Windows'ta `C:\Users\SEN\GameUI`) veya `GAME_UI_MCP_DIR` ortam değişkenidir.
+- Proje kökünde `.uiforge/` klasörü varsa server **otomatik olarak** orayı kullanır (Git dostu, anahtarları sıralı JSON).
+- Yoksa varsayılan çalışma klasörü `~/UIForge` (Windows'ta `C:\Users\SEN\UIForge`) veya `UIFORGE_MCP_DIR` ortam değişkenidir.
 
 | Klasör / Dosya | İçerik |
 | --- | --- |
@@ -54,7 +54,7 @@ Kısa tanıtım ve kurulum için [README.tr.md](../README.tr.md) (English: [READ
 | **Dışa aktarma (12)** | `export_png`, `export_svg`, `export_pdf`, `export_web`, `export_react`, `export_asset`, **`export_pbr_maps`**, `export_layers`, `export_psd`, `export_atlas`, `export_bitmap_font`, `write_engine_helpers` |
 | **Teslim ve motorlar (6)** | `export_spec`, `export_theme`, `set_link`, `set_interaction`, `export_prototype`, `export_screen` |
 
-- **MCP Kaynakları:** `gameui://materials`, `gameui://workspace`, `gameui://guide/{topic}`.
+- **MCP Kaynakları:** `uiforge://materials`, `uiforge://workspace`, `uiforge://guide/{topic}`.
 - **MCP Prompt'ları:** `design_game_hud`, `design_rpg_panel`, `audit_and_polish`.
 - **Yeni çıktı yetenekleri:** `export_pbr_maps` (Albedo / Tangent Normal OpenGL & DirectX / Roughness / Metallic / AO / Height / ORM + Godot 4 `CanvasTexture .tres`), `export_animation(format="dotlottie")` (`animation="all"` ile tek `.lottie` arşivi), `export_atlas(format="texturepacker" | "godot" | "unity" | "css" | "json")`, `export_react(typescript=true)` (`.tsx`).
 - **Lisanslar:** Tam bağımlılık ve gömülü SIL OFL-1.1 font dökümü için [THIRD_PARTY_LICENSES.md](../THIRD_PARTY_LICENSES.md). HarfBuzz + yerleşik saf Python MIT UAX #9 BiDi kullanılır (LGPL `python-bidi` kaldırıldı).
@@ -111,15 +111,15 @@ Kısa tanıtım ve kurulum için [README.tr.md](../README.tr.md) (English: [READ
 
 | Motor | Sahne / Sprite çıktısı | Yardımcılar ve kontrolcü |
 | --- | --- | --- |
-| **Unity (UI Toolkit & uGUI)** | `export_screen(engine="unity")` → `.uxml` + `.uss` + `Controller.cs`; `engine="unity-ugui"` → C# `Canvas`/`RectTransform` oluşturucu | `GameUiImporter.cs` (`.gameui.json` okur, 9-slice ayarlar), C# token'lar |
+| **Unity (UI Toolkit & uGUI)** | `export_screen(engine="unity")` → `.uxml` + `.uss` + `Controller.cs`; `engine="unity-ugui"` → C# `Canvas`/`RectTransform` oluşturucu | `UiForgeImporter.cs` (`.uiforge.json` okur, 9-slice ayarlar), C# token'lar |
 | **Godot 4** | `export_screen(engine="godot")` → `.tscn` + `_controller.gd` (veri bağlama, `sfx_requested` sinyali, gamepad `focus_neighbor_*`) | `<ad>.stylebox.tres`, GDScript token'lar |
-| **Unreal Engine** | `export_asset(engine="unreal")` (normalize Box margin) | `import_game_ui.py` (Editör Python betiği) |
-| **Roblox** | `export_screen(engine="roblox")` → `LocalScript` ScreenGui oluşturucu | `GameUiAssets.luau` (`SliceCenter` / `SliceScale`), Luau token'lar |
+| **Unreal Engine** | `export_asset(engine="unreal")` (normalize Box margin) | `import_uiforge.py` (Editör Python betiği) |
+| **Roblox** | `export_screen(engine="roblox")` → `LocalScript` ScreenGui oluşturucu | `UiForgeAssets.luau` (`SliceCenter` / `SliceScale`), Luau token'lar |
 
 ## Performans ve GPU
 
 - **OpenCV C++ SIMD (varsayılan):** `opencv-python-headless` ile `distance_field` (`cv2.distanceTransform`, 512×512'de ~2.8 ms), Scharr normal gradyanları, `cv2.GaussianBlur`, morfolojik disk dilasyon/erozyon ve `cv2.remap` cam kırılması doğrudan AVX2/NEON SIMD ile çalışır.
-- **Fused CUDA 12 (`[gpu]`):** `pip install -e ".[gpu]"` (CuPy) ile 65.536 piksel üstü shader dolguları tek bir CUDA C++ çekirdeğine derlenir (`1024×1024 fbm+voronoi` RTX 4060 Ti'da ~3–6 ms). `GAME_UI_MCP_GPU=0` GPU'yu kapatır; CPU ile aynı görsel sonuç üretilir.
+- **Fused CUDA 12 (`[gpu]`):** `pip install -e ".[gpu]"` (CuPy) ile 65.536 piksel üstü shader dolguları tek bir CUDA C++ çekirdeğine derlenir (`1024×1024 fbm+voronoi` RTX 4060 Ti'da ~3–6 ms). `UIFORGE_MCP_GPU=0` GPU'yu kapatır; CPU ile aynı görsel sonuç üretilir.
 - **Önbellek ve akış:** 128 MB LRU eleman render önbelleği, bounding-box kırpma, animasyonda statik katman ön-pişirme, `ffmpeg` stdin akışı ve PackBits RLE PSD sıkıştırma.
 
 ## Bilinen sınırlar
@@ -144,4 +144,4 @@ Mimari, doğrulama betikleri ve yol haritası için [DEVELOPMENT.md](DEVELOPMENT
 
 ## Fontlar
 
-`src/game_ui_mcp/assets/fonts/` altındaki fontlar SIL Open Font License ile dağıtılır (`OFL.txt`). `noto/` altında Arapça, İbranice, Devanagari, Bengalce, Tamil ve Tayca gömülüdür; CJK fontları sistemden gelir.
+`src/uiforge_mcp/assets/fonts/` altındaki fontlar SIL Open Font License ile dağıtılır (`OFL.txt`). `noto/` altında Arapça, İbranice, Devanagari, Bengalce, Tamil ve Tayca gömülüdür; CJK fontları sistemden gelir.

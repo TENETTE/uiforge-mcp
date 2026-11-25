@@ -8,8 +8,8 @@ Writes shading_kit.png (contact sheet), orb_layers.png (the orb's layers side by
 import tempfile
 from pathlib import Path
 
-from game_ui_mcp import server as ui
-from game_ui_mcp.store import Store
+from uiforge_mcp import server as ui
+from uiforge_mcp.store import Store
 
 OUT = Path(__file__).resolve().parent
 ui.set_store(Store(Path(tempfile.mkdtemp()) / "ws"))

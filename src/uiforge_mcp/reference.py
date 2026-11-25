@@ -179,7 +179,7 @@ export_animation "mp4" / "webm" writes video (needs ffmpeg); repeat plays a loop
     "export": """\
 Which export to use:
   export_asset   one engine-ready sprite (engine: unity | unreal | roblox | godot | generic) with 9-slice
-                 borders (nine_slice: "auto") and a .gameui.json; write_engine_helpers adds the importer.
+                 borders (nine_slice: "auto") and a .uiforge.json; write_engine_helpers adds the importer.
   export_pbr_maps  real-time engine PBR texture map set (beauty, albedo, tangent normal OpenGL/DirectX,
                  roughness, metallic, ao, height, packed ORM, emissive) + Godot 4 CanvasTexture .tres.
   export_png     PNG / WebP / JPG / ICO at scales [1, 2], exact sizes, or preset "ios" | "android" | "web"

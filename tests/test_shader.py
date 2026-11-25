@@ -2,8 +2,8 @@
 import numpy as np
 import pytest
 
-from game_ui_mcp import server as s
-from game_ui_mcp.store import Store
+from uiforge_mcp import server as s
+from uiforge_mcp.store import Store
 
 
 @pytest.fixture()
@@ -43,7 +43,7 @@ def test_shader_param_animates(ws):
     s.create_animation("c", "pulse", duration=1)
     s.set_keyframes("c", "pulse", "box", "style.fill.params.t", [{"t": 0, "value": 0}, {"t": 1, "value": 1}])
     st = s.store()
-    from game_ui_mcp import animation as anim
+    from uiforge_mcp import animation as anim
     c = st.get("c")
     frame, _ = anim.apply_animation(c, c["animations"]["pulse"], 0.5, {})
     red = np.asarray(st.renderer(frame).render(include_background=False))[10, 10, 0]
@@ -62,7 +62,7 @@ def test_shader_rejects_anything_but_math(ws, code):
 
 
 def test_shader_too_heavy_is_refused_before_running(ws, monkeypatch):
-    from game_ui_mcp import gpu, shader
+    from uiforge_mcp import gpu, shader
     monkeypatch.setattr(gpu, "module_for", lambda pixels: np)
     heavy = ";".join(f"q{i} = voronoi(x/9 + {i}, y/9)" for i in range(70)) + "; r = q1; g = 0; b = 0"
     with pytest.raises(ValueError, match="too heavy"):

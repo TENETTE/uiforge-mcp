@@ -8,8 +8,8 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from game_ui_mcp import server as s
-from game_ui_mcp.store import Store
+from uiforge_mcp import server as s
+from uiforge_mcp.store import Store
 
 SAMPLES = [
     ("en", "Start game"), ("tr", "Oyuna başla ışık İğde"), ("de", "Spiel starten Größe"), ("ru", "Начать игру"),

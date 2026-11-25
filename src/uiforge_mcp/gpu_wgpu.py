@@ -2,7 +2,7 @@
 
 Compiles sandboxed shader ASTs directly into WGSL @compute shaders with bit-exact u32 lattice hashing
 matching CPU NumPy and CUDA C++, and provides a WGSL Cook-Torrance GGX PBR compute shader.
-Optional extra: pip install "game-ui-mcp[wgpu]".
+Optional extra: pip install "uiforge-mcp[wgpu]".
 """
 
 from __future__ import annotations
@@ -161,7 +161,7 @@ def available() -> bool:
 def info() -> dict[str, Any]:
     dev = _init_device()
     if dev is None:
-        return {"wgpu": False, "hint": 'install with pip install "game-ui-mcp[wgpu]" for cross-GPU Vulkan/DX12/Metal acceleration'}
+        return {"wgpu": False, "hint": 'install with pip install "uiforge-mcp[wgpu]" for cross-GPU Vulkan/DX12/Metal acceleration'}
     inf = _ADAPTER_INFO or {}
     return {"wgpu": True, "device": str(inf.get("device", "")), "backend_type": str(inf.get("backend_type", "")),
             "adapter_type": str(inf.get("adapter_type", "")), "vendor": str(inf.get("vendor", ""))}

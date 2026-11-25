@@ -505,7 +505,7 @@ def build_dotlottie(store, canvas: dict, anim_names: list[str], fps: float | Non
         sm_doc = state_machine if isinstance(state_machine, dict) else build_state_machine(canvas, [a["id"] for a in manifest_anims], anim_meta)
         manifest: dict[str, Any] = {
             "version": "2",
-            "generator": "game-ui-mcp",
+            "generator": "uiforge-mcp",
             "animations": manifest_anims,
         }
         sm_id = None

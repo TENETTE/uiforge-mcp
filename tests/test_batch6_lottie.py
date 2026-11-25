@@ -9,9 +9,9 @@ import numpy as np
 import pytest
 from PIL import Image
 
-from game_ui_mcp import animation as anim_mod
-from game_ui_mcp import server as s
-from game_ui_mcp.store import Store
+from uiforge_mcp import animation as anim_mod
+from uiforge_mcp import server as s
+from uiforge_mcp.store import Store
 
 
 @pytest.fixture()

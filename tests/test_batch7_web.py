@@ -4,8 +4,8 @@ import re
 
 import pytest
 
-from game_ui_mcp import server as s
-from game_ui_mcp.store import Store
+from uiforge_mcp import server as s
+from uiforge_mcp.store import Store
 
 
 @pytest.fixture()
@@ -64,7 +64,7 @@ def test_font_names_cannot_break_out_of_css(ws):
     s.create_canvas("c", 100, 40)
     with pytest.raises(ValueError, match="not found"):
         s.add_text("c", "x", x=0, y=0, font="Inter'}body{display:none}", id="t")
-    from game_ui_mcp.webexport import _Ctx
+    from uiforge_mcp.webexport import _Ctx
     import types
     lay = types.SimpleNamespace(family="Inter'}x{", path=None, var_weight=None, weight=400)
     assert "'" not in _Ctx.font_face(types.SimpleNamespace(), lay)[1:-30].replace("', system-ui", "")

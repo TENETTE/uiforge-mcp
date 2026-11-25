@@ -2,7 +2,7 @@
 
 ## 0.13.0 - 2026-11-25
 
-- **Cross-GPU WebGPU Compute Backend (`gpu_wgpu.py`, `[wgpu]` extra):** modular pluggable backend registry (`GAME_UI_MCP_GPU=auto|cuda|wgpu|cpu`) compiling sandboxed shader ASTs to WGSL `@compute` with bit-exact `u32` lattice hashing (`max_diff < 1e-4` vs CPU, **32× faster** at 512×512 on RTX 4060 Ti Vulkan) plus a WGSL Cook-Torrance GGX PBR compute shader (**7.1× faster** than CPU). Targets Vulkan, DirectX 12 and Metal through `wgpu-py` (physically verified on NVIDIA RTX 4060 Ti Vulkan/D3D12; AMD, Intel and Apple Silicon architecturally targeted via standard WGSL, not physically tested).
+- **Cross-GPU WebGPU Compute Backend (`gpu_wgpu.py`, `[wgpu]` extra):** modular pluggable backend registry (`UIFORGE_MCP_GPU=auto|cuda|wgpu|cpu`) compiling sandboxed shader ASTs to WGSL `@compute` with bit-exact `u32` lattice hashing (`max_diff < 1e-4` vs CPU, **32× faster** at 512×512 on RTX 4060 Ti Vulkan) plus a WGSL Cook-Torrance GGX PBR compute shader (**7.1× faster** than CPU). Targets Vulkan, DirectX 12 and Metal through `wgpu-py` (physically verified on NVIDIA RTX 4060 Ti Vulkan/D3D12; AMD, Intel and Apple Silicon architecturally targeted via standard WGSL, not physically tested).
 - **Custom `.hdr` & `.exr` HDRI Environment Maps (IBL):** pure-Python Radiance `.hdr` (RGBE + RLE) decoder and pure-Python OpenEXR `.exr` (uncompressed / ZIPS / ZIP HALF & FLOAT) decoder, plus workspace-level `set_theme(environment=...)` and canvas-level `update_canvas(environment=...)` IBL settings that automatically light all PBR materials.
 - **AAA Procedural Frame Generator Upgrade (`frames.py`):** upgraded `add_frame` to 9 presets (adding `royal_ornate` and `fantasy_parchment`) with symmetrical cubic-Bézier corner filigree scrollwork, winged gemstone crests, bottom fleur-de-lis finials, forged iron corner hinge clasps, perimeter blacksmith rivet rings, tactical HUD telemetry rulers, LED indicators, and warning chevrons.
 - **dotLottie v2.0 Interactive State Machines (`lottie.py`):** upgraded `export_animation(..., format="dotlottie")` to the official dotLottie v2.0 spec (`manifest.json` `version: "2"`, `a/<id>.json` animations, `s/<id>.json` state machine synthesized from `set_interaction` + `set_binding` + animations with `PlaybackState`, `Transition`/`Tweened`, `PointerEnter`/`PointerExit`/`PointerDown`/`PointerUp`/`Click`/`OnComplete`, and typed `inputs`/`guards`).
@@ -22,10 +22,10 @@
 - **New export formats & AI Ergonomics:** compressed **dotLottie (`.lottie`)** multi-animation archive (`export_animation(..., animation="all", format="dotlottie")`), **TypeScript React (`.tsx`)** (`export_react(..., typescript=True)`), industry-standard **TexturePacker / Godot `AtlasTexture` / Unity / CSS** sprite atlases (`export_atlas(..., format=...)`), expanded atomic `batch` ops (`add_frame`, `set_pin`, `set_state`, `set_binding`, `set_interaction`, `set_link`, `align_elements`, `arrange_elements`, `delete_layer`), native MCP Resources & Prompts, atomic JSON writes in `store.py`.
 - **Legal & license hygiene:** replaced LGPL-3.0 `python-bidi` with a clean pure-Python MIT Unicode UAX #9 BiDi resolver in `shaping.py`; added `THIRD_PARTY_LICENSES.md` documenting all dependencies and bundled SIL OFL-1.1 fonts; rebuilt hero banner and showcase examples.
 - **39 built-in materials (+16 new):** rebuilt all 39 materials on Cook-Torrance GGX PBR & domain-warped shaders (`gold`, `silver`, `chrome`, `bronze`, `copper`, `steel`, `iron`, `radial_metal`, `hammered_gold`, `rust`, `wood`, `stone`, `runic_stone`, `marble`, `obsidian`, `jade`, `gem`, `ruby`, `emerald`, `lava`, `ice`, `leather`, `paper`, `aged_parchment`, `fabric`, `carbon_twill`, `wax_seal`, `enamel`, `glass`, `liquid_glass`, `hologram`, `energy_shield`, `foil_holographic`, `neon`, `plastic`, `candy_gloss`, `clay_3d`, `rubber`, `jelly`). Fixed `theme.json` persistence for custom materials and `light: null` / `pbr: null` overrides.
-- **Reactive data binding (`set_binding`):** canvas variables and sandboxed AST expressions driving bar widths, colours, visibility and `{placeholders}`; live override in `preview(..., data=...)`, `window.gameuiSetData()` in web export, `data` prop in React, and typed controllers in engines.
+- **Reactive data binding (`set_binding`):** canvas variables and sandboxed AST expressions driving bar widths, colours, visibility and `{placeholders}`; live override in `preview(..., data=...)`, `window.uiforgeSetData()` in web export, `data` prop in React, and typed controllers in engines.
 - **Engine controllers & Unity uGUI (`export_screen`):** added `engine="unity-ugui"` C# Canvas/RectTransform builder; automatic interactive controller generation (`_controller.gd` for Godot 4 with gamepad `focus_neighbor_*`, `Controller.cs` for Unity UI Toolkit) wired to `set_binding`, `set_interaction` and optional `sfx` audio events.
 - **Live Preview Studio (`live_preview`):** zero-dependency localhost (`127.0.0.1`) HTTP + SSE live browser previewer that auto-reloads on every edit with IDs, safe-area guides, backdrop switcher and cursor coordinate inspection.
-- **Web / React upgrades:** Tailwind CSS utility mode (`export_react(..., css="tailwind")`), keyboard arrow + Web Gamepad API focus navigation, `onSfx` hook, and Git-friendly `.gameui/` auto-detected project-local workspace mode.
+- **Web / React upgrades:** Tailwind CSS utility mode (`export_react(..., css="tailwind")`), keyboard arrow + Web Gamepad API focus navigation, `onSfx` hook, and Git-friendly `.uiforge/` auto-detected project-local workspace mode.
 
 ## 0.11.0 - 2026-11-16
 
@@ -86,7 +86,7 @@ Layout, components, effects, text and export additions:
 
 ## 0.5.0 - 2026-11-14
 
-- Optional GPU acceleration: `pip install "game-ui-mcp[gpu]"` (CuPy, CUDA 12) runs shader fills and large
+- Optional GPU acceleration: `pip install "uiforge-mcp[gpu]"` (CuPy, CUDA 12) runs shader fills and large
   blurs on an NVIDIA GPU, with an automatic CPU fallback.
 
 ## 0.4.0 - 2026-11-14

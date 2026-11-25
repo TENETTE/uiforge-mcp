@@ -2,36 +2,36 @@
 
 [English](README.md) · **Türkçe**
 
-# game-ui-mcp
+# uiforge-mcp
 
 ### Yapay zekâ ajanları için açık kaynaklı, yerel tasarım, materyal, animasyon ve oyun motoru dışa aktarma MCP sunucusu.
 
 **Oyun HUD'u, menü ya da uygulama ekranını anlat. Canlı izle. Abonelik, çağrı limiti ya da görsel üretim modeli olmadan motora hazır görseli, etkileşimli kodu ve videoyu al.**
 
-[![tests](https://img.shields.io/github/actions/workflow/status/TENETTE/game-ui-mcp/tests.yml?branch=main&style=flat-square&label=tests)](https://github.com/TENETTE/game-ui-mcp/actions/workflows/tests.yml)
+[![tests](https://img.shields.io/github/actions/workflow/status/TENETTE/uiforge-mcp/tests.yml?branch=main&style=flat-square&label=tests)](https://github.com/TENETTE/uiforge-mcp/actions/workflows/tests.yml)
 [![MCP tools](https://img.shields.io/badge/MCP-92_tool_+_Kaynak_+_Prompt-7c5cff?style=flat-square)](#toollar)
 [![Materyaller](https://img.shields.io/badge/Materyal-39_Cook--Torrance_PBR-f59e0b?style=flat-square)](#materyaller)
 [![PBR Haritaları](https://img.shields.io/badge/Çıktı-Oyun_Motoru_%7C_.NET_WPF_%7C_C++_Qt_ImGui_%7C_TSX-ec4899?style=flat-square)](#neye-çıktı-verir)
 [![GPU isteğe bağlı](https://img.shields.io/badge/GPU-CUDA_12_%2B_WebGPU_(wgpu)-76b900?style=flat-square)](#performans)
 [![MIT lisansı](https://img.shields.io/badge/lisans-MIT-22c55e?style=flat-square)](LICENSE)
 
-[Neden game-ui-mcp](#neden-game-ui-mcp) · [Hızlı başlangıç](#hızlı-başlangıç) · [Neye çıktı verir](#neye-çıktı-verir) · [Örnekler](#örnekler) · [Performans](#performans) · [Özellikler](#özellikler) · [Tool'lar](#toollar) · [SSS](#sss)
+[Neden uiforge-mcp](#neden-uiforge-mcp) · [Hızlı başlangıç](#hızlı-başlangıç) · [Neye çıktı verir](#neye-çıktı-verir) · [Örnekler](#örnekler) · [Performans](#performans) · [Özellikler](#özellikler) · [Tool'lar](#toollar) · [SSS](#sss)
 
 ```bash
-claude mcp add game-ui -s user -- uvx --from git+https://github.com/TENETTE/game-ui-mcp game-ui-mcp
+claude mcp add uiforge -s user -- uvx --from git+https://github.com/TENETTE/uiforge-mcp uiforge-mcp
 ```
 
 <br />
 
-<img src="docs/banner.png" alt="game-ui-mcp afişi, game-ui-mcp ile çizildi" width="1200" />
+<img src="docs/banner.png" alt="uiforge-mcp afişi, uiforge-mcp ile çizildi" width="1200" />
 
 </div>
 
 ---
 
-## Neden game-ui-mcp?
+## Neden uiforge-mcp?
 
-Ücretli tasarım araçları yapay zekâ iş akışlarını kişi başı aboneliklerle, aylık MCP çağrı kotalarıyla, filigranlarla ya da bulut bağımlılığıyla kısıtlıyor. **game-ui-mcp**, yapay zekâ kodlama ve tasarım ajanları için sıfırdan kurulmuş **%100 yerel, MIT lisanslı** açık kaynak çözümdür:
+Ücretli tasarım araçları yapay zekâ iş akışlarını kişi başı aboneliklerle, aylık MCP çağrı kotalarıyla, filigranlarla ya da bulut bağımlılığıyla kısıtlıyor. **uiforge-mcp**, yapay zekâ kodlama ve tasarım ajanları için sıfırdan kurulmuş **%100 yerel, MIT lisanslı** açık kaynak çözümdür:
 
 - **Deterministik vektör ve Cook-Torrance PBR motoru:** Difüzyon halüsinasyonu yok, bozuk yazı yok, internete veri yüklenmez. Her piksel düzenlenebilir vektör şekillerden, HarfBuzz yazı motorundan, HDR stüdyo yansımalı ve ACES ton eşlemeli Cook-Torrance GGX PBR materyallerden ve keyframe izlerinden üretilir.
 - **Kapalı görsel geri bildirim döngüsü:** Ajan çizer, `preview` ile kendi çıktısına bakar, `review_canvas` ile kontrast/hizalama/taşma denetimi yapar, hataları düzeltir; sen de `live_preview` ile tarayıcıda her adımı canlı izlersin.
@@ -39,12 +39,12 @@ claude mcp add game-ui -s user -- uvx --from git+https://github.com/TENETTE/game
 
 ### Ücretli araçlarla karşılaştırma
 
-| Özellik | **game-ui-mcp** | Figma + MCP | Pencil (`pen.dev`) | Rive | Envy UI |
+| Özellik | **uiforge-mcp** | Figma + MCP | Pencil (`pen.dev`) | Rive | Envy UI |
 | --- | :---: | :---: | :---: | :---: | :---: |
 | **Fiyat ve lisans** | **\$0 · MIT Açık Kaynak** | \$16–\$90/kişi/ay | \$16–\$48/ay | \$9–\$120/ay (ücretsizde splash) | Ücretli masaüstü |
 | **MCP çağrı limiti** | **Sınırsız · Yerel** | Kotalı (ücretsiz 20/ay, Pro 200/gün) | Ücretsiz 5 ajan-günü/ay | CLI yayın kotası | — |
 | **%100 çevrimdışı çalışma** | ✅ | ❌ Bulut | ✅ | ❌ Bulut editör | ✅ |
-| **Git içinde proje dosyaları** | ✅ Otomatik `.gameui/` | ❌ | ✅ `.pen` | ❌ Kapalı `.riv` | ✅ |
+| **Git içinde proje dosyaları** | ✅ Otomatik `.uiforge/` | ❌ | ✅ `.pen` | ❌ Kapalı `.riv` | ✅ |
 | **Canlı tarayıcı önizlemesi** | ✅ `live_preview` (SSE) | ✅ | ✅ | ✅ | ✅ |
 | **Unity / Unreal / Godot / Roblox** | ✅ 4 motor + controller + yerel bileşenler | ❌ Elle kurulum | ❌ Web/HTML | Kısmi (eklenti runtime) | Godot / Unity / Web |
 | **C# .NET (WPF/Avalonia/WinUI) & C++ (Qt/ImGui)** | ✅ Yerel XAML / QML / ImGui + ViewModel | ❌ | ❌ | ❌ | ❌ |
@@ -69,18 +69,18 @@ GPU mimarini otomatik algıla (`nvidia` / `amd` / `intel` / `apple` / `cpu`) ve 
 
 ```bash
 # GPU, aktif arka uç ve kurulu araçları denetle
-uvx --from git+https://github.com/TENETTE/game-ui-mcp game-ui-mcp doctor
+uvx --from git+https://github.com/TENETTE/uiforge-mcp uiforge-mcp doctor
 
 # IDE yapılandırmasını otomatik yaz (mevcut diğer MCP sunucularını koruyarak birleştirir)
-uvx --from git+https://github.com/TENETTE/game-ui-mcp game-ui-mcp setup opencode --write
-uvx --from git+https://github.com/TENETTE/game-ui-mcp game-ui-mcp setup claude --write
-uvx --from git+https://github.com/TENETTE/game-ui-mcp game-ui-mcp setup visualstudio --write
-uvx --from git+https://github.com/TENETTE/game-ui-mcp game-ui-mcp setup vscode --scope project --write
-uvx --from git+https://github.com/TENETTE/game-ui-mcp game-ui-mcp setup antigravity --write
-uvx --from git+https://github.com/TENETTE/game-ui-mcp game-ui-mcp setup cursor --write
+uvx --from git+https://github.com/TENETTE/uiforge-mcp uiforge-mcp setup opencode --write
+uvx --from git+https://github.com/TENETTE/uiforge-mcp uiforge-mcp setup claude --write
+uvx --from git+https://github.com/TENETTE/uiforge-mcp uiforge-mcp setup visualstudio --write
+uvx --from git+https://github.com/TENETTE/uiforge-mcp uiforge-mcp setup vscode --scope project --write
+uvx --from git+https://github.com/TENETTE/uiforge-mcp uiforge-mcp setup antigravity --write
+uvx --from git+https://github.com/TENETTE/uiforge-mcp uiforge-mcp setup cursor --write
 
 # ChatGPT (Streamable HTTP MCP sunucusu)
-uvx --from git+https://github.com/TENETTE/game-ui-mcp game-ui-mcp serve --transport http --port 8765
+uvx --from git+https://github.com/TENETTE/uiforge-mcp uiforge-mcp serve --transport http --port 8765
 ```
 
 Elle yapılandırma örnekleri için [`configs/README.md`](configs/README.md), güncel 2026 motor/API uyumluluk matrisi için [`docs/COMPATIBILITY.md`](docs/COMPATIBILITY.md) dosyasına bak.
@@ -89,11 +89,11 @@ Elle yapılandırma örnekleri için [`configs/README.md`](configs/README.md), g
 
 | GPU Mimarisi | Kurulum Eki | Kullanılan Arka Uç |
 | --- | --- | --- |
-| **NVIDIA (CUDA 12 + WebGPU)** | `game-ui-mcp[nvidia]` (veya `[gpu]`) | Birleşik CuPy CUDA 12 + `wgpu` yedek |
-| **AMD (Vulkan / DirectX 12)** | `game-ui-mcp[amd]` | Ortak taşınabilir `wgpu` WGSL compute |
-| **Intel Arc / Xe (Vulkan / D3D12)** | `game-ui-mcp[intel]` | Ortak taşınabilir `wgpu` WGSL compute |
-| **Apple Silicon (Metal)** | `game-ui-mcp[apple]` | Ortak taşınabilir `wgpu` WGSL compute |
-| **Yalnızca CPU (Evrensel)** | `game-ui-mcp` (varsayılan / `[cpu]`) | OpenCV C++ SIMD + NumPy (0 GPU bağımlılığı) |
+| **NVIDIA (CUDA 12 + WebGPU)** | `uiforge-mcp[nvidia]` (veya `[gpu]`) | Birleşik CuPy CUDA 12 + `wgpu` yedek |
+| **AMD (Vulkan / DirectX 12)** | `uiforge-mcp[amd]` | Ortak taşınabilir `wgpu` WGSL compute |
+| **Intel Arc / Xe (Vulkan / D3D12)** | `uiforge-mcp[intel]` | Ortak taşınabilir `wgpu` WGSL compute |
+| **Apple Silicon (Metal)** | `uiforge-mcp[apple]` | Ortak taşınabilir `wgpu` WGSL compute |
+| **Yalnızca CPU (Evrensel)** | `uiforge-mcp` (varsayılan / `[cpu]`) | OpenCV C++ SIMD + NumPy (0 GPU bağımlılığı) |
 
 ### Seçilebilir Kalite Seviyeleri ve Tasarım Stilleri
 
@@ -104,7 +104,7 @@ Her çıktı AAA veya aşırı detaylı olmak zorunda değil. Proje (`set_theme`
 ### Claude Code
 
 ```bash
-claude mcp add game-ui -s user -- uvx --from git+https://github.com/TENETTE/game-ui-mcp game-ui-mcp
+claude mcp add uiforge -s user -- uvx --from git+https://github.com/TENETTE/uiforge-mcp uiforge-mcp
 ```
 
 ### Cursor, Windsurf, Claude Desktop, Antigravity ve diğer MCP istemcileri
@@ -114,9 +114,9 @@ MCP ayar dosyana ekle (VS Code `.vscode/mcp.json` içinde `"mcpServers"` yerine 
 ```json
 {
   "mcpServers": {
-    "game-ui": {
+    "uiforge": {
       "command": "uvx",
-      "args": ["--from", "git+https://github.com/TENETTE/game-ui-mcp", "game-ui-mcp"]
+      "args": ["--from", "git+https://github.com/TENETTE/uiforge-mcp", "uiforge-mcp"]
     }
   }
 }
@@ -127,17 +127,17 @@ Kaydettikten sonra istemciyi yeniden başlat.
 <details>
 <summary><strong>İsteğe bağlı ekler: NVIDIA GPU (CUDA), Video (ffmpeg), Git-yerel modu ve Skill</strong></summary>
 
-- **Çapraz GPU WebGPU hızlandırması (`[wgpu]`):** `wgpu-py` (Vulkan / DirectX 12 / Metal) üzerinden shader'ları ve Cook-Torrance PBR'ı standart WGSL `@compute` olarak çalıştırır (RTX 4060 Ti Vulkan'da shader'da **32×**, PBR'da **7.1×** hızlanma). `GAME_UI_MCP_GPU=wgpu|cuda|cpu|auto` ile seçilir. *(Not: NVIDIA RTX 4060 Ti Vulkan/D3D12 üzerinde fiziksel test edildi; AMD, Intel ve Apple Silicon Metal standart WGSL ile mimari olarak hedeflendi ancak o donanımlarda fiziksel test edilmedi.)*
+- **Çapraz GPU WebGPU hızlandırması (`[wgpu]`):** `wgpu-py` (Vulkan / DirectX 12 / Metal) üzerinden shader'ları ve Cook-Torrance PBR'ı standart WGSL `@compute` olarak çalıştırır (RTX 4060 Ti Vulkan'da shader'da **32×**, PBR'da **7.1×** hızlanma). `UIFORGE_MCP_GPU=wgpu|cuda|cpu|auto` ile seçilir. *(Not: NVIDIA RTX 4060 Ti Vulkan/D3D12 üzerinde fiziksel test edildi; AMD, Intel ve Apple Silicon Metal standart WGSL ile mimari olarak hedeflendi ancak o donanımlarda fiziksel test edilmedi.)*
   ```bash
-  uvx --from "game-ui-mcp[wgpu] @ git+https://github.com/TENETTE/game-ui-mcp" game-ui-mcp
+  uvx --from "uiforge-mcp[wgpu] @ git+https://github.com/TENETTE/uiforge-mcp" uiforge-mcp
   ```
-- **NVIDIA GPU hızlandırması (`[gpu]`):** Shader ve materyalleri CuPy + CUDA 12 ile tek bir birleşik CUDA C++ çekirdeğine derler (~1 GB indirir; RTX 4060 Ti'de **130× daha hızlı** GPU shader). CUDA yoksa aynı sonuçla WebGPU veya CPU'ya döner. Kapatmak için `GAME_UI_MCP_GPU=0`.
+- **NVIDIA GPU hızlandırması (`[gpu]`):** Shader ve materyalleri CuPy + CUDA 12 ile tek bir birleşik CUDA C++ çekirdeğine derler (~1 GB indirir; RTX 4060 Ti'de **130× daha hızlı** GPU shader). CUDA yoksa aynı sonuçla WebGPU veya CPU'ya döner. Kapatmak için `UIFORGE_MCP_GPU=0`.
   ```bash
-  claude mcp add game-ui -s user -- uvx --from "game-ui-mcp[gpu] @ git+https://github.com/TENETTE/game-ui-mcp" game-ui-mcp
+  claude mcp add uiforge -s user -- uvx --from "uiforge-mcp[gpu] @ git+https://github.com/TENETTE/uiforge-mcp" uiforge-mcp
   ```
 - **MP4 / WebM video (`[video]`):** PATH'teki `ffmpeg`'i kullanır (`winget install ffmpeg`, `brew install ffmpeg`); yoksa `[video]` eki bir tane kurar.
-- **Git-yerel proje modu:** Proje kökünde `.gameui/` klasörü açtığında server tasarım dosyalarını kodun yanında, sıralı ve Git diff dostu JSON olarak tutar (yoksa `~/GameUI` veya `GAME_UI_MCP_DIR` kullanılır).
-- **Ajan Skill'i:** [`skill/game-ui-mcp/SKILL.md`](skill/game-ui-mcp/SKILL.md) ajana işin inceliklerini öğretir (katman sırası, 2.5B ışık, 9-slice, animasyon zamanlaması, kontrol turu, motora teslim). Claude Code'da `~/.claude/skills/` altına kopyala.
+- **Git-yerel proje modu:** Proje kökünde `.uiforge/` klasörü açtığında server tasarım dosyalarını kodun yanında, sıralı ve Git diff dostu JSON olarak tutar (yoksa `~/UIForge` veya `UIFORGE_MCP_DIR` kullanılır).
+- **Ajan Skill'i:** [`skill/uiforge-mcp/SKILL.md`](skill/uiforge-mcp/SKILL.md) ajana işin inceliklerini öğretir (katman sırası, 2.5B ışık, 9-slice, animasyon zamanlaması, kontrol turu, motora teslim). Claude Code'da `~/.claude/skills/` altına kopyala.
 
 </details>
 
@@ -159,7 +159,7 @@ Başka fikirler:
 ### Güncelle
 
 ```bash
-uv cache clean game-ui-mcp
+uv cache clean uiforge-mcp
 ```
 
 ---
@@ -169,7 +169,7 @@ uv cache clean game-ui-mcp
 ```mermaid
 flowchart LR
     U["İsteğin"] --> A["AI Ajanı"]
-    A -->|"92 MCP tool"| S["game-ui-mcp<br/>(Yerel · Deterministik)"]
+    A -->|"92 MCP tool"| S["uiforge-mcp<br/>(Yerel · Deterministik)"]
     S -->|"Canlı SSE"| L["Tarayıcı Stüdyosu<br/>live_preview"]
     S -->|"PNG + review_canvas"| C{"Doğru mu?"}
     C -->|"Düzelt"| A
@@ -185,15 +185,15 @@ flowchart LR
 
 | Hedef | Ne alırsın | Tool'lar |
 | --- | --- | --- |
-| **Unity** | 9-slice sprite + `GameUiImporter.cs`, UI Toolkit (`.uxml` + `.uss` + `Controller.cs`), **uGUI Canvas/RectTransform oluşturucu** (`unity-ugui`), C# token'ları | `export_asset`, `export_screen`, `write_engine_helpers` |
+| **Unity** | 9-slice sprite + `UiForgeImporter.cs`, UI Toolkit (`.uxml` + `.uss` + `Controller.cs`), **uGUI Canvas/RectTransform oluşturucu** (`unity-ugui`), C# token'ları | `export_asset`, `export_screen`, `write_engine_helpers` |
 | **Godot 4** | `.tscn` sahne + `_controller.gd` (veri bağlama, SFX sinyali, gamepad `focus_neighbor_*`), `StyleBoxTexture .tres`, GDScript token'ları | `export_screen`, `export_asset`, `write_engine_helpers` |
 | **Unreal Engine** | Margin'li Box brush, otomatik Python editör içe aktarma betiği | `export_asset`, `write_engine_helpers` |
-| **Roblox** | `LocalScript` ScreenGui oluşturucu, `SliceCenter` / `SliceScale`, `GameUiAssets.luau`, Luau token'ları | `export_screen`, `export_asset`, `write_engine_helpers` |
+| **Roblox** | `LocalScript` ScreenGui oluşturucu, `SliceCenter` / `SliceScale`, `UiForgeAssets.luau`, Luau token'ları | `export_screen`, `export_asset`, `write_engine_helpers` |
 | **C# / .NET Masaüstü** | **WPF** (.NET Framework 4.8 & .NET 8/9 için `.xaml` + `.xaml.cs` + `INotifyPropertyChanged` ViewModel), **Avalonia** (`.axaml`), **WinUI 3** (`.xaml`); yerel `TextBox`/`PasswordBox`/`ScrollViewer` | `export_screen` |
 | **C++ Masaüstü ve Araçlar** | **Qt 6 Quick** (`TextField`, `ScrollView`, sinyal/özellikli `.qml`), **Dear ImGui** (tek başlıklı C++17 `_ui.hpp`, `State` struct, `InputTextWithHint`, `BeginChild`) | `export_screen` |
 | **Motor PBR Haritaları** | **Albedo, Tangent Normal (OpenGL & DirectX), Roughness, Metallic, AO, Height, ORM paketli + Godot 4 `CanvasTexture .tres`** (gerçek zamanlı motor ışığıyla canlı UI aydınlatma) | `export_pbr_maps` |
 | **React & TypeScript** | `<Ekran>.jsx` veya tipli **`<Ekran>.tsx`**, CSS veya **Tailwind sınıfları**, canlı `<input>` / kaydırılabilir listeler, `data` prop bağlama, `onNavigate` / `onSfx`, klavye ve **Gamepad API** gezinme | `export_react` |
-| **Web ve Prototip** | Gerçek seçilebilir yazılı responsive HTML/CSS, canlı giriş kutuları ve kaydırma alanları, linkler, üst pencereler, View Transitions, `window.gameuiSetData()`, gamepad odağı | `export_web`, `export_prototype` |
+| **Web ve Prototip** | Gerçek seçilebilir yazılı responsive HTML/CSS, canlı giriş kutuları ve kaydırma alanları, linkler, üst pencereler, View Transitions, `window.uiforgeSetData()`, gamepad odağı | `export_web`, `export_prototype` |
 | **Hareket ve Video** | **dotLottie v2 (`.lottie` çoklu animasyon + etkileşimli Durum Makinesi ZIP)**, vektör Lottie JSON, H.264 MP4 / saydam VP9 WebM (akışlı), sprite sheet, GIF / APNG / WebP, DOTween ve Roblox ease JSON | `export_animation`, `export_layers` |
 | **Atlas, Tasarım ve Baskı** | **TexturePacker / Godot `AtlasTexture` / Unity / CSS sprite atlasları**, düzenlenebilir SVG, PackBits RLE PSD, vektör PDF, iOS/Android/Web setleri, ICO, BMFont | `export_atlas`, `export_svg`, `export_psd`, `export_pdf`, `export_png`, `export_bitmap_font` |
 | **Tasarım Sistemi** | Geliştirici ölçü dökümü, W3C DTCG JSON, CSS/USS/C#/GDScript/Luau token'ları, **`DESIGN.md`** | `export_spec`, `export_theme` |
@@ -202,7 +202,7 @@ flowchart LR
 
 ## Örnekler
 
-Aşağıdaki her görsel ve animasyon doğrudan `game-ui-mcp` tarafından çizildi (`python examples/run_all.py` hepsini yeniden üretir).
+Aşağıdaki her görsel ve animasyon doğrudan `uiforge-mcp` tarafından çizildi (`python examples/run_all.py` hepsini yeniden üretir).
 
 ### Materyaller
 
@@ -212,7 +212,7 @@ Lineer-HDR **Cook-Torrance GGX PBR**, çift loblu specular, kenar aşınması (`
 
 ### Gerçek Zamanlı Motor PBR Doku Haritaları (`export_pbr_maps`)
 
-**Yalnızca game-ui-mcp'de:** Herhangi bir 2B UI rozetini, madalyonu, butonu veya çerçeveyi tek çağrıda **Albedo, Tangent Normal (OpenGL `+Y` / DirectX `-Y`), Roughness, Metallic, Ambient Occlusion, Height, ORM paketli ve Godot 4 `CanvasTexture .tres`** olarak dışa aktar; oyun motorunun gerçek ışıkları 2B arayüzünü canlı aydınlatsın.
+**Yalnızca uiforge-mcp'de:** Herhangi bir 2B UI rozetini, madalyonu, butonu veya çerçeveyi tek çağrıda **Albedo, Tangent Normal (OpenGL `+Y` / DirectX `-Y`), Roughness, Metallic, Ambient Occlusion, Height, ORM paketli ve Godot 4 `CanvasTexture .tres`** olarak dışa aktar; oyun motorunun gerçek ışıkları 2B arayüzünü canlı aydınlatsın.
 
 ![PBR Doku Haritaları](examples/pbr_maps.png)
 
@@ -326,7 +326,7 @@ Temel motor optimizasyonları:
 | **Dışa aktarma** | `export_png`, `export_svg`, `export_pdf`, `export_web`, `export_react`, `export_asset`, **`export_pbr_maps`**, `export_layers`, `export_psd`, `export_atlas`, `export_bitmap_font`, `write_engine_helpers` |
 | **Teslim ve Motorlar** | `export_spec`, `export_theme`, `set_link`, `set_interaction`, `export_prototype`, `export_screen` |
 
-Salt okunur tool'lar `readOnlyHint=True`, silme tool'ları `destructiveHint=True` olarak işaretlidir. Yerleşik MCP Kaynakları (`gameui://materials`, `gameui://workspace`, `gameui://guide/{topic}`) ve Prompt'lar (`design_game_hud`, `design_rpg_panel`, `audit_and_polish`) ajanların hatasız çalışmasını sağlar (talimatlar ~2k karakter). Lisans ve gömülü font atıfları için [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
+Salt okunur tool'lar `readOnlyHint=True`, silme tool'ları `destructiveHint=True` olarak işaretlidir. Yerleşik MCP Kaynakları (`uiforge://materials`, `uiforge://workspace`, `uiforge://guide/{topic}`) ve Prompt'lar (`design_game_hud`, `design_rpg_panel`, `audit_and_polish`) ajanların hatasız çalışmasını sağlar (talimatlar ~2k karakter). Lisans ve gömülü font atıfları için [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
 
 </details>
 
@@ -361,7 +361,7 @@ Hayır. Her öğe yerel olarak çizilen deterministik vektör şekillerden, shad
 <details>
 <summary><strong>Proje dosyalarım nerede saklanıyor?</strong></summary>
 
-Çalışma dizininde `.gameui/` klasörü varsa otomatik onu kullanır (Git ile sürümlemek için ideal). Yoksa `~/GameUI` (veya `GAME_UI_MCP_DIR`) kullanılır. `<workspace>/fonts/` içine bırakılan `.ttf`/`.otf` fontlar otomatik tanınır.
+Çalışma dizininde `.uiforge/` klasörü varsa otomatik onu kullanır (Git ile sürümlemek için ideal). Yoksa `~/UIForge` (veya `UIFORGE_MCP_DIR`) kullanılır. `<workspace>/fonts/` içine bırakılan `.ttf`/`.otf` fontlar otomatik tanınır.
 
 </details>
 
@@ -377,13 +377,13 @@ Tool şemaları özdür; uzun referanslar sunucu talimatları yerine `guide(topi
 ## Belgeler ve Katkı
 
 - **[docs/GUIDE.md](docs/GUIDE.md)** — Tüm özellik, stil, animasyon ve motor referansı
-- **[skill/game-ui-mcp/SKILL.md](skill/game-ui-mcp/SKILL.md)** — Ajan tasarım kılavuzu (Skill)
+- **[skill/uiforge-mcp/SKILL.md](skill/uiforge-mcp/SKILL.md)** — Ajan tasarım kılavuzu (Skill)
 - **[THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md)** — Bağımlılık ve gömülü SIL OFL-1.1 font lisans dökümü
 - **[CHANGELOG.md](CHANGELOG.md)** — Sürüm geçmişi
 
 ```bash
-git clone https://github.com/TENETTE/game-ui-mcp
-cd game-ui-mcp
+git clone https://github.com/TENETTE/uiforge-mcp
+cd uiforge-mcp
 uv venv && uv pip install -e ".[dev]"
 uv run pytest
 ```

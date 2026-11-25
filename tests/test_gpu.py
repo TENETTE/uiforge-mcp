@@ -2,7 +2,7 @@
 import numpy as np
 import pytest
 
-from game_ui_mcp import effects, gpu, shader
+from uiforge_mcp import effects, gpu, shader
 
 CODE = "n = fbm(x/40, y/40, 6); d = voronoi(x/30, y/30); r = n; g = smoothstep(0, 0.6, d); b = fract(u*7)"
 
@@ -12,13 +12,13 @@ def _cpu(monkeypatch):
 
 
 def test_gpu_switch_off_forces_cpu(monkeypatch):
-    monkeypatch.setenv("GAME_UI_MCP_GPU", "0")
+    monkeypatch.setenv("UIFORGE_MCP_GPU", "0")
     gpu._cupy.cache_clear()
     try:
         assert not gpu.available() and gpu.module_for(10**9) is np
         assert gpu.info()["gpu"] is False
     finally:
-        monkeypatch.delenv("GAME_UI_MCP_GPU")
+        monkeypatch.delenv("UIFORGE_MCP_GPU")
         gpu._cupy.cache_clear()
 
 

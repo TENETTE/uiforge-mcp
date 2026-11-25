@@ -1,6 +1,6 @@
 # Third-Party Licenses & Attribution
 
-`game-ui-mcp` itself is licensed under the **MIT License** ([LICENSE](LICENSE)). All procedural graphics code, Cook-Torrance PBR shaders, UAX #9 BiDi level resolution, vector rasterizer, parametric frames, and example showcase assets in this repository are original works created for `game-ui-mcp` with no third-party copyrighted images, icons, or proprietary game assets.
+`uiforge-mcp` itself is licensed under the **MIT License** ([LICENSE](LICENSE)). All procedural graphics code, Cook-Torrance PBR shaders, UAX #9 BiDi level resolution, vector rasterizer, parametric frames, and example showcase assets in this repository are original works created for `uiforge-mcp` with no third-party copyrighted images, icons, or proprietary game assets.
 
 ---
 
@@ -13,11 +13,11 @@ None of the packages below are vendored inside this repository; they are install
 | `mcp` | MIT | Model Context Protocol Python SDK |
 | `pillow` | MIT-CMU | Image I/O and 2D compositing |
 | `numpy` | BSD-3-Clause | Vectorized numeric arrays |
-| `opencv-python-headless` | Apache-2.0 (OpenCV) / MIT (wrapper) | Optional at runtime (graceful pure-NumPy fallback if absent). Note: PyPI binary wheels of `opencv-python-headless` bundle LGPL-2.1 FFmpeg binaries inside the `cv2` wheel (not invoked by `game-ui-mcp`); see `cv2/LICENSE-3RD-PARTY.txt`. |
+| `opencv-python-headless` | Apache-2.0 (OpenCV) / MIT (wrapper) | Optional at runtime (graceful pure-NumPy fallback if absent). Note: PyPI binary wheels of `opencv-python-headless` bundle LGPL-2.1 FFmpeg binaries inside the `cv2` wheel (not invoked by `uiforge-mcp`); see `cv2/LICENSE-3RD-PARTY.txt`. |
 | `uharfbuzz` | Apache-2.0 (binding) / Old MIT (HarfBuzz) | OpenType text shaping for complex scripts |
 | `pyclipper` | MIT (binding) / Boost Software License 1.0 (Clipper) | Exact polygon boolean & offset operations |
 
-> **Copyleft audit note:** As of v0.12.0, the LGPL-3.0 `python-bidi` dependency has been replaced by an original pure-Python MIT Unicode UAX #9 Bidirectional Algorithm resolver in `src/game_ui_mcp/shaping.py` using Python's standard-library `unicodedata` module.
+> **Copyleft audit note:** As of v0.12.0, the LGPL-3.0 `python-bidi` dependency has been replaced by an original pure-Python MIT Unicode UAX #9 Bidirectional Algorithm resolver in `src/uiforge_mcp/shaping.py` using Python's standard-library `unicodedata` module.
 
 ## 2. Optional Extras (Not Required for Core Usage)
 
@@ -30,7 +30,7 @@ None of the packages below are vendored inside this repository; they are install
 
 ---
 
-## 3. Bundled Fonts (`src/game_ui_mcp/assets/fonts/`)
+## 3. Bundled Fonts (`src/uiforge_mcp/assets/fonts/`)
 
 Every bundled font is distributed unmodified under the **SIL Open Font License, Version 1.1 (OFL-1.1)**, with its full `OFL.txt` license file included in its directory and packaged in built wheels. OFL-1.1 permits free commercial and open-source use, bundling, and embedding in rendered images/games, provided the font software itself is not sold on its own and Reserved Font Names are respected if modified.
 
@@ -52,5 +52,5 @@ Every bundled font is distributed unmodified under the **SIL Open Font License, 
 
 ## 4. Published Graphics Algorithms & Trademarks
 
-- Shading and tone-mapping equations in `src/game_ui_mcp/pbr.py` implement standard published computer graphics literature (Walter et al. GGX/Trowbridge-Reitz, Schlick Fresnel approximation, Heitz Smith height-correlated visibility, Narkowicz ACES filmic approximation).
-- Product, engine, and device names mentioned in documentation or export targets (Unity, Unreal Engine, Godot, Roblox, Figma, Penpot, Pencil, Rive, React, Tailwind CSS, iPhone, Steam Deck, etc.) are trademarks of their respective owners; `game-ui-mcp` is an independent open-source project and is not affiliated with or endorsed by any of them.
+- Shading and tone-mapping equations in `src/uiforge_mcp/pbr.py` implement standard published computer graphics literature (Walter et al. GGX/Trowbridge-Reitz, Schlick Fresnel approximation, Heitz Smith height-correlated visibility, Narkowicz ACES filmic approximation).
+- Product, engine, and device names mentioned in documentation or export targets (Unity, Unreal Engine, Godot, Roblox, Figma, Penpot, Pencil, Rive, React, Tailwind CSS, iPhone, Steam Deck, etc.) are trademarks of their respective owners; `uiforge-mcp` is an independent open-source project and is not affiliated with or endorsed by any of them.

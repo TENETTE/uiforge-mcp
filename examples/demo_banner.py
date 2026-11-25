@@ -1,4 +1,4 @@
-"""The README hero banner, drawn entirely with game-ui-mcp (Cook-Torrance PBR, Liquid Glass, gauges & frames).
+"""The README hero banner, drawn entirely with uiforge-mcp (Cook-Torrance PBR, Liquid Glass, gauges & frames).
 
 Run: python examples/demo_banner.py  ->  docs/banner.png
 """
@@ -6,8 +6,8 @@ Run: python examples/demo_banner.py  ->  docs/banner.png
 import tempfile
 from pathlib import Path
 
-from game_ui_mcp import server as ui
-from game_ui_mcp.store import Store
+from uiforge_mcp import server as ui
+from uiforge_mcp.store import Store
 
 DOCS = Path(__file__).resolve().parent.parent / "docs"
 ui.set_store(Store(Path(tempfile.mkdtemp()) / "ws"))
@@ -30,7 +30,7 @@ ui.batch(c, [
      "style": {"fill": "#8b5cf6@0.16", "stroke": {"color": "#a78bfa@0.45", "width": 1}}},
     {"op": "add_text", "text": "OPEN SOURCE · MIT · 100% LOCAL", "x": 172, "y": 90, "anchor": "center",
      "size": 10.5, "weight": 700, "letter_spacing": 1.4, "color": "#c4b5fd"},
-    {"op": "add_text", "text": "game-ui-mcp", "x": 66, "y": 124, "size": 74, "weight": 800,
+    {"op": "add_text", "text": "uiforge-mcp", "x": 66, "y": 124, "size": 74, "weight": 800,
      "color": {"type": "linear", "angle": 0, "stops": [[0, "#ffffff"], [0.65, "#e2e8f0"], [1, "#a78bfa"]]}},
     {"op": "add_text", "text": "Blender-grade PBR materials, live studio & engine-ready UI for AI agents.",
      "x": 70, "y": 218, "size": 19, "weight": 500, "color": "$muted", "max_width": 560},
@@ -47,7 +47,7 @@ ui.batch(c, [
                "stroke": {"color": "$cyan@0.75", "width": 1.4},
                "glow": {"color": "$cyan@0.25", "blur": 12},
                "shadow": {"blur": 14, "dy": 5, "color": "#000@0.5"}}},
-    {"op": "add_text", "text": "UNITY · GODOT · REACT", "x": 457, "y": 307, "anchor": "center",
+    {"op": "add_text", "text": "GAME · .NET · C++ · REACT", "x": 457, "y": 307, "anchor": "center",
      "size": 10.5, "weight": 700, "letter_spacing": 0.9, "color": "#e0f2fe"},
 
     {"op": "add_rect", "x": 728, "y": 54, "width": 440, "height": 290, "radius": 24,
@@ -112,7 +112,7 @@ for i, (frame_m, gem_m) in enumerate(slots):
          "style": {"material": gem_m}},
     ])
 
-ui.add_text(c, "LIVE STUDIO  ·  DATA BINDING  ·  DOTLOTTIE", 754, 304,
+ui.add_text(c, "LIVE STUDIO  ·  WEBGPU + CUDA  ·  DOTLOTTIE V2", 754, 304,
             size=10, weight=700, letter_spacing=1.1, color="#94a3b8")
 
 st = ui.store()

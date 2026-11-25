@@ -1,8 +1,8 @@
 """Live auto layout (fill, min / max, hug, wrap, grid span, groups), component variants, hide / show, slots."""
 import pytest
 
-from game_ui_mcp import server as s
-from game_ui_mcp.store import Store
+from uiforge_mcp import server as s
+from uiforge_mcp.store import Store
 
 
 @pytest.fixture()

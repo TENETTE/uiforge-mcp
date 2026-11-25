@@ -1,7 +1,7 @@
-"""game-ui-mcp: a local MCP server that lets an AI draw game UI assets with drawing tools.
+"""uiforge-mcp: a local MCP server that lets an AI draw game UI assets with drawing tools.
 
 No AI image generation and no network access: every pixel comes from the shapes,
-text and effects the model asks for. Run with ``python -m game_ui_mcp``.
+text and effects the model asks for. Run with ``python -m uiforge_mcp``.
 """
 
 from __future__ import annotations
@@ -64,7 +64,7 @@ Full reference: call guide(topic) before using an unfamiliar feature.
 Topics: fills, shader, style, design, layers, geometry, text, reuse, review, animation, export.
 """
 
-mcp = _Server("game-ui-mcp", instructions=INSTRUCTIONS)
+mcp = _Server("uiforge-mcp", instructions=INSTRUCTIONS)
 
 
 def tool(fn):
@@ -90,7 +90,7 @@ def tool(fn):
             raise ToolError(f"{fn.__name__}: {exc}\nFix that argument and call {fn.__name__} again "
                             "(do not repeat the identical call).") from exc
         except Exception as exc:
-            raise ToolError(f"{fn.__name__}: unexpected {type(exc).__name__}: {exc}. This is likely a game-ui-mcp "
+            raise ToolError(f"{fn.__name__}: unexpected {type(exc).__name__}: {exc}. This is likely a uiforge-mcp "
                             "bug, not your input. Do not repeat the identical call: change the value that "
                             "triggers it, split the step into smaller calls, or take another route.") from exc
         if isinstance(result, dict):
@@ -1944,7 +1944,7 @@ def _encode_video(images: list, rate: float, path: Path, fmt: str) -> None:
             exe = None
     if not exe:
         raise ValueError('mp4 / webm export needs ffmpeg: install it (winget install ffmpeg, brew install ffmpeg, '
-                         'apt install ffmpeg) or pip install "game-ui-mcp[video]"')
+                         'apt install ffmpeg) or pip install "uiforge-mcp[video]"')
     w, h = images[0].size
     if fmt == "mp4":
         codec = ["-vf", "pad=ceil(iw/2)*2:ceil(ih/2)*2", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "16",
@@ -1986,7 +1986,7 @@ def export_animation(canvas: str, animation: str, format: str = "spritesheet", p
                     transparency; APNG and WebP keep full quality and alpha).
       "mp4" / "webm" video for trailers, store pages, social posts and video players (H.264 MP4 is opaque,
                     on the canvas background or `background`; VP9 WebM keeps transparency). Needs ffmpeg
-                    on PATH or pip install "game-ui-mcp[video]". repeat plays a loop several times.
+                    on PATH or pip install "uiforge-mcp[video]". repeat plays a loop several times.
       "lottie"      Lottie JSON for apps, the web (lottie-web), and Lottie players in Unity / Unreal / Godot.
                     Plain shapes and text become real vector shape layers (crisp at any size, solid colour
                     changes animate natively); effects become pictures moved by Lottie; parts whose glow /
@@ -2874,7 +2874,7 @@ def export_react(canvases: list[str] | str, out_dir: str | None = None, language
                  include_background: bool = True, image_scale: float = 2, css: str = "css",
                  typescript: bool = False):
     """Export canvases as React components (JSX or TypeScript TSX + CSS or Tailwind utilities) for React / Next.js / Vite:
-    one <Name>.jsx/.tsx (and <Name>.css) per canvas, gameui-runtime.js and an assets folder.
+    one <Name>.jsx/.tsx (and <Name>.css) per canvas, uiforge-runtime.js and an assets folder.
     Supports live data bindings (pass data={{hp: 40}} prop), onNavigate(canvasId, mode), onSfx(name),
     keyboard + gamepad focus navigation, hover / pressed CSS, keyframe animations and set_interaction rules.
     css: "css" (default stylesheet per component) or "tailwind" (Tailwind utility classes on elements).
@@ -3286,7 +3286,7 @@ def export_asset(canvas: str, engine: str = "generic", out_dir: str | None = Non
                  nine_slice: str | dict | None = None, minimize: bool = True, scales: list[float] | None = None,
                  trim: bool = False, padding: int = 0, states: list[str] | str | None = None,
                  language: str | None = None):
-    """Export a canvas as an engine-ready UI asset: PNG + "<name>.gameui.json" metadata + manifest entry.
+    """Export a canvas as an engine-ready UI asset: PNG + "<name>.uiforge.json" metadata + manifest entry.
 
     engine: "unity", "unreal", "roblox", "godot" or "generic" (metadata for all of them).
     out_dir: target folder, e.g. "<UnityProject>/Assets/UI/Generated"; default is the workspace exports folder.
@@ -3394,12 +3394,12 @@ def export_asset(canvas: str, engine: str = "generic", out_dir: str | None = Non
             sidecar.update(border_left=borders["left"], border_bottom=borders["bottom"],
                            border_right=borders["right"], border_top=borders["top"])
         sidecar.update(meta)
-        ex.write_json(folder / (Path(filename).stem + ".gameui.json"), sidecar)
+        ex.write_json(folder / (Path(filename).stem + ".uiforge.json"), sidecar)
         files.append(entry)
         rb_warn = meta.get("roblox", {}).get("warning")
         if rb_warn and engine in ("roblox",):
             notes.append(rb_warn)
-    manifest = folder / "game_ui_manifest.json"
+    manifest = folder / "uiforge_manifest.json"
     previous = {}
     if manifest.is_file():
         try:
@@ -3471,7 +3471,7 @@ def export_atlas(canvases: list[str], path: str | None = None, scale: float = 1,
                              "sourceSize": {"w": f["w"], "h": f["h"]}}
                 for k, f in frames.items()
             },
-            "meta": {"app": "game-ui-mcp", "version": "0.12.0", "image": out.name, "format": "RGBA8888",
+            "meta": {"app": "uiforge-mcp", "version": "0.12.0", "image": out.name, "format": "RGBA8888",
                      "size": {"w": atlas.width, "h": atlas.height}, "scale": str(scale)},
         }
         ex.write_json(out.with_suffix(".json"), tp)
@@ -3522,12 +3522,12 @@ def write_engine_helpers(engine: str, out_dir: str, roblox_ids: dict | None = No
                          unreal_content_path: str = "/Game/UI/Generated", godot_res_path: str = "res://ui/generated"):
     """Write the engine-side helper that applies exported metadata automatically.
 
-    unity:  GameUiImporter.cs - out_dir must be an "Editor" folder inside Assets. It imports every PNG that
-            has a .gameui.json next to it as a UI sprite with the 9-slice border set.
-    unreal: import_game_ui.py - written into out_dir (the folder that holds game_ui_manifest.json). Run it in
+    unity:  UiForgeImporter.cs - out_dir must be an "Editor" folder inside Assets. It imports every PNG that
+            has a .uiforge.json next to it as a UI sprite with the 9-slice border set.
+    unreal: import_uiforge.py - written into out_dir (the folder that holds uiforge_manifest.json). Run it in
             the editor's Python console to import textures with UI settings; it logs each brush Margin.
-    roblox: GameUiAssets.luau - a ModuleScript built from game_ui_manifest.json in out_dir, with
-            GameUi.apply(imageLabel, "asset_name"). After uploading the PNGs in Studio pass
+    roblox: UiForgeAssets.luau - a ModuleScript built from uiforge_manifest.json in out_dir, with
+            UiForge.apply(imageLabel, "asset_name"). After uploading the PNGs in Studio pass
             roblox_ids={"asset_name": 1234567890} to fill in the asset ids.
     godot:  one <asset>.stylebox.tres (StyleBoxTexture with texture margins) per 9-sliced asset in out_dir;
             godot_res_path is where that folder lives inside the Godot project.
@@ -3546,19 +3546,19 @@ def write_engine_helpers(engine: str, out_dir: str, roblox_ids: dict | None = No
     if engine == "unity":
         if folder.name != "Editor" and "Editor" not in folder.parts:
             raise ValueError("For Unity, out_dir must be (inside) a folder named 'Editor', e.g. <Project>/Assets/Editor")
-        target = folder / "GameUiImporter.cs"
+        target = folder / "UiForgeImporter.cs"
         target.write_text(engines.UNITY_IMPORTER, encoding="utf-8")
         return {"file": str(target), "next": "Unity compiles it automatically. Export assets with export_asset into "
-                                             "any Assets folder; each PNG with a .gameui.json is set up on import."}
-    manifest_path = folder / "game_ui_manifest.json"
+                                             "any Assets folder; each PNG with a .uiforge.json is set up on import."}
+    manifest_path = folder / "uiforge_manifest.json"
     if engine == "unreal":
-        target = folder / "import_game_ui.py"
+        target = folder / "import_uiforge.py"
         target.write_text(engines.UNREAL_IMPORT.replace("__DEST_PATH__", unreal_content_path), encoding="utf-8")
-        note = "" if manifest_path.is_file() else " (no game_ui_manifest.json here yet - export_asset into this folder first)"
+        note = "" if manifest_path.is_file() else " (no uiforge_manifest.json here yet - export_asset into this folder first)"
         return {"file": str(target), "next": f'In Unreal: Output Log -> Python ->  py "{target.as_posix()}"{note}'}
     if engine == "roblox":
         if not manifest_path.is_file():
-            raise ValueError(f"No game_ui_manifest.json in {folder}. Run export_asset(engine='roblox', out_dir=...) first.")
+            raise ValueError(f"No uiforge_manifest.json in {folder}. Run export_asset(engine='roblox', out_dir=...) first.")
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         for asset, asset_id in (_maybe_json(roblox_ids) or {}).items():
             key = slugify(asset, "asset")
@@ -3569,14 +3569,14 @@ def write_engine_helpers(engine: str, out_dir: str, roblox_ids: dict | None = No
                 raise ValueError(f"roblox_ids: '{asset}' must be a numeric asset id like 1234567890, got {asset_id!r}")
             manifest["assets"][key]["roblox_id"] = rid
         ex.write_json(manifest_path, manifest)
-        target = folder / "GameUiAssets.luau"
+        target = folder / "UiForgeAssets.luau"
         target.write_text(engines.roblox_module(manifest), encoding="utf-8")
         missing = [a for a, e in manifest["assets"].items() if not e.get("roblox_id")]
         return {"file": str(target), "assets_without_id": missing,
                 "next": "Upload the PNGs in Roblox Studio, then call this again with roblox_ids to fill them in."}
     if engine == "godot":
         if not manifest_path.is_file():
-            raise ValueError(f"No game_ui_manifest.json in {folder}. Run export_asset(engine='godot', out_dir=...) first.")
+            raise ValueError(f"No uiforge_manifest.json in {folder}. Run export_asset(engine='godot', out_dir=...) first.")
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         written = []
         for fname, text in engines.godot_styleboxes(manifest, godot_res_path).items():
@@ -3585,7 +3585,7 @@ def write_engine_helpers(engine: str, out_dir: str, roblox_ids: dict | None = No
         return {"folder": str(folder), "files": written,
                 "next": (f"Put this folder at {godot_res_path} in the Godot project. Each .stylebox.tres is a "
                          "StyleBoxTexture with the 9-slice margins set: assign it to a Panel/Button theme override. "
-                         "For a NinePatchRect use the margins_LTRB numbers from the .gameui.json files.")
+                         "For a NinePatchRect use the margins_LTRB numbers from the .uiforge.json files.")
                 if written else "No 9-sliced assets in the manifest; plain PNGs need no helper in Godot."}
     raise ValueError("engine must be 'unity', 'unreal', 'roblox' or 'godot'")
 
@@ -3598,14 +3598,14 @@ from .tools_design import *  # noqa: E402,F401,F403  (registers guide, palettes,
 def _register_mcp_dx() -> None:
     """Register native MCP resources and workflow prompts for zero-guesswork AI discovery."""
     if hasattr(mcp, "resource"):
-        @mcp.resource("gameui://materials")
+        @mcp.resource("uiforge://materials")
         def res_materials() -> str:
             """All 39 built-in Cook-Torrance PBR material names plus any custom theme materials."""
             from .materials import NAMES
             custom = sorted((store().theme.get("materials") or {}).keys())
             return json.dumps({"builtin": NAMES, "custom": custom}, indent=2)
 
-        @mcp.resource("gameui://workspace")
+        @mcp.resource("uiforge://workspace")
         def res_workspace() -> str:
             """Live summary of canvases, theme tokens and workspace directory."""
             st = store()
@@ -3618,9 +3618,9 @@ def _register_mcp_dx() -> None:
                 "theme_styles": sorted((st.theme.get("styles") or {}).keys()),
             }, indent=2)
 
-        @mcp.resource("gameui://guide/{topic}")
+        @mcp.resource("uiforge://guide/{topic}")
         def res_guide(topic: str) -> str:
-            """Reference manual for one game-ui-mcp topic (fills, shader, style, design, layers, geometry, text, reuse, review, animation, export, all)."""
+            """Reference manual for one uiforge-mcp topic (fills, shader, style, design, layers, geometry, text, reuse, review, animation, export, all)."""
             from .reference import TOPICS
             t = str(topic).strip().lower()
             if t == "all":
@@ -3632,7 +3632,7 @@ def _register_mcp_dx() -> None:
         def design_game_hud(genre: str = "sci-fi shooter", engine: str = "unity", resolution: str = "1920x1080") -> str:
             """Step-by-step workflow prompt to design, review, bind and export a production game HUD."""
             return (
-                f"Design an original AAA {genre} HUD at {resolution} for {engine} using game-ui-mcp.\n"
+                f"Design an original AAA {genre} HUD at {resolution} for {engine} using uiforge-mcp.\n"
                 "1. Call live_preview('start') if the user wants to watch live.\n"
                 "2. Set a cohesive token theme with set_theme (1 background, 2 surfaces, 1 primary, 1 accent, semantic states).\n"
                 "3. Create the canvas with safe_area, use add_frame (scifi_hud / rpg_gold / cyber_tech) and Cook-Torrance PBR materials inside batch().\n"
@@ -3645,7 +3645,7 @@ def _register_mcp_dx() -> None:
         def design_rpg_panel(title: str = "Inventory", style_preset: str = "rpg_gold") -> str:
             """Workflow prompt to build a richly shaded ornate RPG modal with PBR materials and states."""
             return (
-                f"Create an ornate '{title}' RPG panel using game-ui-mcp.\n"
+                f"Create an ornate '{title}' RPG panel using uiforge-mcp.\n"
                 "1. Call set_theme with warm medieval/fantasy palette tokens and Cinzel/Inter typography.\n"
                 f"2. Build the outer frame with add_frame(preset='{style_preset}', title='{title}') and use its returned inner_box.\n"
                 "3. Populate slots with add_instance + variants (common/rare/epic/legendary), faceted gem/ruby/emerald PBR accents, and live auto layout.\n"
@@ -3657,7 +3657,7 @@ def _register_mcp_dx() -> None:
         def audit_and_polish(canvas: str) -> str:
             """Closed-loop visual and WCAG quality audit prompt for an existing canvas."""
             return (
-                f"Audit and polish canvas '{canvas}' in game-ui-mcp:\n"
+                f"Audit and polish canvas '{canvas}' in uiforge-mcp:\n"
                 "1. Run review_canvas(canvas) and preview(canvas, show_ids=true).\n"
                 "2. Check contrast (WCAG >= 4.5:1 body, 3:1 headings), clipped shadows, half-pixel edges, safe areas, and pseudo-long localization.\n"
                 "3. Fix every warning with batch() / update_element(), then re-verify with preview() and review_canvas() until ok=true."

@@ -2,11 +2,11 @@
 Streamable HTTP transport (ChatGPT/remote MCP) and zero-friction multi-IDE MCP configuration.
 
 Commands:
-  game-ui-mcp                              Start MCP stdio server (default)
-  game-ui-mcp serve --transport http       Start MCP Streamable HTTP server (ChatGPT / remote clients)
-  game-ui-mcp doctor                       Inspect GPU, backends, installed engines/IDEs and fallbacks
-  game-ui-mcp install-gpu [--arch auto]    Recommend or install the optimal GPU extra for this machine
-  game-ui-mcp setup <client> [--write]     Generate or install MCP config for OpenCode, Claude Code,
+  uiforge-mcp                              Start MCP stdio server (default)
+  uiforge-mcp serve --transport http       Start MCP Streamable HTTP server (ChatGPT / remote clients)
+  uiforge-mcp doctor                       Inspect GPU, backends, installed engines/IDEs and fallbacks
+  uiforge-mcp install-gpu [--arch auto]    Recommend or install the optimal GPU extra for this machine
+  uiforge-mcp setup <client> [--write]     Generate or install MCP config for OpenCode, Claude Code,
                                            VS Code, Visual Studio, Antigravity, Cursor, Windsurf, ChatGPT
 """
 
@@ -132,7 +132,7 @@ def doctor_report() -> dict[str, Any]:
         extra = hw["recommended_extra"]
         fallback_notice = (
             f"Hardware GPU detected ({hw['recommended_arch'].upper()}), currently running on CPU fallback. "
-            f'Install acceleration with: pip install "game-ui-mcp[{extra}]" or game-ui-mcp install-gpu --apply'
+            f'Install acceleration with: pip install "uiforge-mcp[{extra}]" or uiforge-mcp install-gpu --apply'
         )
     return {
         "python": sys.version.split()[0],
@@ -144,7 +144,7 @@ def doctor_report() -> dict[str, Any]:
     }
 
 
-def install_gpu_plan(arch: str = "auto", repo_url: str = "git+https://github.com/TENETTE/game-ui-mcp") -> dict[str, Any]:
+def install_gpu_plan(arch: str = "auto", repo_url: str = "git+https://github.com/TENETTE/uiforge-mcp") -> dict[str, Any]:
     """Build exact architecture-appropriate install plan (uv & pip commands) without duplicating packages."""
     chosen = str(arch or "auto").strip().lower()
     hw = detect_gpu_hardware()
@@ -156,7 +156,7 @@ def install_gpu_plan(arch: str = "auto", repo_url: str = "git+https://github.com
     extra = spec["extra"]
     pkgs = spec["packages"]
     pip_cmd = [sys.executable, "-m", "pip", "install", *pkgs] if pkgs else []
-    uv_cmd = f'uvx --from "game-ui-mcp[{extra}] @ {repo_url}" game-ui-mcp' if extra != "cpu" else f"uvx --from {repo_url} game-ui-mcp"
+    uv_cmd = f'uvx --from "uiforge-mcp[{extra}] @ {repo_url}" uiforge-mcp' if extra != "cpu" else f"uvx --from {repo_url} uiforge-mcp"
     return {
         "detected_arch": hw["recommended_arch"],
         "selected_arch": chosen,
@@ -171,13 +171,13 @@ def install_gpu_plan(arch: str = "auto", repo_url: str = "git+https://github.com
 
 def _launch_command(server_name: str, extra: str | None, repo_url: str, local_python: bool = False) -> tuple[str, list[str]]:
     if local_python:
-        return sys.executable, ["-m", "game_ui_mcp.server"]
-    src = f"game-ui-mcp[{extra}] @ {repo_url}" if (extra and extra != "cpu") else repo_url
-    return "uvx", ["--from", src, "game-ui-mcp"]
+        return sys.executable, ["-m", "uiforge_mcp.server"]
+    src = f"uiforge-mcp[{extra}] @ {repo_url}" if (extra and extra != "cpu") else repo_url
+    return "uvx", ["--from", src, "uiforge-mcp"]
 
 
 def client_config(client: str, scope: str = "user", gpu_arch: str = "auto",
-                  server_name: str = "game-ui", repo_url: str = "git+https://github.com/TENETTE/game-ui-mcp",
+                  server_name: str = "uiforge", repo_url: str = "git+https://github.com/TENETTE/uiforge-mcp",
                   local_python: bool = False, http_port: int = 8765) -> dict[str, Any]:
     """Generate official 2026 MCP configuration JSON, target path and CLI command for an AI IDE/client."""
     c = str(client).strip().lower()
@@ -198,7 +198,7 @@ def client_config(client: str, scope: str = "user", gpu_arch: str = "auto",
                     server_name: {
                         "type": "local",
                         "command": [cmd, *args],
-                        "environment": {"GAME_UI_MCP_GPU": "auto"},
+                        "environment": {"UIFORGE_MCP_GPU": "auto"},
                     }
                 }
             },
@@ -209,10 +209,10 @@ def client_config(client: str, scope: str = "user", gpu_arch: str = "auto",
 
     if c == "claude":
         cfg_path = (cwd / ".mcp.json") if scope == "project" else (home / ".claude.json")
-        cfg = {"mcpServers": {server_name: {"command": cmd, "args": args, "env": {"GAME_UI_MCP_GPU": "auto"}}}}
+        cfg = {"mcpServers": {server_name: {"command": cmd, "args": args, "env": {"UIFORGE_MCP_GPU": "auto"}}}}
         cli_cmd = f"claude mcp add {server_name} -s {scope} -- {cmd} " + " ".join(args)
         return {"client": c, "path": str(cfg_path), "config": cfg, "cli_command": cli_cmd,
-                "notes": "Also copy skill/game-ui-mcp/ into ~/.claude/skills/ for full AI craft guidance."}
+                "notes": "Also copy skill/uiforge-mcp/ into ~/.claude/skills/ for full AI craft guidance."}
 
     if c == "vscode":
         cfg_path = (cwd / ".mcp.json") if scope == "project" else (home / ".mcp.json")
@@ -222,7 +222,7 @@ def client_config(client: str, scope: str = "user", gpu_arch: str = "auto",
                     "type": "stdio",
                     "command": cmd,
                     "args": args,
-                    "env": {"GAME_UI_MCP_GPU": "auto"},
+                    "env": {"UIFORGE_MCP_GPU": "auto"},
                 }
             }
         }
@@ -238,7 +238,7 @@ def client_config(client: str, scope: str = "user", gpu_arch: str = "auto",
                     "type": "stdio",
                     "command": cmd,
                     "args": args,
-                    "env": {"GAME_UI_MCP_GPU": "auto"},
+                    "env": {"UIFORGE_MCP_GPU": "auto"},
                 }
             }
         }
@@ -247,26 +247,26 @@ def client_config(client: str, scope: str = "user", gpu_arch: str = "auto",
 
     if c == "antigravity":
         cfg_path = home / ".gemini" / "antigravity" / "mcp_config.json"
-        cfg = {"mcpServers": {server_name: {"command": cmd, "args": args, "env": {"GAME_UI_MCP_GPU": "auto"}}}}
+        cfg = {"mcpServers": {server_name: {"command": cmd, "args": args, "env": {"UIFORGE_MCP_GPU": "auto"}}}}
         return {"client": c, "path": str(cfg_path), "config": cfg,
                 "notes": "Google Antigravity loads MCP servers from ~/.gemini/antigravity/mcp_config.json and skills from ~/.gemini/config/skills/."}
 
     if c == "cursor":
         cfg_path = (cwd / ".cursor" / "mcp.json") if scope == "project" else (home / ".cursor" / "mcp.json")
-        cfg = {"mcpServers": {server_name: {"command": cmd, "args": args, "env": {"GAME_UI_MCP_GPU": "auto"}}}}
+        cfg = {"mcpServers": {server_name: {"command": cmd, "args": args, "env": {"UIFORGE_MCP_GPU": "auto"}}}}
         return {"client": c, "path": str(cfg_path), "config": cfg,
                 "notes": "Cursor reads ~/.cursor/mcp.json (global) or .cursor/mcp.json (project)."}
 
     if c == "windsurf":
         cfg_path = home / ".codeium" / "windsurf" / "mcp_config.json"
-        cfg = {"mcpServers": {server_name: {"command": cmd, "args": args, "env": {"GAME_UI_MCP_GPU": "auto"}}}}
+        cfg = {"mcpServers": {server_name: {"command": cmd, "args": args, "env": {"UIFORGE_MCP_GPU": "auto"}}}}
         return {"client": c, "path": str(cfg_path), "config": cfg,
                 "notes": "Windsurf reads ~/.codeium/windsurf/mcp_config.json."}
 
     return {
         "client": "chatgpt",
         "transport": "streamable-http",
-        "start_command": f"game-ui-mcp serve --transport http --host 127.0.0.1 --port {http_port}",
+        "start_command": f"uiforge-mcp serve --transport http --host 127.0.0.1 --port {http_port}",
         "endpoint_url": f"http://127.0.0.1:{http_port}/mcp",
         "config": {"name": server_name, "transport": "streamable-http", "url": f"http://127.0.0.1:{http_port}/mcp"},
         "notes": "ChatGPT Apps/Connectors require an HTTPS Streamable HTTP MCP URL. Run the local HTTP server and expose it via your own HTTPS tunnel (e.g. cloudflared/ngrok) when connecting from ChatGPT Web.",
@@ -301,14 +301,14 @@ def write_client_config(spec: dict[str, Any]) -> Path:
 
 
 def cli_main(argv: list[str] | None = None) -> None:
-    """Entry point for game-ui-mcp: runs MCP stdio server by default or dispatches CLI utilities."""
+    """Entry point for uiforge-mcp: runs MCP stdio server by default or dispatches CLI utilities."""
     args_list = sys.argv[1:] if argv is None else list(argv)
     if not args_list:
         from .server import mcp
         mcp.run()
         return
 
-    parser = argparse.ArgumentParser(prog="game-ui-mcp", description="Local deterministic UI design, PBR & multi-engine MCP server.")
+    parser = argparse.ArgumentParser(prog="uiforge-mcp", description="Local deterministic UI design, PBR & multi-engine MCP server.")
     sub = parser.add_subparsers(dest="cmd")
 
     p_srv = sub.add_parser("serve", help="Run the MCP server (stdio or Streamable HTTP for ChatGPT/remote clients).")
@@ -326,7 +326,7 @@ def cli_main(argv: list[str] | None = None) -> None:
     p_set.add_argument("client", choices=(*CLIENTS, "all"))
     p_set.add_argument("--scope", choices=("user", "project"), default="user")
     p_set.add_argument("--gpu", choices=("auto", "nvidia", "amd", "intel", "apple", "cpu"), default="auto")
-    p_set.add_argument("--name", default="game-ui")
+    p_set.add_argument("--name", default="uiforge")
     p_set.add_argument("--local-python", action="store_true")
     p_set.add_argument("--port", type=int, default=8765)
     p_set.add_argument("--write", action="store_true", help="Write/merge directly into the IDE config file.")

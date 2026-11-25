@@ -5,12 +5,12 @@ import numpy as np
 import pytest
 from PIL import Image
 
-from game_ui_mcp import export as ex
-from game_ui_mcp import geometry as geo
-from game_ui_mcp import server as s
-from game_ui_mcp.colors import parse_color
-from game_ui_mcp.render import parse_anchor
-from game_ui_mcp.store import Store
+from uiforge_mcp import export as ex
+from uiforge_mcp import geometry as geo
+from uiforge_mcp import server as s
+from uiforge_mcp.colors import parse_color
+from uiforge_mcp.render import parse_anchor
+from uiforge_mcp.store import Store
 
 
 @pytest.fixture()
@@ -282,9 +282,9 @@ def test_nine_slice_auto_and_metadata(ws):
     assert f["unity"]["spriteBorder_LBRT"] == [b["left"], b["bottom"], b["right"], b["top"]]
     assert f["roblox"]["SliceCenter"] == [b["left"], b["top"], f["width"] - b["right"], f["height"] - b["bottom"]]
     assert abs(f["unreal"]["margin_LTRB"][0] - b["left"] / f["width"]) < 1e-4
-    side = json.loads((ws / "out" / "panel.gameui.json").read_text())
+    side = json.loads((ws / "out" / "panel.uiforge.json").read_text())
     assert side["has_border"] is True and side["border_left"] == b["left"]
-    manifest = json.loads((ws / "out" / "game_ui_manifest.json").read_text())
+    manifest = json.loads((ws / "out" / "uiforge_manifest.json").read_text())
     assert "panel" in manifest["assets"]
 
 
@@ -335,7 +335,7 @@ def test_atlas_and_engine_helpers(ws):
     lua = Path(res["file"]).read_text()
     assert 'id = "rbxassetid://123456"' in lua and "Rect.new(" in lua and res["assets_without_id"] == []
     s.export_asset("panel", engine="roblox", out_dir=str(out_dir), nine_slice="auto")
-    assert json.loads((out_dir / "game_ui_manifest.json").read_text())["assets"]["panel"]["roblox_id"] == "123456"
+    assert json.loads((out_dir / "uiforge_manifest.json").read_text())["assets"]["panel"]["roblox_id"] == "123456"
 
     unity = s.write_engine_helpers("unity", str(ws / "Assets" / "Editor"))
     assert "AssetPostprocessor" in Path(unity["file"]).read_text()
@@ -506,7 +506,7 @@ def test_conic_on_partial_arc_is_centred_on_the_circle(ws):
 
 
 
-from game_ui_mcp import animation as am
+from uiforge_mcp import animation as am
 
 
 def test_easing_endpoints_and_shapes():
@@ -654,7 +654,7 @@ def test_batch_animation_ops_and_undo(ws):
 
 
 
-from game_ui_mcp import effects as fxlib
+from uiforge_mcp import effects as fxlib
 
 
 def test_round_dilation_and_float_blur():
@@ -1113,7 +1113,7 @@ def test_presets_safe_area_and_guides(ws):
 
 
 def test_colour_vision_simulation_changes_red_green():
-    from game_ui_mcp.viewing import simulate
+    from uiforge_mcp.viewing import simulate
     img = Image.new("RGBA", (2, 1))
     img.putpixel((0, 0), (220, 40, 40, 255))
     img.putpixel((1, 0), (40, 180, 40, 255))
@@ -1161,10 +1161,10 @@ def test_states_render_and_export(ws, tmp_path):
     assert f["godot_texture_button"]["texture_pressed"] == "btn_pressed.png"
     assert f["roblox_image_button"]["HoverImage"] == "btn_hover.png"
     assert tuple(np.asarray(Image.open(tmp_path / "o" / "btn_pressed.png"))[20, 50][:3]) == (255, 0, 0)
-    manifest = json.loads((tmp_path / "o" / "game_ui_manifest.json").read_text())
+    manifest = json.loads((tmp_path / "o" / "uiforge_manifest.json").read_text())
     assert manifest["assets"]["btn"]["states"]["hover"] == "btn_hover" and "btn_hover" in manifest["assets"]
     s.write_engine_helpers("roblox", str(tmp_path / "o"))
-    assert 'hover = "btn_hover"' in (tmp_path / "o" / "GameUiAssets.luau").read_text()
+    assert 'hover = "btn_hover"' in (tmp_path / "o" / "UiForgeAssets.luau").read_text()
     with pytest.raises(ValueError):
         s.preview("btn", state="nope")
     s.delete_state("btn", "pressed")

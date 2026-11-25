@@ -1,6 +1,6 @@
 """Pluggable GPU acceleration registry: NVIDIA CUDA (CuPy) + Cross-Vendor WebGPU (wgpu-py) + CPU fallback.
 
-Configure via GAME_UI_MCP_GPU:
+Configure via UIFORGE_MCP_GPU:
   "auto" / "1" (default): prefers CUDA (CuPy) -> WebGPU (wgpu-py Vulkan/DX12/Metal) -> CPU (OpenCV SIMD + NumPy).
   "cuda": force NVIDIA CuPy backend when available.
   "wgpu": force WebGPU compute backend (Vulkan / DirectX 12 / Metal via wgpu-py).
@@ -37,7 +37,7 @@ def select_backend(name: str | None) -> None:
 def _requested_mode() -> str:
     if _OVERRIDE is not None:
         return _OVERRIDE
-    raw = os.environ.get("GAME_UI_MCP_GPU", "auto").strip().lower()
+    raw = os.environ.get("UIFORGE_MCP_GPU", "auto").strip().lower()
     if raw in ("0", "false", "off", "no", "cpu"):
         return "cpu"
     if raw in ("wgpu", "webgpu"):
@@ -138,5 +138,5 @@ def info() -> dict[str, Any]:
         out["device"] = wgpu_info.get("device", "WebGPU")
         out["adapter_backend"] = wgpu_info.get("backend_type", "")
     else:
-        out["hint"] = 'install "game-ui-mcp[wgpu]" (cross-GPU Vulkan/DX12/Metal) or "game-ui-mcp[gpu]" (NVIDIA CUDA 12)'
+        out["hint"] = 'install "uiforge-mcp[wgpu]" (cross-GPU Vulkan/DX12/Metal) or "uiforge-mcp[gpu]" (NVIDIA CUDA 12)'
     return out

@@ -747,7 +747,7 @@ def build(store, canvases: list[dict], out: Path, layout: str, language: str | N
         all_fonts.update(ctx.fonts)
         cfg = _ix_config(c, ix, pages)
         has_runtime = bool(ix or c.get("focus_order") or c.get("bindings") or c.get("data"))
-        ix_script = ("<script>window.GAMEUI_IX=" + json.dumps(cfg, ensure_ascii=False).replace("</", "<\\/")
+        ix_script = ("<script>window.UIFORGE_IX=" + json.dumps(cfg, ensure_ascii=False).replace("</", "<\\/")
                      + "</script>") if has_runtime else ""
         report.setdefault("parts", {})[c["id"]] = {
             "file": pages[c["id"]], "fonts_css": fonts_css, "size": size, "bg_css": bg_css,
@@ -787,7 +787,7 @@ def _ix_attrs(key: str, ix_ids: set, clickable: set, existing: str, tab: int) ->
 
 
 def _ix_config(c: dict, ix: list, pages: dict) -> dict:
-    """The page's interaction rules, focus order, and data bindings for the runtime (gameuiAttach)."""
+    """The page's interaction rules, focus order, and data bindings for the runtime (uiforgeAttach)."""
     from . import binding
     rules = []
     for rule in ix:
@@ -857,7 +857,7 @@ body.fit .page{transform-origin:center center}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 """
 
-RUNTIME_JS = """function gameuiApplyData(root, cfg, patch) {
+RUNTIME_JS = """function uiforgeApplyData(root, cfg, patch) {
   cfg = cfg || {};
   var d = Object.assign({}, cfg.data || {}, patch || {});
   var tpls = cfg.templates || {};
@@ -880,7 +880,7 @@ RUNTIME_JS = """function gameuiApplyData(root, cfg, patch) {
   });
   return d;
 }
-function gameuiAttach(root, cfg, go, onSfx) {
+function uiforgeAttach(root, cfg, go, onSfx) {
   cfg = cfg || {};
   var rules = cfg.rules || [], anims = cfg.anims || {}, timers = [];
   function act(r) {
@@ -929,7 +929,7 @@ function gameuiAttach(root, cfg, go, onSfx) {
     if (el && el.dataset && el.dataset.bind) {
       cfg.data = Object.assign({}, cfg.data || {}, {});
       cfg.data[el.dataset.bind] = el.value;
-      gameuiApplyData(root, cfg, cfg.data);
+      uiforgeApplyData(root, cfg, cfg.data);
     }
   });
   root.addEventListener('click', function (e) {
@@ -964,13 +964,13 @@ function gameuiAttach(root, cfg, go, onSfx) {
     raf = requestAnimationFrame(pollGamepad);
   }
   if (typeof requestAnimationFrame === 'function' && navigator.getGamepads) raf = requestAnimationFrame(pollGamepad);
-  if ((cfg.bindings && cfg.bindings.length) || (cfg.data && Object.keys(cfg.data).length)) gameuiApplyData(root, cfg, cfg.data);
+  if ((cfg.bindings && cfg.bindings.length) || (cfg.data && Object.keys(cfg.data).length)) uiforgeApplyData(root, cfg, cfg.data);
   fire(null, 'load');
   return function () { timers.forEach(clearTimeout); if (raf) cancelAnimationFrame(raf); document.removeEventListener('keydown', key); };
 }
 """
 
-_APP_JS = """// game-ui-mcp web export: fit-to-window scaling, links, overlays, interactions, gamepad nav, data binding
+_APP_JS = """// uiforge-mcp web export: fit-to-window scaling, links, overlays, interactions, gamepad nav, data binding
 (function () {
   const page = document.querySelector('.page');
   function fit() {
@@ -997,8 +997,8 @@ _APP_JS = """// game-ui-mcp web export: fit-to-window scaling, links, overlays, 
   }
   addEventListener('message', e => { if (e.data === 'close-overlay') document.querySelectorAll('.overlay').forEach(o => o.remove()); });
   if (page) {
-    gameuiAttach(page, window.GAMEUI_IX, (href, mode) => go({ dataset: { href: href, mode: mode } }));
-    window.gameuiSetData = patch => gameuiApplyData(page, window.GAMEUI_IX, patch);
+    uiforgeAttach(page, window.UIFORGE_IX, (href, mode) => go({ dataset: { href: href, mode: mode } }));
+    window.uiforgeSetData = patch => uiforgeApplyData(page, window.UIFORGE_IX, patch);
   }
 """ + RUNTIME_JS + """})();
 """
@@ -1166,7 +1166,7 @@ def build_react(store, canvases: list[dict], out: Path, language: str | None, in
                                          + part["page_css"] + "\n", encoding="utf-8")
         jsx, images, svgs = to_jsx(part["body"], tailwind=tailwind)
         lines = ["import { useEffect, useRef } from 'react';", "import './styles.css';", f"import './{name}.css';",
-                 "import { gameuiAttach, gameuiApplyData } from './gameui-runtime.js';"]
+                 "import { uiforgeAttach, uiforgeApplyData } from './uiforge-runtime.js';"]
         lines += [f"import {var} from './{path}';" for path, var in images.items()]
         lines += ["", f"const IX = {json.dumps(part['ix'], ensure_ascii=False)};"]
         lines += [f"const SVG_{i} = {json.dumps(s, ensure_ascii=False)};" for i, s in enumerate(svgs)]
@@ -1186,11 +1186,11 @@ def build_react(store, canvases: list[dict], out: Path, language: str | None, in
             sig = f"export default function {name}({{ onNavigate, onSfx, data, className }}) {{"
             ref_decl = "  const ref = useRef(null);"
         lines += ["", sig, ref_decl,
-                  "  useEffect(() => gameuiAttach(ref.current, IX, (href, mode, to) => {",
+                  "  useEffect(() => uiforgeAttach(ref.current, IX, (href, mode, to) => {",
                   "    if (onNavigate) return onNavigate(to || href, mode);",
                   "    if (mode === 'url') window.open(href, '_blank', 'noopener');",
                   "  }, onSfx), [onNavigate, onSfx]);",
-                  "  useEffect(() => { if (ref.current && data) gameuiApplyData(ref.current, IX, data); }, [data]);",
+                  "  useEffect(() => { if (ref.current && data) uiforgeApplyData(ref.current, IX, data); }, [data]);",
                   "  return (",
                   f'    <main ref={{ref}} className={{`{page_cls} ${{className || ""}}`.trim()}} data-w="{_n(part["W"])}" data-h="{_n(part["H"])}">',
                   f"      {jsx}",
@@ -1204,9 +1204,9 @@ def build_react(store, canvases: list[dict], out: Path, language: str | None, in
     css = (out / "styles.css").read_text(encoding="utf-8")
     css = "\n".join(line for line in css.splitlines() if not line.startswith(("html,body", "body.fit", "@view-transition")))
     (out / "styles.css").write_text(css + "\n", encoding="utf-8")
-    runtime_esm = RUNTIME_JS.replace("function gameuiApplyData", "export function gameuiApplyData").replace(
-        "function gameuiAttach", "export function gameuiAttach")
-    (out / "gameui-runtime.js").write_text(runtime_esm, encoding="utf-8")
+    runtime_esm = RUNTIME_JS.replace("function uiforgeApplyData", "export function uiforgeApplyData").replace(
+        "function uiforgeAttach", "export function uiforgeAttach")
+    (out / "uiforge-runtime.js").write_text(runtime_esm, encoding="utf-8")
     idx_ext = "ts" if typescript else "js"
     (out / f"index.{idx_ext}").write_text(
         "".join(f"export {{ default as {Path(cmp).stem} }} from './{Path(cmp).stem}';\n" for cmp in components),

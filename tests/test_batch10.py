@@ -5,10 +5,10 @@ import shutil
 import numpy as np
 import pytest
 
-from game_ui_mcp import server as s
-from game_ui_mcp import tools_delivery as d
-from game_ui_mcp import tools_design as td
-from game_ui_mcp.store import Store
+from uiforge_mcp import server as s
+from uiforge_mcp import tools_delivery as d
+from uiforge_mcp import tools_design as td
+from uiforge_mcp.store import Store
 
 
 @pytest.fixture()
@@ -44,12 +44,12 @@ def test_interactions_validate_and_reach_web(ws):
         d.set_interaction("menu", "btn", "wiggle", "back")
     out = s.export_web(["menu", "settings"], out_dir=str(ws / "web"))
     page = (ws / "web" / "index.html").read_text(encoding="utf-8")
-    assert 'data-ix="btn"' in page and "window.GAMEUI_IX" in page
+    assert 'data-ix="btn"' in page and "window.UIFORGE_IX" in page
     assert ".page.p-hover_in #btn{animation:" in page and ".page.s-selected #btn{" in page and "!important" in page
-    cfg = json.loads(page.split("window.GAMEUI_IX=")[1].split("</script>")[0])
+    cfg = json.loads(page.split("window.UIFORGE_IX=")[1].split("</script>")[0])
     nav = next(r for r in cfg["rules"] if r["action"] == "navigate")
     assert nav["href"] == "settings.html" and nav["delay"] == 0.2
-    assert "gameuiAttach" in (ws / "web" / "app.js").read_text(encoding="utf-8")
+    assert "uiforgeAttach" in (ws / "web" / "app.js").read_text(encoding="utf-8")
     assert out["pages"] == ["index.html", "settings.html"]
     d.set_interaction("menu", "canvas", "key:Escape", "back", remove=True)
     assert len(s.store().get("menu")["interactions"]) == 4
@@ -66,9 +66,9 @@ def test_react_export_is_valid_jsx(ws):
     assert out["components"] == ["Menu.jsx", "Settings.jsx"]
     jsx = (ws / "react" / "Menu.jsx").read_text(encoding="utf-8")
     assert "className=" in jsx and "class=" not in jsx and "style={{" in jsx
-    assert "dangerouslySetInnerHTML" in jsx and "gameuiAttach" in jsx and "onNavigate" in jsx
+    assert "dangerouslySetInnerHTML" in jsx and "uiforgeAttach" in jsx and "onNavigate" in jsx
     assert not (ws / "react" / "index.html").exists()
-    assert "export function gameuiAttach" in (ws / "react" / "gameui-runtime.js").read_text(encoding="utf-8")
+    assert "export function uiforgeAttach" in (ws / "react" / "uiforge-runtime.js").read_text(encoding="utf-8")
 
 
 @pytest.mark.skipif(not shutil.which("ffmpeg"), reason="ffmpeg not installed")

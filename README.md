@@ -2,36 +2,36 @@
 
 **English** · [Türkçe](README.tr.md)
 
-# game-ui-mcp
+# uiforge-mcp
 
 ### Open-source local design, material, animation & engine-export MCP server for AI agents.
 
 **Describe a game HUD, menu, or app screen. Watch it build live. Ship engine-ready art, interactive code, and video — with zero subscriptions, zero call limits, and zero image models.**
 
-[![tests](https://img.shields.io/github/actions/workflow/status/TENETTE/game-ui-mcp/tests.yml?branch=main&style=flat-square&label=tests)](https://github.com/TENETTE/game-ui-mcp/actions/workflows/tests.yml)
+[![tests](https://img.shields.io/github/actions/workflow/status/TENETTE/uiforge-mcp/tests.yml?branch=main&style=flat-square&label=tests)](https://github.com/TENETTE/uiforge-mcp/actions/workflows/tests.yml)
 [![MCP tools](https://img.shields.io/badge/MCP-92_tools_+_Resources_+_Prompts-7c5cff?style=flat-square)](#tools)
 [![Materials](https://img.shields.io/badge/Materials-39_Cook--Torrance_PBR-f59e0b?style=flat-square)](#materials)
 [![PBR Maps](https://img.shields.io/badge/Export-Game_Engines_%7C_.NET_WPF_%7C_C++_Qt_ImGui_%7C_TSX-ec4899?style=flat-square)](#what-you-can-ship)
 [![GPU optional](https://img.shields.io/badge/GPU-CUDA_12_%2B_WebGPU_(wgpu)-76b900?style=flat-square)](#performance)
 [![MIT license](https://img.shields.io/badge/license-MIT-22c55e?style=flat-square)](LICENSE)
 
-[Why game-ui-mcp](#why-game-ui-mcp) · [Quick start](#quick-start) · [What you can ship](#what-you-can-ship) · [Showcases](#showcases) · [Performance](#performance) · [Features](#features) · [Tools](#tools) · [FAQ](#faq)
+[Why uiforge-mcp](#why-uiforge-mcp) · [Quick start](#quick-start) · [What you can ship](#what-you-can-ship) · [Showcases](#showcases) · [Performance](#performance) · [Features](#features) · [Tools](#tools) · [FAQ](#faq)
 
 ```bash
-claude mcp add game-ui -s user -- uvx --from git+https://github.com/TENETTE/game-ui-mcp game-ui-mcp
+claude mcp add uiforge -s user -- uvx --from git+https://github.com/TENETTE/uiforge-mcp uiforge-mcp
 ```
 
 <br />
 
-<img src="docs/banner.png" alt="game-ui-mcp banner, drawn with game-ui-mcp itself" width="1200" />
+<img src="docs/banner.png" alt="uiforge-mcp banner, drawn with uiforge-mcp itself" width="1200" />
 
 </div>
 
 ---
 
-## Why game-ui-mcp?
+## Why uiforge-mcp?
 
-Paid design platforms increasingly gate AI design workflows behind seat licenses, monthly MCP call limits, splash screens, or cloud lock-in. **game-ui-mcp** is a **100% local, MIT-licensed** alternative built from the ground up for AI coding & design agents:
+Paid design platforms increasingly gate AI design workflows behind seat licenses, monthly MCP call limits, splash screens, or cloud lock-in. **uiforge-mcp** is a **100% local, MIT-licensed** alternative built from the ground up for AI coding & design agents:
 
 - **Deterministic vector & Cook-Torrance PBR engine:** No diffusion hallucinations, no broken text, no upload to external APIs. Every pixel comes from editable vector shapes, HarfBuzz-shaped typography, physically-based Cook-Torrance GGX materials with HDR studio IBL + ACES filmic tone mapping, and keyframe tracks.
 - **Closed visual feedback loop:** The agent draws, inspects the rendered PNG with `preview`, audits layout/contrast/alignment with `review_canvas`, fixes issues automatically, and lets **you** watch edits in real time via `live_preview` in your browser.
@@ -39,12 +39,12 @@ Paid design platforms increasingly gate AI design workflows behind seat licenses
 
 ### Compared to paid tools
 
-| Capability | **game-ui-mcp** | Figma + MCP | Pencil (`pen.dev`) | Rive | Envy UI |
+| Capability | **uiforge-mcp** | Figma + MCP | Pencil (`pen.dev`) | Rive | Envy UI |
 | --- | :---: | :---: | :---: | :---: | :---: |
 | **Price & license** | **\$0 · MIT Open Source** | \$16–\$90/seat/mo | \$16–\$48/mo | \$9–\$120/mo (splash on free) | Paid desktop app |
 | **MCP tool calls** | **Unlimited · Local** | Metered (20/mo free, 200/day Pro) | 5 agent-days/mo free | CLI publish caps | — |
 | **Runs 100% offline** | ✅ | ❌ Cloud | ✅ | ❌ Cloud editor | ✅ |
-| **Git-local project files** | ✅ Auto `.gameui/` | ❌ | ✅ `.pen` | ❌ Binary `.riv` | ✅ |
+| **Git-local project files** | ✅ Auto `.uiforge/` | ❌ | ✅ `.pen` | ❌ Binary `.riv` | ✅ |
 | **Live browser preview** | ✅ `live_preview` (SSE) | ✅ | ✅ | ✅ | ✅ |
 | **Unity / Unreal / Godot / Roblox export** | ✅ All 4 + controllers + native widgets | ❌ Manual rebuild | ❌ Web/HTML | Partial (runtime plugin) | Godot / Unity / Web |
 | **C# .NET (WPF/Avalonia/WinUI) & C++ (Qt/ImGui)** | ✅ Native XAML / QML / ImGui + ViewModel | ❌ | ❌ | ❌ | ❌ |
@@ -69,18 +69,18 @@ Auto-detect your GPU architecture (`nvidia` / `amd` / `intel` / `apple` / `cpu`)
 
 ```bash
 # Inspect your GPU, active backend, and installed tools
-uvx --from git+https://github.com/TENETTE/game-ui-mcp game-ui-mcp doctor
+uvx --from git+https://github.com/TENETTE/uiforge-mcp uiforge-mcp doctor
 
 # Auto-configure your IDE (merges safely without overwriting existing servers)
-uvx --from git+https://github.com/TENETTE/game-ui-mcp game-ui-mcp setup opencode --write
-uvx --from git+https://github.com/TENETTE/game-ui-mcp game-ui-mcp setup claude --write
-uvx --from git+https://github.com/TENETTE/game-ui-mcp game-ui-mcp setup visualstudio --write
-uvx --from git+https://github.com/TENETTE/game-ui-mcp game-ui-mcp setup vscode --scope project --write
-uvx --from git+https://github.com/TENETTE/game-ui-mcp game-ui-mcp setup antigravity --write
-uvx --from git+https://github.com/TENETTE/game-ui-mcp game-ui-mcp setup cursor --write
+uvx --from git+https://github.com/TENETTE/uiforge-mcp uiforge-mcp setup opencode --write
+uvx --from git+https://github.com/TENETTE/uiforge-mcp uiforge-mcp setup claude --write
+uvx --from git+https://github.com/TENETTE/uiforge-mcp uiforge-mcp setup visualstudio --write
+uvx --from git+https://github.com/TENETTE/uiforge-mcp uiforge-mcp setup vscode --scope project --write
+uvx --from git+https://github.com/TENETTE/uiforge-mcp uiforge-mcp setup antigravity --write
+uvx --from git+https://github.com/TENETTE/uiforge-mcp uiforge-mcp setup cursor --write
 
 # ChatGPT Apps / Connectors (Streamable HTTP MCP server)
-uvx --from git+https://github.com/TENETTE/game-ui-mcp game-ui-mcp serve --transport http --port 8765
+uvx --from git+https://github.com/TENETTE/uiforge-mcp uiforge-mcp serve --transport http --port 8765
 ```
 
 See [`configs/README.md`](configs/README.md) for manual JSON snippets and [`docs/COMPATIBILITY.md`](docs/COMPATIBILITY.md) for the full 2026 engine/API compatibility matrix.
@@ -89,11 +89,11 @@ See [`configs/README.md`](configs/README.md) for manual JSON snippets and [`docs
 
 | GPU Vendor / Architecture | Install Extra | Runtime Used |
 | --- | --- | --- |
-| **NVIDIA (CUDA 12 + WebGPU)** | `game-ui-mcp[nvidia]` (or `[gpu]`) | Fused CuPy CUDA 12 + `wgpu` fallback |
-| **AMD (Vulkan / DirectX 12)** | `game-ui-mcp[amd]` | Shared portable `wgpu` WGSL compute |
-| **Intel Arc / Xe (Vulkan / D3D12)** | `game-ui-mcp[intel]` | Shared portable `wgpu` WGSL compute |
-| **Apple Silicon (Metal)** | `game-ui-mcp[apple]` | Shared portable `wgpu` WGSL compute |
-| **CPU-Only (Universal)** | `game-ui-mcp` (default / `[cpu]`) | OpenCV C++ SIMD + NumPy (0 GPU deps) |
+| **NVIDIA (CUDA 12 + WebGPU)** | `uiforge-mcp[nvidia]` (or `[gpu]`) | Fused CuPy CUDA 12 + `wgpu` fallback |
+| **AMD (Vulkan / DirectX 12)** | `uiforge-mcp[amd]` | Shared portable `wgpu` WGSL compute |
+| **Intel Arc / Xe (Vulkan / D3D12)** | `uiforge-mcp[intel]` | Shared portable `wgpu` WGSL compute |
+| **Apple Silicon (Metal)** | `uiforge-mcp[apple]` | Shared portable `wgpu` WGSL compute |
+| **CPU-Only (Universal)** | `uiforge-mcp` (default / `[cpu]`) | OpenCV C++ SIMD + NumPy (0 GPU deps) |
 
 ### Configurable Quality Tiers & Visual Style Presets
 
@@ -104,7 +104,7 @@ Not every project should look dark, gritty or AAA. Choose the exact visual style
 ### Claude Code
 
 ```bash
-claude mcp add game-ui -s user -- uvx --from git+https://github.com/TENETTE/game-ui-mcp game-ui-mcp
+claude mcp add uiforge -s user -- uvx --from git+https://github.com/TENETTE/uiforge-mcp uiforge-mcp
 ```
 
 ### Cursor, Windsurf, Claude Desktop, Antigravity & other MCP clients
@@ -114,9 +114,9 @@ Add to your MCP config (`~/.cursor/mcp.json`, Claude Desktop config, or `.vscode
 ```json
 {
   "mcpServers": {
-    "game-ui": {
+    "uiforge": {
       "command": "uvx",
-      "args": ["--from", "git+https://github.com/TENETTE/game-ui-mcp", "game-ui-mcp"]
+      "args": ["--from", "git+https://github.com/TENETTE/uiforge-mcp", "uiforge-mcp"]
     }
   }
 }
@@ -127,17 +127,17 @@ Restart your client afterwards.
 <details>
 <summary><strong>Optional extras: NVIDIA GPU (CUDA), Video (ffmpeg), Git-local mode & Agent Skill</strong></summary>
 
-- **Cross-GPU WebGPU acceleration (`[wgpu]`):** Compiles shaders & Cook-Torrance PBR to standard WGSL `@compute` via `wgpu-py` (Vulkan / DirectX 12 / Metal; **32× faster** shaders & **7.1× faster** PBR vs CPU on RTX 4060 Ti Vulkan). Select via `GAME_UI_MCP_GPU=wgpu|cuda|cpu|auto`. *(Honesty note: physically verified on NVIDIA RTX 4060 Ti Vulkan/D3D12; AMD, Intel and Apple Silicon Metal are architecturally targeted via standard WGSL but not physically tested.)*
+- **Cross-GPU WebGPU acceleration (`[wgpu]`):** Compiles shaders & Cook-Torrance PBR to standard WGSL `@compute` via `wgpu-py` (Vulkan / DirectX 12 / Metal; **32× faster** shaders & **7.1× faster** PBR vs CPU on RTX 4060 Ti Vulkan). Select via `UIFORGE_MCP_GPU=wgpu|cuda|cpu|auto`. *(Honesty note: physically verified on NVIDIA RTX 4060 Ti Vulkan/D3D12; AMD, Intel and Apple Silicon Metal are architecturally targeted via standard WGSL but not physically tested.)*
   ```bash
-  uvx --from "game-ui-mcp[wgpu] @ git+https://github.com/TENETTE/game-ui-mcp" game-ui-mcp
+  uvx --from "uiforge-mcp[wgpu] @ git+https://github.com/TENETTE/uiforge-mcp" uiforge-mcp
   ```
-- **NVIDIA GPU acceleration (`[gpu]`):** Compiles shader fills & materials into fused CUDA C++ kernels via CuPy + CUDA 12 (~1 GB download; **130× faster** GPU shaders on RTX 4060 Ti). Falls back transparently to WebGPU or CPU with identical output. Disable anytime with `GAME_UI_MCP_GPU=0`.
+- **NVIDIA GPU acceleration (`[gpu]`):** Compiles shader fills & materials into fused CUDA C++ kernels via CuPy + CUDA 12 (~1 GB download; **130× faster** GPU shaders on RTX 4060 Ti). Falls back transparently to WebGPU or CPU with identical output. Disable anytime with `UIFORGE_MCP_GPU=0`.
   ```bash
-  claude mcp add game-ui -s user -- uvx --from "game-ui-mcp[gpu] @ git+https://github.com/TENETTE/game-ui-mcp" game-ui-mcp
+  claude mcp add uiforge -s user -- uvx --from "uiforge-mcp[gpu] @ git+https://github.com/TENETTE/uiforge-mcp" uiforge-mcp
   ```
 - **MP4 / WebM video (`[video]`):** Uses `ffmpeg` from PATH (`winget install ffmpeg`, `brew install ffmpeg`), or install the `[video]` extra to bundle one.
-- **Git-local project workspace:** Create a `.gameui/` folder in your project root and the server automatically stores sorted, diff-friendly project JSONs right alongside your code (otherwise defaults to `~/GameUI`, or set `GAME_UI_MCP_DIR`).
-- **Agent Skill:** [`skill/game-ui-mcp/SKILL.md`](skill/game-ui-mcp/SKILL.md) teaches your agent UI craft (layer order, 2.5D lighting, 9-slice rules, timing curves, review pass, and engine hand-off). Copy `skill/game-ui-mcp/` to `~/.claude/skills/` (or upload as zip in Claude Settings → Capabilities → Skills).
+- **Git-local project workspace:** Create a `.uiforge/` folder in your project root and the server automatically stores sorted, diff-friendly project JSONs right alongside your code (otherwise defaults to `~/UIForge`, or set `UIFORGE_MCP_DIR`).
+- **Agent Skill:** [`skill/uiforge-mcp/SKILL.md`](skill/uiforge-mcp/SKILL.md) teaches your agent UI craft (layer order, 2.5D lighting, 9-slice rules, timing curves, review pass, and engine hand-off). Copy `skill/uiforge-mcp/` to `~/.claude/skills/` (or upload as zip in Claude Settings → Capabilities → Skills).
 
 </details>
 
@@ -159,7 +159,7 @@ More ideas:
 ### Update
 
 ```bash
-uv cache clean game-ui-mcp
+uv cache clean uiforge-mcp
 ```
 
 ---
@@ -169,7 +169,7 @@ uv cache clean game-ui-mcp
 ```mermaid
 flowchart LR
     U["Your Prompt"] --> A["AI Agent"]
-    A -->|"92 MCP tools"| S["game-ui-mcp<br/>(Local · Deterministic)"]
+    A -->|"92 MCP tools"| S["uiforge-mcp<br/>(Local · Deterministic)"]
     S -->|"Live SSE"| L["Browser Studio<br/>live_preview"]
     S -->|"PNG + review_canvas"| C{"Looks right?"}
     C -->|"Fix issues"| A
@@ -185,15 +185,15 @@ flowchart LR
 
 | Target | What you get | Tools |
 | --- | --- | --- |
-| **Unity** | 9-slice sprites + `GameUiImporter.cs`, UI Toolkit (`.uxml` + `.uss` + `Controller.cs`), **uGUI Canvas/RectTransform builder** (`unity-ugui`), C# tokens | `export_asset`, `export_screen`, `write_engine_helpers` |
+| **Unity** | 9-slice sprites + `UiForgeImporter.cs`, UI Toolkit (`.uxml` + `.uss` + `Controller.cs`), **uGUI Canvas/RectTransform builder** (`unity-ugui`), C# tokens | `export_asset`, `export_screen`, `write_engine_helpers` |
 | **Godot 4** | `.tscn` scenes + `_controller.gd` (data binding, SFX signals, gamepad `focus_neighbor_*`), `StyleBoxTexture .tres`, GDScript tokens | `export_screen`, `export_asset`, `write_engine_helpers` |
 | **Unreal Engine** | Box brushes with normalized margins, automated Python editor import script | `export_asset`, `write_engine_helpers` |
-| **Roblox** | `LocalScript` ScreenGui builder, `SliceCenter` / `SliceScale` metadata, `GameUiAssets.luau`, Luau tokens | `export_screen`, `export_asset`, `write_engine_helpers` |
+| **Roblox** | `LocalScript` ScreenGui builder, `SliceCenter` / `SliceScale` metadata, `UiForgeAssets.luau`, Luau tokens | `export_screen`, `export_asset`, `write_engine_helpers` |
 | **C# / .NET Desktop** | **WPF** (`.xaml` + `.xaml.cs` + `INotifyPropertyChanged` ViewModel for .NET Framework 4.8 & .NET 8/9), **Avalonia** (`.axaml`), **WinUI 3** (`.xaml`) with native `TextBox`/`PasswordBox`/`ScrollViewer` | `export_screen` |
 | **C++ Desktop & Tools** | **Qt 6 Quick** (`.qml` with `TextField`, `ScrollView`, properties & signals), **Dear ImGui** (self-contained C++17 `_ui.hpp` with `State`, `InputTextWithHint`, `BeginChild`) | `export_screen` |
 | **Engine PBR Maps** | **Albedo, Tangent Normal (OpenGL & DirectX), Roughness, Metallic, AO, Height, ORM packed + Godot 4 `CanvasTexture .tres`** for live dynamic engine lighting | `export_pbr_maps` |
 | **React & TypeScript** | `<Screen>.jsx` or typed **`<Screen>.tsx`**, CSS or **Tailwind utilities**, live `<input>` / scrollable views, `data` prop bindings, `onNavigate` / `onSfx`, keyboard & **Gamepad API** navigation | `export_react` |
-| **Websites & Prototypes** | Responsive HTML/CSS with real selectable text, live inputs & scroll containers, links, overlays, View Transitions, `window.gameuiSetData()`, gamepad focus | `export_web`, `export_prototype` |
+| **Websites & Prototypes** | Responsive HTML/CSS with real selectable text, live inputs & scroll containers, links, overlays, View Transitions, `window.uiforgeSetData()`, gamepad focus | `export_web`, `export_prototype` |
 | **Motion & Video** | **dotLottie v2 (`.lottie` multi-animation + interactive State Machine ZIP)**, vector Lottie JSON, H.264 MP4 / transparent VP9 WebM (streamed), sprite sheets, GIF / APNG / WebP, DOTween & Roblox ease JSON | `export_animation`, `export_layers` |
 | **Atlases, Design & Print** | **TexturePacker / Godot `AtlasTexture` / Unity / CSS sprite atlases**, editable SVG, PackBits RLE PSD, vector PDF, iOS/Android/Web sets, ICO, BMFont | `export_atlas`, `export_svg`, `export_psd`, `export_pdf`, `export_png`, `export_bitmap_font` |
 | **Design Systems** | Developer spec, W3C DTCG JSON, CSS/USS/C#/GDScript/Luau tokens, **`DESIGN.md`** | `export_spec`, `export_theme` |
@@ -202,7 +202,7 @@ flowchart LR
 
 ## Showcases
 
-Every single image and animation below was rendered directly by `game-ui-mcp` (reproducible via `python examples/run_all.py`).
+Every single image and animation below was rendered directly by `uiforge-mcp` (reproducible via `python examples/run_all.py`).
 
 ### Materials
 
@@ -212,7 +212,7 @@ Every single image and animation below was rendered directly by `game-ui-mcp` (r
 
 ### Real-time Engine PBR Texture Maps (`export_pbr_maps`)
 
-**Unique to game-ui-mcp:** Bake any 2D UI badge, medallion, button, or frame directly into **Albedo, Tangent Normal (OpenGL `+Y` / DirectX `-Y`), Roughness, Metallic, Ambient Occlusion, Height, ORM packed, and Godot 4 `CanvasTexture .tres`** so your game engine dynamically lights your UI with real lights.
+**Unique to uiforge-mcp:** Bake any 2D UI badge, medallion, button, or frame directly into **Albedo, Tangent Normal (OpenGL `+Y` / DirectX `-Y`), Roughness, Metallic, Ambient Occlusion, Height, ORM packed, and Godot 4 `CanvasTexture .tres`** so your game engine dynamically lights your UI with real lights.
 
 ![PBR Texture Maps Breakdown](examples/pbr_maps.png)
 
@@ -326,7 +326,7 @@ Key engine optimizations:
 | **Export** | `export_png`, `export_svg`, `export_pdf`, `export_web`, `export_react`, `export_asset`, **`export_pbr_maps`**, `export_layers`, `export_psd`, `export_atlas`, `export_bitmap_font`, `write_engine_helpers` |
 | **Hand-off & Engines** | `export_spec`, `export_theme`, `set_link`, `set_interaction`, `export_prototype`, `export_screen` |
 
-Read-only tools carry `readOnlyHint=True` and destructive tools carry `destructiveHint=True` via MCP `ToolAnnotations`. Native MCP Resources (`gameui://materials`, `gameui://workspace`, `gameui://guide/{topic}`) and Prompts (`design_game_hud`, `design_rpg_panel`, `audit_and_polish`) aid agent discovery while keeping server instructions under 2k chars. See [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) for full dependency & OFL font attribution.
+Read-only tools carry `readOnlyHint=True` and destructive tools carry `destructiveHint=True` via MCP `ToolAnnotations`. Native MCP Resources (`uiforge://materials`, `uiforge://workspace`, `uiforge://guide/{topic}`) and Prompts (`design_game_hud`, `design_rpg_panel`, `audit_and_polish`) aid agent discovery while keeping server instructions under 2k chars. See [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) for full dependency & OFL font attribution.
 
 </details>
 
@@ -361,7 +361,7 @@ No. Every element is built from deterministic vector primitives, shaders, lighti
 <details>
 <summary><strong>Where are my project files saved?</strong></summary>
 
-If your working directory contains a `.gameui/` folder, it uses that automatically (ideal for Git). Otherwise it uses `~/GameUI` (or `GAME_UI_MCP_DIR`). Custom `.ttf`/`.otf` fonts dropped into `<workspace>/fonts/` are picked up automatically.
+If your working directory contains a `.uiforge/` folder, it uses that automatically (ideal for Git). Otherwise it uses `~/UIForge` (or `UIFORGE_MCP_DIR`). Custom `.ttf`/`.otf` fonts dropped into `<workspace>/fonts/` are picked up automatically.
 
 </details>
 
@@ -377,13 +377,13 @@ Tool schemas are concise and long references live behind `guide(topic)` and MCP 
 ## Documentation & Contributing
 
 - **[docs/GUIDE.md](docs/GUIDE.md)** — Full feature, style, animation, and engine reference (Turkish)
-- **[skill/game-ui-mcp/SKILL.md](skill/game-ui-mcp/SKILL.md)** — Agent UI craft skill (Turkish)
+- **[skill/uiforge-mcp/SKILL.md](skill/uiforge-mcp/SKILL.md)** — Agent UI craft skill (Turkish)
 - **[THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md)** — Dependency & bundled SIL OFL-1.1 font audit
 - **[CHANGELOG.md](CHANGELOG.md)** — Release history
 
 ```bash
-git clone https://github.com/TENETTE/game-ui-mcp
-cd game-ui-mcp
+git clone https://github.com/TENETTE/uiforge-mcp
+cd uiforge-mcp
 uv venv && uv pip install -e ".[dev]"
 uv run pytest
 ```

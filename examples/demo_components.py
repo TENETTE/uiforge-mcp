@@ -7,8 +7,8 @@ import json
 import tempfile
 from pathlib import Path
 
-from game_ui_mcp import server as ui
-from game_ui_mcp.store import Store
+from uiforge_mcp import server as ui
+from uiforge_mcp.store import Store
 
 HERE = Path(__file__).resolve().parent
 ui.set_store(Store(Path(tempfile.mkdtemp()) / "ws"))

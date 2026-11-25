@@ -1,4 +1,4 @@
-"""PBR texture map baking showcase & parametric AAA frame gallery, rendered by game-ui-mcp itself.
+"""PBR texture map baking showcase & parametric AAA frame gallery, rendered by uiforge-mcp itself.
 
 Run: python examples/demo_pbr_maps.py  ->  examples/pbr_maps.png, examples/frames.png
 """
@@ -8,10 +8,10 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw
 
-from game_ui_mcp import server as ui
-from game_ui_mcp import tools_delivery as td
-from game_ui_mcp.frames import FRAME_PRESETS
-from game_ui_mcp.store import Store
+from uiforge_mcp import server as ui
+from uiforge_mcp import tools_delivery as td
+from uiforge_mcp.frames import FRAME_PRESETS
+from uiforge_mcp.store import Store
 
 OUT = Path(__file__).resolve().parent
 tmp = Path(tempfile.mkdtemp())

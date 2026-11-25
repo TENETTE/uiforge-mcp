@@ -1,4 +1,4 @@
-"""Ready materials (39 built-in 2.5D PBR-lite) and design variations, drawn with game-ui-mcp itself.
+"""Ready materials (39 built-in 2.5D PBR-lite) and design variations, drawn with uiforge-mcp itself.
 
 Run: python examples/demo_materials.py  ->  examples/materials.png, examples/variations.png
 """
@@ -6,10 +6,10 @@ Run: python examples/demo_materials.py  ->  examples/materials.png, examples/var
 import tempfile
 from pathlib import Path
 
-from game_ui_mcp import server as ui
-from game_ui_mcp import tools_design as td
-from game_ui_mcp.materials import NAMES
-from game_ui_mcp.store import Store
+from uiforge_mcp import server as ui
+from uiforge_mcp import tools_design as td
+from uiforge_mcp.materials import NAMES
+from uiforge_mcp.store import Store
 
 OUT = Path(__file__).resolve().parent
 ui.set_store(Store(Path(tempfile.mkdtemp()) / "ws"))

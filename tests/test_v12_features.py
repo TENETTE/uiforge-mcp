@@ -1,5 +1,5 @@
 """Tests for v0.12 features: 2.5D PBR-lite materials/SDF/bump, PackBits PSD, render cache,
-data binding, live preview studio, engine controller codegen, Unity uGUI, Tailwind React, and .gameui/ mode."""
+data binding, live preview studio, engine controller codegen, Unity uGUI, Tailwind React, and .uiforge/ mode."""
 import json
 import urllib.request
 from pathlib import Path
@@ -7,10 +7,10 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from game_ui_mcp import binding, effects, materials, psd, render, shader
-from game_ui_mcp import server as s
-from game_ui_mcp import tools_delivery as td
-from game_ui_mcp.store import Store, default_workspace
+from uiforge_mcp import binding, effects, materials, psd, render, shader
+from uiforge_mcp import server as s
+from uiforge_mcp import tools_delivery as td
+from uiforge_mcp.store import Store, default_workspace
 
 
 @pytest.fixture()
@@ -112,8 +112,8 @@ def test_engine_controllers_ugui_and_tailwind_react(ws, tmp_path):
     r_res = s.export_react("menu", out_dir=str(tmp_path / "react"), css="tailwind")
     assert r_res["css"] == "tailwind"
     jsx = (tmp_path / "react" / "Menu.jsx").read_text(encoding="utf-8")
-    assert "onSfx" in jsx and "gameuiApplyData" in jsx and "rounded-[12px]" in jsx
-    rt = (tmp_path / "react" / "gameui-runtime.js").read_text(encoding="utf-8")
+    assert "onSfx" in jsx and "uiforgeApplyData" in jsx and "rounded-[12px]" in jsx
+    rt = (tmp_path / "react" / "uiforge-runtime.js").read_text(encoding="utf-8")
     assert "getGamepads" in rt and "ArrowDown" in rt
 
 
@@ -124,7 +124,7 @@ def test_live_preview_server_serves_state_and_png(ws):
     assert started["running"] and started["url"].startswith("http://127.0.0.1:")
     url = started["url"]
     with urllib.request.urlopen(url + "/") as resp:
-        assert resp.status == 200 and b"game-ui-mcp" in resp.read()
+        assert resp.status == 200 and b"uiforge-mcp" in resp.read()
     with urllib.request.urlopen(url + "/api/state") as resp:
         state = json.loads(resp.read().decode("utf-8"))
         assert any(c["id"] == "live_c" for c in state["canvases"])
@@ -145,10 +145,10 @@ def test_packbits_psd_compression_and_local_workspace(ws, tmp_path, monkeypatch)
     assert len(data) < 256 * 256 * 4
 
     proj = tmp_path / "mygame"
-    (proj / ".gameui").mkdir(parents=True)
-    monkeypatch.delenv("GAME_UI_MCP_DIR", raising=False)
+    (proj / ".uiforge").mkdir(parents=True)
+    monkeypatch.delenv("UIFORGE_MCP_DIR", raising=False)
     monkeypatch.chdir(proj)
-    assert default_workspace() == proj / ".gameui"
+    assert default_workspace() == proj / ".uiforge"
 
 
 def test_cook_torrance_pbr_metal_clearcoat_and_studio_ibl(ws):
@@ -239,7 +239,7 @@ def test_add_frame_presets_expanded_batch_dotlottie_atlas_and_tsx(ws, tmp_path):
 
     tp = s.export_atlas(["ic1", "ic2"], path=str(tmp_path / "tp.png"), format="texturepacker")
     tp_json = json.loads(Path(tp["json"]).read_text(encoding="utf-8"))
-    assert "ic1.png" in tp_json["frames"] and tp_json["meta"]["app"] == "game-ui-mcp"
+    assert "ic1.png" in tp_json["frames"] and tp_json["meta"]["app"] == "uiforge-mcp"
 
     gd = s.export_atlas(["ic1", "ic2"], path=str(tmp_path / "gd.png"), format="godot")
     assert "ic1.atlas.tres" in gd["extras"]

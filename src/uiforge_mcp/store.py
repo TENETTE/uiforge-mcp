@@ -21,13 +21,13 @@ MAX_VERSIONS = 30
 
 
 def default_workspace() -> Path:
-    env = os.environ.get("GAME_UI_MCP_DIR")
+    env = os.environ.get("UIFORGE_MCP_DIR")
     if env:
         return Path(env).expanduser()
-    local = Path.cwd() / ".gameui"
+    local = Path.cwd() / ".uiforge"
     if local.is_dir():
         return local
-    return Path.home() / "GameUI"
+    return Path.home() / "UIForge"
 
 
 def slugify(name: str, fallback: str = "canvas") -> str:

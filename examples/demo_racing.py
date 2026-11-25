@@ -8,8 +8,8 @@ Writes racing_hud.png and realistic_kit.png next to this file (temporary workspa
 import tempfile
 from pathlib import Path
 
-from game_ui_mcp import server as ui
-from game_ui_mcp.store import Store
+from uiforge_mcp import server as ui
+from uiforge_mcp.store import Store
 
 OUT = Path(__file__).resolve().parent
 ui.set_store(Store(Path(tempfile.mkdtemp()) / "ws"))

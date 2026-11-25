@@ -10,7 +10,7 @@ disclosing it publicly.
 
 ## What counts
 
-game-ui-mcp runs locally and is driven by an AI model, which may have read untrusted content
+uiforge-mcp runs locally and is driven by an AI model, which may have read untrusted content
 (web pages, SVG files, documents) and can be steered by it. Issues worth reporting include:
 
 - a tool argument that leads to code execution, including code injected into generated engine
