@@ -14,7 +14,7 @@ from .fonts import FontLibrary
 from .render import Renderer, shift_element
 
 ELEMENT_TYPES = ("rect", "ellipse", "polygon", "line", "path", "text", "image", "arc", "ticks", "instance",
-                 "boolean")
+                 "boolean", "input", "scroll")
 MAX_CANVAS = 8192
 MAX_UNDO = 40
 MAX_VERSIONS = 30
@@ -22,7 +22,12 @@ MAX_VERSIONS = 30
 
 def default_workspace() -> Path:
     env = os.environ.get("GAME_UI_MCP_DIR")
-    return Path(env).expanduser() if env else Path.home() / "GameUI"
+    if env:
+        return Path(env).expanduser()
+    local = Path.cwd() / ".gameui"
+    if local.is_dir():
+        return local
+    return Path.home() / "GameUI"
 
 
 def slugify(name: str, fallback: str = "canvas") -> str:
@@ -47,8 +52,23 @@ class Store:
         self._undo: dict[str, list[dict]] = {}
         self._redo: dict[str, list[dict]] = {}
         self._version_mem: dict[str, dict] = {}
+        self.rev: int = 0
+        self._listeners: list = []
         if persist:
             self._load()
+
+    def on_change(self, fn) -> None:
+        """Register a callback invoked as fn(canvas_id | None) whenever the store changes."""
+        if fn not in self._listeners:
+            self._listeners.append(fn)
+
+    def _notify(self, canvas_id: str | None = None) -> None:
+        self.rev += 1
+        for fn in list(self._listeners):
+            try:
+                fn(canvas_id)
+            except Exception:
+                pass
 
 
     def _load(self) -> None:
@@ -65,7 +85,9 @@ class Store:
                 data = json.loads(theme_file.read_text(encoding="utf-8"))
                 self.theme = {"colors": dict(data.get("colors", {})), "styles": dict(data.get("styles", {})),
                               "modes": dict(data.get("modes", {})), "mode": data.get("mode"),
-                              "numbers": dict(data.get("numbers", {}))}
+                              "numbers": dict(data.get("numbers", {})), "materials": dict(data.get("materials", {})),
+                              "environment": dict(data.get("environment", {})) if isinstance(data.get("environment"), dict) else {},
+                              "profile": dict(data.get("profile", {})) if isinstance(data.get("profile"), dict) else {}}
             except Exception:
                 pass
         for path in sorted(self.projects_dir.glob("*.json")):
@@ -76,18 +98,26 @@ class Store:
             except Exception:
                 continue
 
+    @staticmethod
+    def _atomic_write(path: Path, text: str) -> None:
+        tmp = path.with_suffix(path.suffix + ".tmp")
+        tmp.write_text(text, encoding="utf-8")
+        os.replace(tmp, path)
+
     def save_canvas(self, canvas: dict) -> None:
         if any(isinstance(e.get("layout"), dict) for e in canvas.get("elements", [])):
             from .autolayout import reflow
             reflow(self, canvas)
         if self.persist:
             path = self.projects_dir / f"{canvas['id']}.json"
-            path.write_text(json.dumps(canvas, ensure_ascii=False, indent=1), encoding="utf-8")
+            self._atomic_write(path, json.dumps(canvas, ensure_ascii=False, indent=1, sort_keys=True))
+        self._notify(canvas["id"])
 
     def save_theme(self) -> None:
         if self.persist:
-            (self.workspace / "theme.json").write_text(
-                json.dumps(self.theme, ensure_ascii=False, indent=1), encoding="utf-8")
+            self._atomic_write(self.workspace / "theme.json",
+                               json.dumps(self.theme, ensure_ascii=False, indent=1, sort_keys=True))
+        self._notify(None)
 
 
     def get(self, canvas_id: str) -> dict:
@@ -771,10 +801,59 @@ class Store:
 
     def set_theme(self, colors: dict | None, styles: dict | None, replace: bool,
                   modes: dict | None = None, mode: str | None = None, numbers: dict | None = None,
-                  materials: dict | None = None) -> None:
+                  materials: dict | None = None, environment: dict | None = None,
+                  quality: str | None = None, style_preset: str | None = None,
+                  apply_preset_tokens: bool = True) -> None:
+        from . import profiles
         old = copy.deepcopy(self.theme)
         if replace:
             self.theme = {"colors": {}, "styles": {}}
+        if quality is not None or style_preset is not None:
+            prof = dict(self.theme.get("profile") or {})
+            if style_preset is not None:
+                norm_sp = profiles.normalize_style_preset(style_preset)
+                if norm_sp:
+                    prof["style_preset"] = norm_sp
+                    if apply_preset_tokens:
+                        sp_data = profiles.STYLE_PRESETS[norm_sp]
+                        colors = {**sp_data["colors"], **(colors or {})}
+                        numbers = {**sp_data["numbers"], **(numbers or {})}
+                        styles = {**sp_data["styles"], **(styles or {})}
+                else:
+                    prof.pop("style_preset", None)
+            if quality is not None:
+                norm_q = profiles.normalize_quality(quality)
+                if norm_q:
+                    prof["quality"] = norm_q
+                else:
+                    prof.pop("quality", None)
+            if prof:
+                self.theme["profile"] = prof
+            else:
+                self.theme.pop("profile", None)
+        if environment is not None:
+            if not isinstance(environment, dict):
+                self.theme = old
+                raise ValueError('environment must be an object, e.g. {"env_map": "studio.hdr", "rotation": 45, "intensity": 1.1}')
+            if not environment:
+                self.theme.pop("environment", None)
+            else:
+                merged_env = dict(self.theme.get("environment") or {})
+                for ek, ev in environment.items():
+                    if ev is None:
+                        merged_env.pop(ek, None)
+                    else:
+                        merged_env[ek] = ev
+                if merged_env.get("env_map"):
+                    ep = Path(str(merged_env["env_map"])).expanduser()
+                    if not ep.is_file():
+                        self.theme = old
+                        raise ValueError(f"environment.env_map file not found: {ep}")
+                    merged_env["env_map"] = str(ep.resolve())
+                if merged_env:
+                    self.theme["environment"] = merged_env
+                else:
+                    self.theme.pop("environment", None)
         if materials:
             own = self.theme.setdefault("materials", {})
             for key, value in materials.items():

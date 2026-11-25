@@ -7,9 +7,13 @@ All element coordinates are in canvas units; ``k`` is pixels per unit (1 = 1x).
 
 from __future__ import annotations
 
+import hashlib
+import json
 import math
 import re
+import threading
 import zlib
+from collections import OrderedDict
 from pathlib import Path
 from typing import Any
 
@@ -68,6 +72,7 @@ def _letter_case(text: str, case: str) -> str:
 VECTOR_TYPES = {"rect", "ellipse", "polygon", "line", "path", "arc", "ticks", "boolean"}
 BOOLEAN_OPS = ("union", "subtract", "intersect", "exclude")
 BITMAP_TYPES = {"image", "instance"}
+WIDGET_TYPES = {"input", "scroll"}
 MAX_INSTANCE_DEPTH = 6
 LINE_TYPES = {"line", "arc", "ticks"}
 BLENDS = ("normal", "add", "screen", "multiply", "overlay", "soft-light", "hard-light", "color-dodge",
@@ -100,7 +105,11 @@ def resolve_style(style: Any, theme: dict) -> dict:
     if style is None:
         return {}
     if isinstance(style, str):
-        return lookup(style)
+        out = lookup(style)
+        if out.get("material"):
+            from .materials import expand
+            out = {**expand(out.pop("material"), theme), **out}
+        return out
     if not isinstance(style, dict):
         raise ValueError("style must be a theme style name or an object")
     out: dict = {}
@@ -108,14 +117,20 @@ def resolve_style(style: Any, theme: dict) -> dict:
     parent = spec.pop("use", None)
     if parent:
         out.update(lookup(parent))
+    cleared: set[str] = set()
     for key, value in spec.items():
         if value is None:
             out.pop(key, None)
+            cleared.add(key)
         else:
             out[key] = value
     if out.get("material"):
         from .materials import expand
         out = {**expand(out.pop("material"), theme), **out}
+        for key in cleared:
+            out.pop(key, None)
+        if "light" in cleared and "pbr" not in spec:
+            out.pop("pbr", None)
     return out
 
 
@@ -293,143 +308,175 @@ def _ramp(t: np.ndarray, offs: np.ndarray, cols: np.ndarray) -> np.ndarray:
 
 def _pattern_cov(spec: dict, kind: str, size: tuple[int, int], origin: tuple[float, float], k: float) -> np.ndarray:
     w, h = size
-    ys, xs = np.mgrid[0:h, 0:w].astype(np.float64)
-    ux = (xs + 0.5) / k - origin[0]
-    uy = (ys + 0.5) / k - origin[1]
-    cell = max(0.5, float(spec.get("size", 48 if kind == "clouds" else 16 if kind == "hex" else 8)))
+    xs = np.arange(w, dtype=np.float32)[None, :]
+    ys = np.arange(h, dtype=np.float32)[:, None]
+    ux = (xs + np.float32(0.5)) / np.float32(k) - np.float32(origin[0])
+    uy = (ys + np.float32(0.5)) / np.float32(k) - np.float32(origin[1])
+    cell = np.float32(max(0.5, float(spec.get("size", 48 if kind == "clouds" else 16 if kind == "hex" else 8))))
     ang = math.radians(float(spec.get("angle", 45 if kind == "stripes" else 0)))
-    ca, sa = math.cos(ang), math.sin(ang)
+    ca, sa = np.float32(math.cos(ang)), np.float32(math.sin(ang))
     rx, ry = ux * ca + uy * sa, -ux * sa + uy * ca
+    kf = np.float32(k)
     if kind == "stripes":
-        ratio = max(0.02, min(0.98, float(spec.get("ratio", 0.5))))
-        f = np.mod(rx / cell, 1.0)
-        f = np.where(f > (1 + ratio) / 2, f - 1.0, f)
-        return np.clip(np.minimum(f, ratio - f) * cell * k + 0.5, 0, 1)
+        ratio = np.float32(max(0.02, min(0.98, float(spec.get("ratio", 0.5)))))
+        f = np.mod(rx / cell, np.float32(1.0))
+        f = np.where(f > (np.float32(1.0) + ratio) / np.float32(2.0), f - np.float32(1.0), f)
+        return np.clip(np.minimum(f, ratio - f) * cell * kf + np.float32(0.5), 0, 1)
     if kind == "dots":
-        radius = float(spec.get("radius", cell * 0.25))
-        fx = (np.mod(rx / cell, 1.0) - 0.5) * cell
-        fy = (np.mod(ry / cell, 1.0) - 0.5) * cell
-        return np.clip((radius - np.hypot(fx, fy)) * k + 0.5, 0, 1)
+        radius = np.float32(float(spec.get("radius", float(cell) * 0.25)))
+        fx = (np.mod(rx / cell, np.float32(1.0)) - np.float32(0.5)) * cell
+        fy = (np.mod(ry / cell, np.float32(1.0)) - np.float32(0.5)) * cell
+        return np.clip((radius - np.hypot(fx, fy)) * kf + np.float32(0.5), 0, 1)
     if kind == "grid":
-        lw = float(spec.get("line_width", 1))
-        dx = np.abs((np.mod(rx / cell + 0.5, 1.0) - 0.5) * cell)
-        dy = np.abs((np.mod(ry / cell + 0.5, 1.0) - 0.5) * cell)
-        return np.clip((lw / 2 - np.minimum(dx, dy)) * k + 0.5, 0, 1)
+        lw = np.float32(float(spec.get("line_width", 1)))
+        dx = np.abs((np.mod(rx / cell + np.float32(0.5), np.float32(1.0)) - np.float32(0.5)) * cell)
+        dy = np.abs((np.mod(ry / cell + np.float32(0.5), np.float32(1.0)) - np.float32(0.5)) * cell)
+        return np.clip((lw / np.float32(2.0) - np.minimum(dx, dy)) * kf + np.float32(0.5), 0, 1)
     if kind == "carbon":
         cu, cv = rx / cell, ry / cell
-        fu, fv = np.mod(cu, 1.0), np.mod(cv, 1.0)
+        fu, fv = np.mod(cu, np.float32(1.0)), np.mod(cv, np.float32(1.0))
         horizontal = (np.floor(cu) + np.floor(cv)) % 2 == 0
         shade = np.where(horizontal, fu, fv)
-        return np.clip(0.15 + 0.85 * shade, 0, 1)
+        return np.clip(np.float32(0.15) + np.float32(0.85) * shade, 0, 1)
     if kind == "brushed":
         seed = zlib.crc32(repr(sorted((str(a), str(b)) for a, b in spec.items())).encode())
         rng = np.random.default_rng(seed)
-        amount = max(0.0, min(1.0, float(spec.get("amount", 0.5))))
+        amount = np.float32(max(0.0, min(1.0, float(spec.get("amount", 0.5)))))
         span = max(h, w) * 2 + 8
-        fine = rng.normal(0, 1, span * 2)
-        coarse = np.repeat(rng.normal(0, 1, span // 6 + 2), 12)[: span * 2]
-        streak = 0.65 * fine + 0.35 * coarse
-        idx = np.clip((ry * k + span).astype(np.int64), 0, span * 2 - 1)
-        grain = rng.normal(0, 0.25, (h, w))
-        return np.clip(0.5 + (streak[idx] + grain) * 0.22 * amount, 0, 1)
+        fine = rng.normal(0, 1, span * 2).astype(np.float32)
+        coarse = np.repeat(rng.normal(0, 1, span // 6 + 2).astype(np.float32), 12)[: span * 2]
+        streak = np.float32(0.65) * fine + np.float32(0.35) * coarse
+        idx = np.clip((ry * kf + span).astype(np.int64), 0, span * 2 - 1)
+        grain = rng.normal(0, 0.25, (h, w)).astype(np.float32)
+        return np.clip(np.float32(0.5) + (streak[idx] + grain) * np.float32(0.22) * amount, 0, 1)
     if kind == "hex":
-        lw = float(spec.get("line_width", 1))
+        lw = np.float32(float(spec.get("line_width", 1)))
         px_, py_ = rx / cell, ry / cell
-        r3 = 1.7320508075688772
-        ax, ay = np.mod(px_, 1.0) - 0.5, np.mod(py_, r3) - r3 / 2
-        bx, by = np.mod(px_ - 0.5, 1.0) - 0.5, np.mod(py_ - r3 / 2, r3) - r3 / 2
+        r3 = np.float32(1.7320508)
+        ax, ay = np.mod(px_, np.float32(1.0)) - np.float32(0.5), np.mod(py_, r3) - r3 / np.float32(2.0)
+        bx, by = np.mod(px_ - np.float32(0.5), np.float32(1.0)) - np.float32(0.5), np.mod(py_ - r3 / np.float32(2.0), r3) - r3 / np.float32(2.0)
         near_a = ax * ax + ay * ay < bx * bx + by * by
         gx, gy = np.abs(np.where(near_a, ax, bx)), np.abs(np.where(near_a, ay, by))
-        edge = 0.5 - np.maximum(gx, gx * 0.5 + gy * (r3 / 2))
-        return np.clip((lw / 2 - edge * cell) * k + 0.5, 0, 1)
+        edge = np.float32(0.5) - np.maximum(gx, gx * np.float32(0.5) + gy * (r3 / np.float32(2.0)))
+        return np.clip((lw / np.float32(2.0) - edge * cell) * kf + np.float32(0.5), 0, 1)
     if kind == "clouds":
         seed = float(spec.get("seed", 1))
-        n = fxlib.fractal_noise(rx, ry, cell, int(spec.get("octaves", 4)), seed)
-        contrast = float(spec.get("contrast", 1))
-        return np.clip((n - 0.5) * contrast + 0.5, 0, 1)
+        n = fxlib.fractal_noise(rx, ry, float(cell), int(spec.get("octaves", 4)), seed)
+        contrast = np.float32(float(spec.get("contrast", 1)))
+        return np.clip((n - np.float32(0.5)) * contrast + np.float32(0.5), 0, 1)
     raise ValueError(f"Unknown fill type '{kind}'. Use linear, radial, conic, shader, stripes, dots, grid, hex, carbon, "
                      "brushed, clouds or image.")
 
 
-def paint(mask: Image.Image, spec: Any, box_px: Box, colors: dict, k: float) -> Image.Image | None:
-    """Return an RGBA image: ``spec`` (color / gradient / pattern) limited to ``mask``."""
+def _paint_surface(mask: Image.Image, spec: Any, box_px: Box, colors: dict, k: float,
+                   sdf: np.ndarray | None = None, want_height: bool = False) -> tuple[Image.Image | None, np.ndarray | None]:
+    """Paint ``spec`` limited to ``mask`` (cropped to mask bbox to skip empty shadow padding).
+    Returns (RGBA image, optional bump height float32 array matching mask.size)."""
     if _is_none(spec):
-        return None
+        return None, None
     w, h = mask.size
     if not isinstance(spec, dict):
         r, g, b, a = parse_color(spec, colors)
         img = Image.new("RGBA", (w, h), (r, g, b, 0))
         img.putalpha(mask if a == 255 else mask.point(lambda v: v * a // 255))
-        return img
+        return img, None
     kind = str(spec.get("type", "linear")).lower()
-    x0, y0, x1, y1 = box_px
-    bw, bh = max(1e-6, x1 - x0), max(1e-6, y1 - y0)
     if kind == "image":
-        return _image_fill(mask, spec, box_px, k)
+        return _image_fill(mask, spec, box_px, k), None
+
+    bbox = mask.getbbox()
+    if bbox is None:
+        return Image.new("RGBA", (w, h), (0, 0, 0, 0)), None
+    cx0, cy0, cx1, cy1 = bbox
+    cw, ch = cx1 - cx0, cy1 - cy0
+    cropped = (cx0 > 0 or cy0 > 0 or cx1 < w or cy1 < h)
+    sub_mask = mask.crop(bbox) if cropped else mask
+    sub_box = (box_px[0] - cx0, box_px[1] - cy0, box_px[2] - cx0, box_px[3] - cy0)
+    sub_sdf = sdf[cy0:cy1, cx0:cx1] if (sdf is not None and cropped) else sdf
+    bump_full: np.ndarray | None = None
+
+    x0, y0, x1, y1 = sub_box
+    bw, bh = max(1e-6, x1 - x0), max(1e-6, y1 - y0)
     if kind == "shader":
-        rgba = shader.evaluate(spec, (w, h), box_px, k, colors)
+        rgba, sub_h = shader.evaluate_surface(spec, (cw, ch), sub_box, k, colors, sdf=sub_sdf, want_height=want_height)
+        if sub_h is not None:
+            if cropped:
+                bump_full = np.full((h, w), np.float32(0.5), dtype=np.float32)
+                bump_full[cy0:cy1, cx0:cx1] = sub_h
+            else:
+                bump_full = sub_h
     elif kind in ("linear", "radial", "conic", "diamond"):
         space = str(spec.get("space", "srgb")).lower()
         offs, cols = _stops(spec, colors, space)
-        ys, xs = np.mgrid[0:h, 0:w].astype(np.float64)
-        xs += 0.5
-        ys += 0.5
+        xs = np.arange(cw, dtype=np.float32)[None, :] + np.float32(0.5)
+        ys = np.arange(ch, dtype=np.float32)[:, None] + np.float32(0.5)
         if kind == "linear":
             ang = math.radians(float(spec.get("angle", 90)))
-            ca, sa = math.cos(ang), math.sin(ang)
-            length = abs(bw * ca) + abs(bh * sa)
-            t = ((xs - (x0 + x1) / 2) * ca + (ys - (y0 + y1) / 2) * sa) / max(1e-6, length) + 0.5
+            ca, sa = np.float32(math.cos(ang)), np.float32(math.sin(ang))
+            length = max(1e-6, abs(bw * float(ca)) + abs(bh * float(sa)))
+            t = ((xs - np.float32((x0 + x1) / 2)) * ca + (ys - np.float32((y0 + y1) / 2)) * sa) / np.float32(length) + np.float32(0.5)
         elif kind == "diamond":
-            cx = x0 + bw * float(spec.get("cx", 0.5))
-            cy = y0 + bh * float(spec.get("cy", 0.5))
+            cx = np.float32(x0 + bw * float(spec.get("cx", 0.5)))
+            cy = np.float32(y0 + bh * float(spec.get("cy", 0.5)))
             rad = float(spec.get("r", 0.5))
-            t = np.abs(xs - cx) / max(1e-6, bw * rad) + np.abs(ys - cy) / max(1e-6, bh * rad)
+            t = np.abs(xs - cx) / np.float32(max(1e-6, bw * rad)) + np.abs(ys - cy) / np.float32(max(1e-6, bh * rad))
         elif kind == "conic":
-            cx = x0 + bw * float(spec.get("cx", 0.5))
-            cy = y0 + bh * float(spec.get("cy", 0.5))
+            cx = np.float32(x0 + bw * float(spec.get("cx", 0.5)))
+            cy = np.float32(y0 + bh * float(spec.get("cy", 0.5)))
             a_from = float(spec.get("from", 0))
             a_to = float(spec.get("to", a_from + 360))
             span = a_to - a_from
             if abs(span) < 1e-6:
                 raise ValueError("conic gradient: 'from' and 'to' angles must differ")
             ang = np.degrees(np.arctan2(ys - cy, xs - cx))
-            rel = np.mod((ang - a_from) * (1 if span > 0 else -1), 360.0)
-            width = min(360.0, abs(span))
+            rel = np.mod((ang - np.float32(a_from)) * np.float32(1 if span > 0 else -1), np.float32(360.0))
+            width = np.float32(min(360.0, abs(span)))
             t = rel / width
-            if width < 360:
-                dead = 360.0 - width
-                t = np.where(rel <= width, t, np.where(rel - width < dead / 2, 1.0, 0.0))
+            if float(width) < 360:
+                dead = np.float32(360.0) - width
+                t = np.where(rel <= width, t, np.where(rel - width < dead / np.float32(2.0), np.float32(1.0), np.float32(0.0)))
         else:
-            cx = x0 + bw * float(spec.get("cx", 0.5))
-            cy = y0 + bh * float(spec.get("cy", 0.5))
+            cx = np.float32(x0 + bw * float(spec.get("cx", 0.5)))
+            cy = np.float32(y0 + bh * float(spec.get("cy", 0.5)))
             rad = float(spec.get("r", 0.5))
             if spec.get("circle"):
-                t = np.hypot(xs - cx, ys - cy) / max(1e-6, max(bw, bh) * rad)
+                t = np.hypot(xs - cx, ys - cy) / np.float32(max(1e-6, max(bw, bh) * rad))
             else:
-                t = np.hypot((xs - cx) / max(1e-6, bw * rad), (ys - cy) / max(1e-6, bh * rad))
-        rgba = _ramp(np.clip(t, 0, 1), offs, cols)
+                t = np.hypot((xs - cx) / np.float32(max(1e-6, bw * rad)), (ys - cy) / np.float32(max(1e-6, bh * rad)))
+        rgba = _ramp(np.clip(t, 0, 1), offs, cols).astype(np.float32)
         if space != "srgb":
-            rgba[..., :3] = fxlib.decode_space(rgba[..., :3], space)
+            rgba[..., :3] = fxlib.decode_space(rgba[..., :3].astype(np.float64), space).astype(np.float32)
         if spec.get("dither", True):
             rng = np.random.default_rng(zlib.crc32(repr(spec.get("stops") or spec.get("colors") or "").encode()))
-            rgba[..., :3] += rng.uniform(-0.5, 0.5, (h, w, 1))
+            rgba[..., :3] += rng.uniform(-0.5, 0.5, (ch, cw, 1)).astype(np.float32)
             soft = (rgba[..., 3] > 0.5) & (rgba[..., 3] < 254.5)
-            rgba[..., 3] += np.where(soft, rng.uniform(-0.5, 0.5, (h, w)), 0.0)
+            rgba[..., 3] += np.where(soft, rng.uniform(-0.5, 0.5, (ch, cw)).astype(np.float32), np.float32(0.0))
     else:
-        c1 = np.array(parse_color(spec.get("color", "#ffffff@0.15"), colors), dtype=np.float64)
-        c2 = np.array(parse_color(spec.get("color2", spec.get("background", "transparent")), colors), dtype=np.float64)
-        cov = _pattern_cov(spec, kind, (w, h), (x0 / k, y0 / k), k)[..., None]
-        a1, a2 = c1[3] / 255.0, c2[3] / 255.0
-        pre = cov * np.append(c1[:3] * a1, c1[3]) + (1 - cov) * np.append(c2[:3] * a2, c2[3])
+        c1 = np.array(parse_color(spec.get("color", "#ffffff@0.15"), colors), dtype=np.float32)
+        c2 = np.array(parse_color(spec.get("color2", spec.get("background", "transparent")), colors), dtype=np.float32)
+        cov = _pattern_cov(spec, kind, (cw, ch), (x0 / k, y0 / k), k)[..., None]
+        a1, a2 = c1[3] / np.float32(255.0), c2[3] / np.float32(255.0)
+        pre = cov * np.append(c1[:3] * a1, c1[3]) + (np.float32(1.0) - cov) * np.append(c2[:3] * a2, c2[3])
         alpha = pre[..., 3:4]
-        safe = np.where(alpha > 0, alpha / 255.0, 1.0)
+        safe = np.where(alpha > 0, alpha / np.float32(255.0), np.float32(1.0))
         rgba = np.concatenate([pre[..., :3] / safe, alpha], axis=-1)
-    m = np.asarray(mask, dtype=np.float64) / 255.0
+    m = np.asarray(sub_mask, dtype=np.float32) / np.float32(255.0)
     rgba[..., 3] *= m
-    return Image.fromarray(np.clip(rgba + 0.5, 0, 255).astype(np.uint8), "RGBA")
+    patch = Image.fromarray(np.clip(rgba + np.float32(0.5), 0, 255).astype(np.uint8), "RGBA")
+    if cropped:
+        out = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+        out.paste(patch, (cx0, cy0))
+        return out, bump_full
+    return patch, bump_full
 
 
-_IMAGE_CACHE: dict[tuple[str, float], Image.Image] = {}
+def paint(mask: Image.Image, spec: Any, box_px: Box, colors: dict, k: float) -> Image.Image | None:
+    """Return an RGBA image: ``spec`` (color / gradient / pattern / shader) limited to ``mask``."""
+    img, _ = _paint_surface(mask, spec, box_px, colors, k)
+    return img
+
+
+_IMAGE_CACHE: OrderedDict[tuple[str, float], Image.Image] = OrderedDict()
 
 
 def _image_fill(mask: Image.Image, spec: dict, box_px: Box, k: float) -> Image.Image:
@@ -438,9 +485,11 @@ def _image_fill(mask: Image.Image, spec: dict, box_px: Box, k: float) -> Image.I
     if not path.is_file():
         raise ValueError(f"image fill: file not found: {path.resolve()} - use an absolute path (relative paths resolve against the server's working folder, not yours)")
     key = (str(path), path.stat().st_mtime)
-    if key not in _IMAGE_CACHE:
-        if len(_IMAGE_CACHE) > 16:
-            _IMAGE_CACHE.clear()
+    if key in _IMAGE_CACHE:
+        _IMAGE_CACHE.move_to_end(key)
+    else:
+        while len(_IMAGE_CACHE) >= 32:
+            _IMAGE_CACHE.popitem(last=False)
         _IMAGE_CACHE[key] = Image.open(path).convert("RGBA")
     src = _IMAGE_CACHE[key]
     w, h = mask.size
@@ -498,7 +547,7 @@ def _cutout(img: Image.Image, spec: Any) -> Image.Image:
     return out
 
 
-_FRAMES: dict[tuple, Image.Image] = {}
+_FRAMES: OrderedDict[tuple, Image.Image] = OrderedDict()
 
 
 def load_frame(path: Path, el: dict) -> Image.Image:
@@ -508,6 +557,7 @@ def load_frame(path: Path, el: dict) -> Image.Image:
     frame = int(math.floor(float(el.get("frame", 0) or 0)))
     key = (str(path), path.stat().st_mtime, frame, repr(sheet), repr(el.get("crop")), repr(el.get("cutout")))
     if key in _FRAMES:
+        _FRAMES.move_to_end(key)
         return _FRAMES[key]
     src = Image.open(path)
     if sheet:
@@ -533,10 +583,50 @@ def load_frame(path: Path, el: dict) -> Image.Image:
         img = img.crop((int(cx), int(cy), int(cx + cw), int(cy + ch)))
     if el.get("cutout"):
         img = _cutout(img, el["cutout"])
-    if len(_FRAMES) > 256:
-        _FRAMES.clear()
+    while len(_FRAMES) >= 256:
+        _FRAMES.popitem(last=False)
     _FRAMES[key] = img
     return img
+
+
+_EL_CACHE_LOCK = threading.Lock()
+_EL_CACHE: OrderedDict[str, tuple[tuple[Image.Image, int, int, str] | None, int]] = OrderedDict()
+_EL_CACHE_BYTES = 0
+_EL_CACHE_MAX_BYTES = 128 * 1024 * 1024
+
+
+def clear_render_cache() -> None:
+    """Drop cached element renders (mainly for tests or memory pressure)."""
+    global _EL_CACHE_BYTES
+    with _EL_CACHE_LOCK:
+        _EL_CACHE.clear()
+        _EL_CACHE_BYTES = 0
+
+
+def _cache_get(key: str):
+    with _EL_CACHE_LOCK:
+        hit = _EL_CACHE.get(key)
+        if hit is not None:
+            _EL_CACHE.move_to_end(key)
+            return True, hit[0]
+        return False, None
+
+
+def _cache_put(key: str, value) -> None:
+    global _EL_CACHE_BYTES
+    res = value[0]
+    size = (res[0].width * res[0].height * 4) if res is not None else 64
+    if size > _EL_CACHE_MAX_BYTES // 2:
+        return
+    with _EL_CACHE_LOCK:
+        old = _EL_CACHE.pop(key, None)
+        if old is not None:
+            _EL_CACHE_BYTES -= old[1]
+        while _EL_CACHE and _EL_CACHE_BYTES + size > _EL_CACHE_MAX_BYTES:
+            _, (_, old_sz) = _EL_CACHE.popitem(last=False)
+            _EL_CACHE_BYTES -= old_sz
+        _EL_CACHE[key] = (value, size)
+        _EL_CACHE_BYTES += size
 
 
 _DITHER: dict[tuple[int, int], np.ndarray] = {}
@@ -650,38 +740,41 @@ def composite(dst: Image.Image, src: Image.Image, ox: int, oy: int, blend: str =
     part = src.crop((x0 - ox, y0 - oy, x1 - ox, y1 - oy))
     base = dst.crop((x0, y0, x1, y1))
     if blend == "erase":
-        b = np.asarray(base, dtype=np.float64).copy()
-        b[..., 3] *= 1.0 - np.asarray(part, dtype=np.float64)[..., 3] / 255.0
-        merged = Image.fromarray((b + 0.5).astype(np.uint8), "RGBA")
+        b = np.asarray(base, dtype=np.float32).copy()
+        b[..., 3] *= np.float32(1.0) - np.asarray(part, dtype=np.float32)[..., 3] / np.float32(255.0)
+        merged = Image.fromarray((b + np.float32(0.5)).astype(np.uint8), "RGBA")
     elif blend == "add":
-        b = np.asarray(base, dtype=np.float64)
-        s = np.asarray(part, dtype=np.float64)
-        sa = s[..., 3:4] / 255.0
-        ba = b[..., 3:4] / 255.0
+        b = np.asarray(base, dtype=np.float32)
+        s = np.asarray(part, dtype=np.float32)
+        sa = s[..., 3:4] / np.float32(255.0)
+        ba = b[..., 3:4] / np.float32(255.0)
         rgb = np.clip(b[..., :3] * ba + s[..., :3] * sa, 0, 255)
-        alpha = np.clip(b[..., 3:4] + s[..., 3:4] * (1 - ba), 0, 255)
-        safe = np.where(alpha > 0, alpha / 255.0, 1.0)
+        alpha = np.clip(b[..., 3:4] + s[..., 3:4] * (np.float32(1.0) - ba), 0, 255)
+        safe = np.where(alpha > 0, alpha / np.float32(255.0), np.float32(1.0))
         out = np.concatenate([np.clip(rgb / safe, 0, 255), alpha], axis=-1)
-        merged = Image.fromarray((out + 0.5).astype(np.uint8), "RGBA")
+        merged = Image.fromarray((out + np.float32(0.5)).astype(np.uint8), "RGBA")
     elif blend != "normal":
-        b = np.asarray(base, dtype=np.float64) / 255.0
-        s = np.asarray(part, dtype=np.float64) / 255.0
+        b = np.asarray(base, dtype=np.float32) / np.float32(255.0)
+        s = np.asarray(part, dtype=np.float32) / np.float32(255.0)
         bc, sc, ba, sa = b[..., :3], s[..., :3], b[..., 3:4], s[..., 3:4]
+        one = np.float32(1.0)
+        half = np.float32(0.5)
+        two = np.float32(2.0)
         if blend == "multiply":
             mixed = bc * sc
         elif blend == "screen":
-            mixed = 1 - (1 - bc) * (1 - sc)
+            mixed = one - (one - bc) * (one - sc)
         elif blend == "overlay":
-            mixed = np.where(bc <= 0.5, 2 * bc * sc, 1 - 2 * (1 - bc) * (1 - sc))
+            mixed = np.where(bc <= half, two * bc * sc, one - two * (one - bc) * (one - sc))
         elif blend == "hard-light":
-            mixed = np.where(sc <= 0.5, 2 * bc * sc, 1 - 2 * (1 - bc) * (1 - sc))
+            mixed = np.where(sc <= half, two * bc * sc, one - two * (one - bc) * (one - sc))
         elif blend == "soft-light":
-            d = np.where(bc <= 0.25, ((16 * bc - 12) * bc + 4) * bc, np.sqrt(bc))
-            mixed = np.where(sc <= 0.5, bc - (1 - 2 * sc) * bc * (1 - bc), bc + (2 * sc - 1) * (d - bc))
+            d = np.where(bc <= np.float32(0.25), ((np.float32(16.0) * bc - np.float32(12.0)) * bc + np.float32(4.0)) * bc, np.sqrt(bc))
+            mixed = np.where(sc <= half, bc - (one - two * sc) * bc * (one - bc), bc + (two * sc - one) * (d - bc))
         elif blend == "color-dodge":
-            mixed = np.where(sc >= 1, 1.0, np.minimum(1.0, bc / np.maximum(1e-6, 1 - sc)))
+            mixed = np.where(sc >= one, one, np.minimum(one, bc / np.maximum(np.float32(1e-6), one - sc)))
         elif blend == "color-burn":
-            mixed = np.where(sc <= 0, 0.0, 1 - np.minimum(1.0, (1 - bc) / np.maximum(1e-6, sc)))
+            mixed = np.where(sc <= 0, np.float32(0.0), one - np.minimum(one, (one - bc) / np.maximum(np.float32(1e-6), sc)))
         elif blend == "darken":
             mixed = np.minimum(bc, sc)
         elif blend == "lighten":
@@ -690,11 +783,11 @@ def composite(dst: Image.Image, src: Image.Image, ox: int, oy: int, blend: str =
             mixed = np.abs(bc - sc)
         else:
             raise ValueError(f"blend must be one of {', '.join(BLENDS)}")
-        pre = (1 - sa) * bc * ba + (1 - ba) * sc * sa + ba * sa * mixed
+        pre = (one - sa) * bc * ba + (one - ba) * sc * sa + ba * sa * mixed
         alpha = ba + sa - ba * sa
-        safe = np.where(alpha > 0, alpha, 1.0)
-        out = np.concatenate([np.clip(pre / safe, 0, 1), alpha], axis=-1) * 255.0
-        merged = Image.fromarray((out + 0.5).astype(np.uint8), "RGBA")
+        safe = np.where(alpha > 0, alpha, one)
+        out = np.concatenate([np.clip(pre / safe, 0, 1), alpha], axis=-1) * np.float32(255.0)
+        merged = Image.fromarray((out + np.float32(0.5)).astype(np.uint8), "RGBA")
     else:
         merged = Image.alpha_composite(base, part)
     dst.paste(merged, (x0, y0))
@@ -1507,7 +1600,11 @@ def _inset_rect(rect: tuple, delta: float, res: float) -> list[geo.Point] | None
 class Renderer:
     def __init__(self, canvas: dict, theme: dict, fonts: FontLibrary, scale: float = 1.0,
                  lookup=None, depth: int = 0, state: str | None = None, language: str | None = None,
-                 strings: dict | None = None, extra_vars: dict | None = None, extra_colors: dict | None = None):
+                 strings: dict | None = None, extra_vars: dict | None = None, extra_colors: dict | None = None,
+                 extra_data: dict | None = None):
+        if canvas.get("bindings") or extra_data:
+            from . import binding
+            canvas = binding.apply_bindings(canvas, extra_data)
         if state:
             canvas = apply_state(canvas, state)
         self.canvas = canvas
@@ -1525,7 +1622,8 @@ class Renderer:
         self.numbers = {**(theme.get("numbers") or {}), **{k: v for k, v in mode_vals.items() if _is_number(v)},
                         **(canvas.get("numbers") or {})}
         self._num_cache: dict[int, tuple] = {}
-        self.text_vars = text_vars(canvas, language, self.strings, extra_vars)
+        merged_vars = {**(canvas.get("data") or {}), **(extra_vars or {})}
+        self.text_vars = text_vars(canvas, language, self.strings, merged_vars)
         self.fonts = fonts
         self.k = float(scale)
         self.width = max(1, int(round(canvas["width"] * self.k)))
@@ -1662,6 +1760,12 @@ class Renderer:
             x, y = float(el.get("x", 0)), float(el.get("y", 0))
             w, h = self._image_size(el)
             return (x, y, x + w, y + h)
+        if t in WIDGET_TYPES:
+            x, y = float(el.get("x", 0)), float(el.get("y", 0))
+            w = max(16.0, float(el.get("width", 220)))
+            h = max(20.0, float(el.get("height", 40 if t == "input" else 180)))
+            top_pad = 22.0 if (t == "input" and el.get("label")) else 0.0
+            return (x, y - top_pad, x + w, y + h)
         raise ValueError(f"Unknown element type '{t}'")
 
     def _source_canvas(self, el: dict) -> dict:
@@ -1730,10 +1834,14 @@ class Renderer:
         px1, py1 = int(math.ceil(x1 * k)) + 1, int(math.ceil(y1 * k)) + 1
         return px0, py0, px1 - px0, py1 - py0
 
+    def _profile(self) -> dict:
+        from . import profiles
+        return profiles.resolve_profile(self.theme, self.canvas)
+
     def _pick_ss(self, w: int, h: int) -> int:
         if self.canvas.get("pixel_art"):
             return 1
-        ss = SS
+        ss = min(SS, int(self._profile().get("ss_max", SS)))
         while ss > 1 and w * h * ss * ss > MAX_MASK_PIXELS:
             ss -= 1
         return ss
@@ -1970,15 +2078,96 @@ class Renderer:
             return self._vector_masks(el, st, region, ss, [])[0]
         if t == "text":
             return self._text_masks(el, st, region, ss, [])[0]
+        if t in WIDGET_TYPES:
+            from . import widgets
+            return widgets.render_widget(self, el, st, region)[0]
         return self._image_layer(el, region)[0]
+
+    def _env_cfg(self) -> dict:
+        """Merge workspace theme environment with canvas-level environment override."""
+        base = dict(self.theme.get("environment") or {})
+        override = self.canvas.get("environment") or {}
+        if isinstance(override, dict):
+            base.update(override)
+        return base
+
+    def _pbr_spec(self, raw_spec) -> dict | None:
+        """Merge workspace/canvas HDRI environment defaults and quality profile into an element's PBR spec."""
+        if not raw_spec:
+            return None
+        from . import profiles
+        spec = dict(raw_spec) if isinstance(raw_spec, dict) else {}
+        env = self._env_cfg()
+        if env:
+            if env.get("env_map") and not spec.get("env_map"):
+                spec["env_map"] = env["env_map"]
+            if env.get("studio") and "studio" not in spec:
+                spec["studio"] = env["studio"]
+            if "rotation" in env and "env_rotation" not in spec:
+                spec["env_rotation"] = float(env["rotation"])
+            if "env_rotation" in env and "env_rotation" not in spec:
+                spec["env_rotation"] = float(env["env_rotation"])
+            if "intensity" in env and "env" not in spec:
+                spec["env"] = float(env["intensity"])
+            elif "env" in env and "env" not in spec:
+                spec["env"] = float(env["env"])
+        return profiles.apply_quality_to_pbr(spec, self._profile())
+
+    def _el_cache_key(self, el: dict, st: dict) -> str | None:
+        """Content key for caching a rendered element, or None if the element depends on external state."""
+        t = el.get("type")
+        if t in ("instance", "image") or el.get("clip"):
+            return None
+        if t == "input" and el.get("bind"):
+            return None
+        if st.get("backdrop_blur") or st.get("glass"):
+            return None
+        fill = st.get("fill")
+        if isinstance(fill, dict) and str(fill.get("type", "")).lower() == "image":
+            return None
+        if isinstance(fill, list) and any(isinstance(f, dict) and str(f.get("type", "")).lower() == "image" for f in fill):
+            return None
+        prof = self._profile()
+        payload = {
+            "el": el, "st": st, "k": round(self.k, 5),
+            "cw": self.canvas["width"], "ch": self.canvas["height"],
+            "px": bool(self.canvas.get("pixel_art")),
+            "cols": self.colors,
+            "q": prof["quality"],
+            "sp": prof.get("style_preset"),
+        }
+        if st.get("pbr"):
+            env = self._env_cfg()
+            if env:
+                payload["env"] = env
+        if t == "text":
+            payload["txt"] = self.text_of(el)
+            payload["lang"] = self.text_lang(el)
+            payload["fonts_dir"] = str(self.fonts.user_dir or "")
+        raw = json.dumps(payload, sort_keys=True, default=str, separators=(",", ":")).encode("utf-8")
+        return hashlib.sha1(raw).hexdigest()
 
     def render_element(self, el: dict):
         """Render one element to (layer, x, y, blend). Handles scale_x / scale_y, which grow or shrink
         the finished element (effects included) around its pivot, the way an engine scales a widget."""
         el = self._nums(el)
+        st_resolved = self._nums(resolve_style(el.get("style"), self.theme))
+        ckey = self._el_cache_key(el, st_resolved)
+        if ckey is not None:
+            found, cached = _cache_get(ckey)
+            if found:
+                res, cwarns = cached
+                for w in cwarns:
+                    if w not in self.warnings:
+                        self.warnings.append(w)
+                return res
+        w_before = len(self.warnings)
         sx, sy = _scales(el)
         if sx == 1 and sy == 1:
-            return self._render_plain(el)
+            res = self._render_plain(el)
+            if ckey is not None:
+                _cache_put(ckey, (res, tuple(self.warnings[w_before:])))
+            return res
         if sx == 0 or sy == 0:
             return None
         ax, ay = abs(sx), abs(sy)
@@ -2025,7 +2214,10 @@ class Renderer:
                 raise ValueError(f"clip target '{clip_id}' does not exist on this canvas")
             cm = self.shape_mask(target, (ox, oy, layer.width, layer.height))
             layer.putalpha(ImageChops.multiply(layer.getchannel("A"), cm))
-        return layer, ox, oy, blend
+        res = (layer, ox, oy, blend)
+        if ckey is not None:
+            _cache_put(ckey, (res, tuple(self.warnings[w_before:])))
+        return res
 
     def _render_plain(self, el: dict, clip_region: bool = True):
         el = self._nums(el)
@@ -2073,6 +2265,27 @@ class Renderer:
         elif t in BITMAP_TYPES:
             shape, color_layer = self._image_layer(el, region)
             smasks = []
+        elif t in WIDGET_TYPES:
+            from . import widgets
+            shape, layer = widgets.render_widget(self, el, st, region)
+            if st.get("adjust"):
+                layer = fxlib.adjust(layer, st["adjust"], self.colors)
+            if soften > 0:
+                prog = fxlib.progressive_t((w, h), soften_prog, box_px) if soften_prog else None
+                layer = fxlib.blur_image(layer, soften * k / 2, prog)
+            clip_id = el.get("clip")
+            if clip_id:
+                target = self._by_id.get(clip_id)
+                if target is None:
+                    raise ValueError(f"clip target '{clip_id}' does not exist on this canvas")
+                cm = self.shape_mask(target, region)
+                layer.putalpha(ImageChops.multiply(layer.getchannel("A"), cm))
+            if opacity < 1:
+                layer.putalpha(layer.getchannel("A").point(lambda v: int(v * opacity + 0.5)))
+            blend = str(st.get("blend", "normal")).lower()
+            if blend not in BLENDS:
+                raise ValueError(f"style.blend must be one of {', '.join(BLENDS)}")
+            return layer, px0, py0, blend
         else:
             raise ValueError(f"Unknown element type '{t}'")
         if feather > 0:
@@ -2111,13 +2324,38 @@ class Renderer:
         emoji = self.__dict__.pop("_text_color", None) if t == "text" else None
 
         if has_fill:
+            light_spec = st.get("light")
+            pbr_spec = st.get("pbr")
+            want_bump = bool(light_spec or pbr_spec)
+            sdf_arr: np.ndarray | None = None
+            def _needs_sdf(fs) -> bool:
+                if isinstance(fs, dict) and str(fs.get("type", "")).lower() == "shader":
+                    code_t = str(fs.get("code", ""))
+                    return bool(re.search(r"\b(d|edge)\b", code_t))
+                return False
+            need_sdf = bool(pbr_spec) or (isinstance(light_spec, dict)
+                        and str(light_spec.get("profile", "")).lower() in ("machined", "pillow", "engraved"))
+            if not need_sdf:
+                if _is_fill_stack(fill_spec):
+                    need_sdf = any(_needs_sdf(_fill_blend(one)[0]) for one in fill_spec)
+                else:
+                    need_sdf = _needs_sdf(fill_spec)
+            sb = shape.getbbox()
+            if need_sdf and sb is not None:
+                sx0, sy0, sx1, sy1 = sb
+                sdf_arr = np.zeros((h, w), dtype=np.float32)
+                sdf_arr[sy0:sy1, sx0:sx1] = fxlib.distance_field(shape.crop(sb), k)
+
+            bump_map: np.ndarray | None = None
             if color_layer is not None:
                 fill_img = color_layer
             elif _is_fill_stack(fill_spec):
                 fill_img = None
                 for one in fill_spec:
                     one, fill_blend = _fill_blend(one)
-                    one_img = paint(shape, one, box_px, self.colors, k)
+                    one_img, one_bump = _paint_surface(shape, one, box_px, self.colors, k, sdf=sdf_arr, want_height=want_bump)
+                    if one_bump is not None:
+                        bump_map = one_bump
                     if one_img is None:
                         continue
                     if fill_img is None:
@@ -2127,16 +2365,37 @@ class Renderer:
                     else:
                         composite(fill_img, one_img, 0, 0, fill_blend)
             else:
-                fill_img = paint(shape, fill_spec, box_px, self.colors, k)
+                fill_img, bump_map = _paint_surface(shape, fill_spec, box_px, self.colors, k, sdf=sdf_arr, want_height=want_bump)
+            if fill_img is not None and pbr_spec and sb is not None:
+                from . import pbr as pbr_mod
+                sx0, sy0, sx1, sy1 = sb
+                sub_fill = fill_img.crop(sb)
+                sub_mask = shape.crop(sb)
+                sub_bump = bump_map[sy0:sy1, sx0:sx1] if bump_map is not None else None
+                sub_sdf = sdf_arr[sy0:sy1, sx0:sx1] if sdf_arr is not None else None
+                shaded = pbr_mod.shade_pbr(sub_fill, sub_mask, self._pbr_spec(pbr_spec), k, bump=sub_bump, sdf=sub_sdf)
+                if sx0 > 0 or sy0 > 0 or sx1 < w or sy1 < h:
+                    full_pbr = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+                    full_pbr.paste(shaded, (sx0, sy0))
+                    fill_img = full_pbr
+                else:
+                    fill_img = shaded
             noise = st.get("noise")
-            if fill_img is not None and not _is_none(noise) and (isinstance(noise, dict) or float(noise) > 0):
+            n_scale = float(self._profile().get("noise_scale", 1.0))
+            if fill_img is not None and n_scale > 0 and not _is_none(noise) and (isinstance(noise, dict) or float(noise) > 0):
+                if n_scale != 1.0:
+                    if isinstance(noise, dict):
+                        noise = {**noise, "amount": float(noise.get("amount", 0.05)) * n_scale}
+                    else:
+                        noise = float(noise) * n_scale
                 fill_img = fxlib.apply_noise(fill_img, noise, zlib.crc32(el["id"].encode()), k, self.colors)
             if fill_img is not None:
                 layer = Image.alpha_composite(layer, fill_img)
             if emoji is not None:
                 layer = Image.alpha_composite(layer, emoji)
-            if st.get("light"):
-                layer = Image.alpha_composite(layer, fxlib.emboss(shape, st["light"], self.colors, k))
+            if light_spec:
+                layer = Image.alpha_composite(layer, fxlib.emboss(shape, light_spec, self.colors, k,
+                                                                  bump=bump_map, sdf=sdf_arr))
             layer = _inner_effects(layer, shape, fx, k)
 
         layer = draw_strokes(layer, drawn)
@@ -2264,6 +2523,14 @@ class Renderer:
             sil = ImageChops.lighter(sil, m)
         out = _outer_effects(Image.new("RGBA", content.size, (0, 0, 0, 0)), sil, fx, k)
         body = fxlib.adjust(content, st["adjust"], self.colors) if st.get("adjust") else content
+        if st.get("pbr"):
+            from . import pbr as pbr_mod
+            lb = alpha.getbbox()
+            if lb is not None:
+                sub = pbr_mod.shade_pbr(body.crop(lb), alpha.crop(lb), self._pbr_spec(st["pbr"]), k)
+                full_b = Image.new("RGBA", body.size, (0, 0, 0, 0))
+                full_b.paste(sub, (lb[0], lb[1]))
+                body = full_b
         out = Image.alpha_composite(out, body)
         if st.get("light"):
             out = Image.alpha_composite(out, fxlib.emboss(alpha, st["light"], self.colors, k))
@@ -2281,6 +2548,101 @@ class Renderer:
                                                                              st.get("mask_mode", "alpha"))))
         return out
 
+    def render_pbr_maps(self, normal_format: str = "opengl", include_background: bool = False) -> dict[str, Image.Image]:
+        """Bake full-canvas engine-ready PBR texture maps (beauty, albedo, normal, roughness, metallic, ao, height, orm, emissive)."""
+        from . import pbr as pbr_mod
+        beauty = self.render(include_background=include_background)
+        W, H = beauty.size
+        albedo = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+        normal = Image.new("RGBA", (W, H), (128, 128, 255, 255))
+        roughness = Image.new("RGBA", (W, H), (128, 128, 128, 255))
+        metallic = Image.new("RGBA", (W, H), (0, 0, 0, 255))
+        ao = Image.new("RGBA", (W, H), (255, 255, 255, 255))
+        height = Image.new("RGBA", (W, H), (128, 128, 128, 255))
+        orm = Image.new("RGBA", (W, H), (255, 128, 0, 255))
+        emissive = Image.new("RGBA", (W, H), (0, 0, 0, 255))
+        if include_background and not _is_none(self.canvas.get("background")):
+            bg = paint(Image.new("L", (W, H), 255), self._nums(self.canvas["background"]), (0, 0, W, H), self.colors, self.k)
+            if bg is not None:
+                albedo = Image.alpha_composite(albedo, bg)
+
+        def _paste_over(dst: Image.Image, src: Image.Image, px0: int, py0: int) -> None:
+            sx0, sy0 = max(0, -px0), max(0, -py0)
+            dx0, dy0 = max(0, px0), max(0, py0)
+            cw = min(src.width - sx0, W - dx0)
+            ch = min(src.height - sy0, H - dy0)
+            if cw <= 0 or ch <= 0:
+                return
+            crop = src.crop((sx0, sy0, sx0 + cw, sy0 + ch))
+            dst.alpha_composite(crop, (dx0, dy0))
+
+        for layer_cfg, els in self.stack():
+            if layer_cfg and not layer_cfg.get("visible", True):
+                continue
+            for el in els:
+                if not el.get("visible", True):
+                    continue
+                st = self._nums(resolve_style(el.get("style"), self.theme))
+                pbr_spec = st.get("pbr")
+                if not pbr_spec and st.get("light"):
+                    lt = st["light"] if isinstance(st["light"], dict) else {}
+                    pbr_spec = {"metallic": 0.0, "roughness": max(0.08, 1.0 - float(lt.get("gloss", 0.45)) * 0.7),
+                                "bevel_size": float(lt.get("size", 6.0)), "bevel_depth": float(lt.get("depth", 1.0)),
+                                "profile": str(lt.get("profile", "round"))}
+                if pbr_spec and el["type"] in VECTOR_TYPES:
+                    try:
+                        plain = dict(el)
+                        plain_st = dict(st)
+                        plain_st.pop("pbr", None)
+                        plain_st.pop("light", None)
+                        plain_st.pop("shadow", None)
+                        plain_st.pop("glow", None)
+                        plain["style"] = plain_st
+                        res = self.render_element(plain)
+                    except Exception:
+                        res = None
+                    if res is not None:
+                        unlit, px0, py0, _ = res
+                        mask = unlit.getchannel("A")
+                        sb = mask.getbbox()
+                        if sb is not None:
+                            sub_fill = unlit.crop(sb)
+                            sub_mask = mask.crop(sb)
+                            sdf_sub = fxlib.distance_field(sub_mask, self.k)
+                            bump_sub = None
+                            fspec = plain_st.get("fill")
+                            if isinstance(fspec, dict) and str(fspec.get("type", "")).lower() == "shader":
+                                _, bump_sub = _paint_surface(sub_mask, fspec, (0, 0, sub_mask.width, sub_mask.height),
+                                                             self.colors, self.k, sdf=sdf_sub, want_height=True)
+                            maps = pbr_mod.bake_pbr_maps(sub_fill, sub_mask, self._pbr_spec(pbr_spec), self.k,
+                                                         bump=bump_sub, sdf=sdf_sub, normal_format=normal_format)
+                            ox, oy = px0 + sb[0], py0 + sb[1]
+                            _paste_over(albedo, maps["albedo"], ox, oy)
+                            _paste_over(normal, maps["normal"], ox, oy)
+                            _paste_over(roughness, maps["roughness"], ox, oy)
+                            _paste_over(metallic, maps["metallic"], ox, oy)
+                            _paste_over(ao, maps["ao"], ox, oy)
+                            _paste_over(height, maps["height"], ox, oy)
+                            _paste_over(orm, maps["orm"], ox, oy)
+                            _paste_over(emissive, maps["emissive"], ox, oy)
+                            continue
+                res = self.render_element(el)
+                if res is None:
+                    continue
+                img_el, px0, py0, _ = res
+                _paste_over(albedo, img_el, px0, py0)
+                a_ch = img_el.getchannel("A")
+                flat_n = Image.merge("RGBA", (Image.new("L", img_el.size, 128), Image.new("L", img_el.size, 128),
+                                              Image.new("L", img_el.size, 255), a_ch))
+                _paste_over(normal, flat_n, px0, py0)
+                if st.get("glow") or (isinstance(el.get("style"), dict) and el["style"].get("material") in ("neon", "hologram", "energy_shield")):
+                    _paste_over(emissive, img_el, px0, py0)
+
+        return {"beauty": beauty, "albedo": albedo, "normal": normal.convert("RGB"),
+                "roughness": roughness.convert("L"), "metallic": metallic.convert("L"),
+                "ao": ao.convert("L"), "height": height.convert("L"),
+                "orm": orm.convert("RGB"), "emissive": emissive.convert("RGB")}
+
     def layer_image(self, layer: dict | None, elements: list[dict], clip_alpha: Image.Image | None = None,
                     bake_opacity: bool = True) -> tuple[Image.Image, Image.Image]:
         """Render one layer on its own. Returns (finished layer, alpha of its raw content); the second
@@ -2291,14 +2653,33 @@ class Renderer:
         if st:
             fx = Effects(st, self.colors)
             reach = max(0.0, max((sp["d1"] for sp in _stroke_specs(st, self.colors)), default=0.0))
-            margin = int(math.ceil((fx.pad() + float(st.get("blur", 0) or 0) * 1.5 + reach + 2) * self.k))
+            b_rad, _ = fxlib.blur_amount(st.get("blur"))
+            margin = int(math.ceil((fx.pad() + b_rad * 1.5 + reach + 2) * self.k))
         size = (self.width + 2 * margin, self.height + 2 * margin)
         content = Image.new("RGBA", size, (0, 0, 0, 0))
         self._draw_elements(content, elements, margin)
         frame = (margin, margin, margin + self.width, margin + self.height)
         content_alpha = content.getchannel("A").crop(frame)
-        final = self._style_layer(content, st, tuple(float(v) for v in frame)) if st else content
-        final = final.crop(frame)
+        if st:
+            bb = content.getchannel("A").getbbox()
+            if bb is None:
+                final = Image.new("RGBA", (self.width, self.height), (0, 0, 0, 0))
+            else:
+                pad = max(margin, 4)
+                x0, y0 = max(0, bb[0] - pad), max(0, bb[1] - pad)
+                x1, y1 = min(size[0], bb[2] + pad), min(size[1], bb[3] + pad)
+                if (x1 - x0) * (y1 - y0) < size[0] * size[1] * 0.75:
+                    sub = content.crop((x0, y0, x1, y1))
+                    sub_frame = (float(margin - x0), float(margin - y0),
+                                 float(margin + self.width - x0), float(margin + self.height - y0))
+                    styled = self._style_layer(sub, st, sub_frame)
+                    full = Image.new("RGBA", size, (0, 0, 0, 0))
+                    full.paste(styled, (x0, y0))
+                    final = full.crop(frame)
+                else:
+                    final = self._style_layer(content, st, tuple(float(v) for v in frame)).crop(frame)
+        else:
+            final = content.crop(frame)
         if clip_alpha is not None:
             final.putalpha(ImageChops.multiply(final.getchannel("A"), clip_alpha))
         if bake_opacity and props["opacity"] < 1:
@@ -2534,15 +2915,16 @@ def _mirror_style(st: dict, fx: bool, fy: bool) -> dict:
         bevel = dict(st["bevel"]) if isinstance(st["bevel"], dict) else {}
         bevel["highlight"], bevel["shadow"] = bevel.get("shadow", "#000000@0.35"), bevel.get("highlight", "#ffffff@0.35")
         st["bevel"] = bevel
-    if st.get("light"):
-        light = dict(st["light"]) if isinstance(st["light"], dict) else {}
-        a = float(light.get("angle", 225))
-        if fx:
-            a = 180.0 - a
-        if fy:
-            a = -a
-        light["angle"] = a
-        st["light"] = light
+    for lkey in ("light", "pbr"):
+        if st.get(lkey):
+            light = dict(st[lkey]) if isinstance(st[lkey], dict) else {}
+            a = float(light.get("angle", 225))
+            if fx:
+                a = 180.0 - a
+            if fy:
+                a = -a
+            light["angle"] = a
+            st[lkey] = light
     st.pop("use", None)
     return st
 
@@ -2573,8 +2955,7 @@ def shift_element(el: dict, dx: float, dy: float) -> None:
 def checkerboard(size: tuple[int, int], cell: int = 12, dark: bool = True) -> Image.Image:
     w, h = size
     a, b = ((38, 38, 44), (52, 52, 60)) if dark else ((235, 235, 238), (255, 255, 255))
-    ys, xs = np.mgrid[0:h, 0:w]
-    pick = ((xs // cell + ys // cell) % 2).astype(bool)
+    pick = (((np.arange(w, dtype=np.int32)[None, :] // cell) + (np.arange(h, dtype=np.int32)[:, None] // cell)) & 1).astype(bool)
     arr = np.empty((h, w, 4), dtype=np.uint8)
     arr[..., 3] = 255
     for c in range(3):
@@ -2594,13 +2975,14 @@ def backdrop(size: tuple[int, int], background: str, colors: dict) -> Image.Imag
         return Image.new("RGBA", size, (240, 240, 244, 255))
     if key == "game":
         w, h = size
-        ys, xs = np.mgrid[0:h, 0:w].astype(np.float64)
+        xs = np.arange(w, dtype=np.float32)[None, :]
+        ys = np.arange(h, dtype=np.float32)[:, None]
         arr = np.empty((h, w, 4), dtype=np.uint8)
-        t = ys / max(1, h - 1)
-        wave = 12 * np.sin(xs / 37.0) * np.cos(ys / 23.0)
-        arr[..., 0] = np.clip(70 + 60 * t + wave, 0, 255)
-        arr[..., 1] = np.clip(110 + 30 * (1 - t) + wave, 0, 255)
-        arr[..., 2] = np.clip(150 - 70 * t + wave, 0, 255)
+        t = ys / np.float32(max(1, h - 1))
+        wave = np.float32(12.0) * np.sin(xs / np.float32(37.0)) * np.cos(ys / np.float32(23.0))
+        arr[..., 0] = np.clip(np.float32(70.0) + np.float32(60.0) * t + wave, 0, 255).astype(np.uint8)
+        arr[..., 1] = np.clip(np.float32(110.0) + np.float32(30.0) * (np.float32(1.0) - t) + wave, 0, 255).astype(np.uint8)
+        arr[..., 2] = np.clip(np.float32(150.0) - np.float32(70.0) * t + wave, 0, 255).astype(np.uint8)
         arr[..., 3] = 255
         return Image.fromarray(arr, "RGBA")
     r, g, b, _ = parse_color(background, colors)
