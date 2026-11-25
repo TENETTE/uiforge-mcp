@@ -25,8 +25,10 @@ from .server import (Image, _gradient_blocks, _label_font, _maybe_json, _out_dir
                      backdrop, store, tool)
 from .store import slugify
 
-__all__ = ["preview_nine_slice", "export_spec", "export_theme", "set_link", "set_interaction", "export_prototype",
-           "export_screen"]
+__all__ = ["preview_nine_slice", "export_spec", "export_theme", "set_link", "set_interaction", "set_binding",
+           "live_preview", "export_prototype", "export_screen"]
+
+_STUDIO = None
 
 _TRIGGERS = ("load", "hover", "leave", "press", "release", "click")
 _ACTIONS = ("play", "stop", "set_state", "clear_state", "toggle_state", "navigate", "overlay", "back", "url")
@@ -411,9 +413,11 @@ def set_link(canvas: str, id: str, target: str | None, mode: str = "navigate"):
 
 @tool
 def set_interaction(canvas: str, id: str, trigger: str, action: str, animation: str | None = None,
-                    state: str | None = None, target: str | None = None, delay: float = 0, remove: bool = False):
+                    state: str | None = None, target: str | None = None, delay: float = 0,
+                    sfx: str | None = None, remove: bool = False):
     """A state machine for the canvas: when `trigger` happens on `id`, do `action`. Rules run in
-    export_web and export_react and are listed in export_animation(format="json") for engine code.
+    export_web and export_react, are listed in export_animation(format="json"), and generate controller
+    scripts in export_screen (Unity, Godot, Roblox).
 
     id: an element id, "group:<name>", or "canvas" (for load / key / end triggers).
     trigger: "load", "hover", "leave", "press", "release", "click", "key:<Key>" (e.g. "key:Escape",
@@ -421,10 +425,9 @@ def set_interaction(canvas: str, id: str, trigger: str, action: str, animation: 
     action: "play" / "stop" an animation (it no longer autoplays once a rule plays it; restarts on each
       play), "set_state" / "clear_state" / "toggle_state" a canvas state (set_state looks: selected, open,
       muted, tab=2...), "navigate" / "overlay" to another canvas, "back", or "url" (target = https link).
-    delay: seconds before the action. Several rules may share a trigger (click: play "press" + navigate
-      after 0.2 s). remove=true deletes the rule with this id + trigger + action.
-    Example - a menu button: hover -> play "hover_in"; leave -> play "hover_out"; press -> set_state
-    "pressed"; release -> clear_state "pressed"; click -> navigate "settings" with delay 0.15."""
+    delay: seconds before the action. sfx: optional sound / haptic event id (e.g. "ui_click", "ui_hover")
+      emitted to onSfx in web / React and to audio signals in generated engine controllers.
+    remove=true deletes the rule with this id + trigger + action."""
     st = store()
     c = st.get(canvas)
     if id != "canvas":
@@ -463,6 +466,11 @@ def set_interaction(canvas: str, id: str, trigger: str, action: str, animation: 
         rule["target"] = str(target)
     if delay:
         rule["delay"] = max(0.0, float(delay))
+    if sfx:
+        sfx_clean = re.sub(r"[^A-Za-z0-9_.\-:/]", "", str(sfx))
+        if not sfx_clean:
+            raise ValueError("sfx must be a sound event name like 'ui_click' or 'hover_tick'")
+        rule["sfx"] = sfx_clean
     key = (id, trigger, action, rule.get("animation"), rule.get("state"))
     rows = [r for r in (c.get("interactions") or [])
             if (r["id"], r["trigger"], r["action"], r.get("animation"), r.get("state")) != key]
@@ -474,6 +482,96 @@ def set_interaction(canvas: str, id: str, trigger: str, action: str, animation: 
         c.pop("interactions", None)
     st.save_canvas(c)
     return {"canvas": c["id"], "interactions": rows}
+
+
+@tool
+def set_binding(canvas: str, data: dict | None = None, target: str | None = None, property: str | None = None,
+                expr: str | None = None, remove: bool = False):
+    """Bind canvas data variables to element properties (Rive / Envy style reactive UI).
+
+    data: default variable values on the canvas, e.g. {"hp": 75, "max_hp": 100, "player": "Aria"}.
+      Also fills {hp} / {player} placeholders in text elements automatically.
+    target + property + expr: bind an element property to a safe expression evaluated against `data`:
+      - Bar width:  target="hp_fill", property="width", expr="clamp(hp / max_hp, 0, 1) * 240"
+      - Low-HP red: target="hp_fill", property="style.fill", expr="where(hp / max_hp < 0.25, '#ef4444', '#22c55e')"
+      - Warning:    target="low_icon", property="visible", expr="hp < 25"
+      - Text:       target="hp_txt", property="text", expr="pct(hp, max_hp)"
+    Test different values with preview(canvas, data={"hp": 15}). Exported live to Web (window.gameuiSetData),
+    React (<Hud data={{ hp: 40 }} />), Unity C#, Godot GDScript and Roblox Luau.
+    remove=true deletes the binding for (target, property)."""
+    from . import binding
+    st = store()
+    c = st.get(canvas)
+    st.checkpoint(c)
+    try:
+        if data is not None:
+            parsed = _maybe_json(data)
+            if not isinstance(parsed, dict):
+                raise ValueError('data must be a JSON object like {"hp": 75, "max_hp": 100}')
+            cur = dict(c.get("data") or {})
+            for k, v in parsed.items():
+                if not str(k).isidentifier() or str(k).startswith("_"):
+                    raise ValueError(f"data variable '{k}' must be a plain identifier (letters, digits, _)")
+                if v is None:
+                    cur.pop(k, None)
+                else:
+                    cur[str(k)] = v
+            if cur:
+                c["data"] = cur
+            else:
+                c.pop("data", None)
+        if target is not None:
+            el = st.find(c, target)
+            if not property:
+                raise ValueError("property is required when binding a target (e.g. 'width', 'visible', 'style.fill')")
+            prop = str(property).strip()
+            rows = [r for r in (c.get("bindings") or []) if not (r["target"] == el["id"] and r["property"] == prop)]
+            if not remove:
+                if not expr:
+                    raise ValueError("expr is required (e.g. \"clamp(hp / max_hp, 0, 1) * 240\")")
+                binding.compile_expr(expr)
+                binding.eval_expr(expr, c.get("data") or {})
+                rows.append({"target": el["id"], "property": prop, "expr": str(expr).strip()})
+            if rows:
+                c["bindings"] = rows
+            else:
+                c.pop("bindings", None)
+        st.renderer(c, 0.25).render()
+    except Exception:
+        st.drop_checkpoint(c)
+        raise
+    st.save_canvas(c)
+    return {"canvas": c["id"], "data": c.get("data", {}), "bindings": c.get("bindings", [])}
+
+
+@tool
+def live_preview(action: str = "start", canvas: str | None = None, port: int = 0):
+    """Start, check or stop a zero-dependency localhost live preview studio (127.0.0.1 HTTP + SSE).
+
+    The browser window auto-reloads whenever you create or edit any canvas or theme, lets the user
+    toggle element IDs, safe-area guides, backdrops and inspect cursor coordinates in real time.
+    action: "start" (opens local HTTP server and returns its URL), "status" or "stop".
+    port: 0 picks a free port automatically (e.g. http://127.0.0.1:54321), or pass e.g. 8765."""
+    global _STUDIO
+    from .live import LiveStudio
+    act = str(action or "start").strip().lower()
+    if act not in ("start", "status", "stop"):
+        raise ValueError("action must be 'start', 'status' or 'stop'")
+    cid = store().get(canvas)["id"] if canvas else None
+    if act == "status":
+        if _STUDIO is None or not _STUDIO.running:
+            return {"running": False}
+        return {"running": True, "url": _STUDIO.url, "active": _STUDIO._last_canvas}
+    if act == "stop":
+        if _STUDIO is None:
+            return {"running": False}
+        return _STUDIO.stop()
+    p = int(port or 0)
+    if p != 0 and not (1024 <= p <= 65535):
+        raise ValueError("port must be 0 (auto) or between 1024 and 65535")
+    if _STUDIO is None or (not _STUDIO.running and p != _STUDIO.port):
+        _STUDIO = LiveStudio(store, port=p)
+    return _STUDIO.start(cid)
 
 
 def _data_uri(img: PILImage.Image) -> str:
@@ -631,12 +729,20 @@ def _pieces(c: dict, scale: float, bake_text: bool, language: str | None):
             nodes.append({"kind": "text", "id": el["id"], "box": (x0, y0, x1, y1), "pin": el.get("pin") or {},
                           "el": el, "info": info})
             continue
+        if el["type"] in ("input", "scroll"):
+            x0, y0, x1, y1 = r1.element_box(el)
+            nodes.append({"kind": el["type"], "id": el["id"], "box": (x0, y0, x1, y1), "pin": el.get("pin") or {},
+                          "el": el})
+            continue
         if el.get("group"):
             if el["group"] in groups_done:
                 continue
             groups_done.add(el["group"])
             members = [e for e in c["elements"] if e.get("group") == el["group"] and e.get("visible", True)
+                       and e["type"] not in ("input", "scroll")
                        and (bake_text or e["type"] != "text" or e.get("arc"))]
+            if not members:
+                continue
             name = el["group"]
         else:
             members = [el]
@@ -706,6 +812,39 @@ def _write_godot(c: dict, nodes: list, folder: Path, res: str, name: str, colors
             else:
                 body += [f'[node name="{_ident_node(node["id"])}" type="TextureRect" parent="."]', "layout_mode = 1",
                          *anchors, "mouse_filter = 2", f'texture = ExtResource("{tex}")', "expand_mode = 1", ""]
+        elif node["kind"] == "input":
+            el = node["el"]
+            from .widgets import widget_colors_summary
+            wc = widget_colors_summary(el, colors)
+            props = [f'[node name="{_ident_node(node["id"])}" type="LineEdit" parent="."]', "layout_mode = 1", *anchors,
+                     f'placeholder_text = {json.dumps(str(el.get("placeholder") or ""), ensure_ascii=False)}',
+                     f'text = {json.dumps(str(el.get("value") or ""), ensure_ascii=False)}',
+                     f"theme_override_colors/font_color = {_godot_color(wc['text'])}",
+                     f"theme_override_colors/font_placeholder_color = {_godot_color(wc['placeholder'])}",
+                     f"theme_override_font_sizes/font_size = {int(round(float(el.get('size', 15))))}"]
+            if str(el.get("input_type", "")).lower() == "password":
+                props.append("secret = true")
+            if el.get("max_length"):
+                props.append(f"max_length = {int(el['max_length'])}")
+            if el.get("readonly"):
+                props.append("editable = false")
+            body += props + [""]
+        elif node["kind"] == "scroll":
+            el = node["el"]
+            nid = _ident_node(node["id"])
+            horiz = str(el.get("direction", "vertical")).lower() == "horizontal"
+            box_type = "HBoxContainer" if horiz else "VBoxContainer"
+            body += [f'[node name="{nid}" type="ScrollContainer" parent="."]', "layout_mode = 1", *anchors,
+                     f"horizontal_scroll_mode = {1 if horiz or el.get('direction') == 'both' else 0}",
+                     f"vertical_scroll_mode = {0 if horiz else 1}", "",
+                     f'[node name="Content" type="{box_type}" parent="{nid}"]',
+                     "size_flags_horizontal = 3",
+                     f"theme_override_constants/separation = {int(round(float(el.get('gap', 8))))}", ""]
+            for i, raw_item in enumerate(el.get("items") or []):
+                title = (raw_item.get("title") or raw_item.get("label") or f"Item {i + 1}") if isinstance(raw_item, dict) else str(raw_item)
+                body += [f'[node name="Item{i}" type="Label" parent="{nid}/Content"]',
+                         f'text = {json.dumps(str(title), ensure_ascii=False)}',
+                         f"theme_override_font_sizes/font_size = {int(round(float(el.get('size', 13))))}", ""]
         else:
             t = node["info"]
             props = [f'[node name="{_ident_node(node["id"])}" type="Label" parent="."]', "layout_mode = 1", *anchors]
@@ -791,6 +930,56 @@ def _write_roblox(c: dict, nodes: list, folder: Path, name: str, colors: dict) -
                 lines += [f"{var}.ScaleType = Enum.ScaleType.Slice",
                           f"{var}.SliceCenter = Rect.new({b['left']}, {b['top']}, {iw - b['right']}, {ih - b['bottom']})",
                           f"{var}.SliceScale = {round(1 / node['scale'], 4)}"]
+        elif node["kind"] == "input":
+            el = node["el"]
+            from .widgets import widget_colors_summary
+            wc = widget_colors_summary(el, colors)
+            rad = int(round(float(el.get("radius", 8) if not isinstance(el.get("radius"), list) else el["radius"][0])))
+            lines += [
+                f'local {var} = Instance.new("TextBox")', f'{var}.Name = "{node["id"]}"',
+                f"{var}.BackgroundColor3 = Color3.fromRGB({wc['bg'][0]}, {wc['bg'][1]}, {wc['bg'][2]})",
+                f"{var}.BackgroundTransparency = {round(1 - wc['bg'][3] / 255, 3)}",
+                f'{var}.PlaceholderText = {json.dumps(str(el.get("placeholder") or ""), ensure_ascii=False)}',
+                f'{var}.Text = {json.dumps(str(el.get("value") or ""), ensure_ascii=False)}',
+                f"{var}.TextColor3 = Color3.fromRGB({wc['text'][0]}, {wc['text'][1]}, {wc['text'][2]})",
+                f"{var}.PlaceholderColor3 = Color3.fromRGB({wc['placeholder'][0]}, {wc['placeholder'][1]}, {wc['placeholder'][2]})",
+                f"{var}.TextSize = {int(round(float(el.get('size', 15))))}",
+                f"{var}.ClearTextOnFocus = false",
+                f"{var}.TextXAlignment = Enum.TextXAlignment.Left",
+                f'local {var}c = Instance.new("UICorner")', f"{var}c.CornerRadius = UDim.new(0, {rad})", f"{var}c.Parent = {var}",
+                f'local {var}p = Instance.new("UIPadding")', f"{var}p.PaddingLeft = UDim.new(0, {int(round(float(el.get('padding', 12))))})", f"{var}p.Parent = {var}",
+            ]
+        elif node["kind"] == "scroll":
+            el = node["el"]
+            from .widgets import widget_colors_summary
+            wc = widget_colors_summary(el, colors)
+            rad = int(round(float(el.get("radius", 10) if not isinstance(el.get("radius"), list) else el["radius"][0])))
+            horiz = str(el.get("direction", "vertical")).lower() == "horizontal"
+            lines += [
+                f'local {var} = Instance.new("ScrollingFrame")', f'{var}.Name = "{node["id"]}"',
+                f"{var}.BackgroundColor3 = Color3.fromRGB({wc['bg'][0]}, {wc['bg'][1]}, {wc['bg'][2]})",
+                f"{var}.BackgroundTransparency = {round(1 - wc['bg'][3] / 255, 3)}",
+                f"{var}.AutomaticCanvasSize = Enum.AutomaticSize.{'X' if horiz else 'Y'}",
+                f"{var}.CanvasSize = UDim2.new(0, 0, 0, 0)",
+                f"{var}.ScrollBarThickness = {int(round(float(el.get('scrollbar_width', 6))))}",
+                f'local {var}c = Instance.new("UICorner")', f"{var}c.CornerRadius = UDim.new(0, {rad})", f"{var}c.Parent = {var}",
+                f'local {var}l = Instance.new("UIListLayout")',
+                f"{var}l.FillDirection = Enum.FillDirection.{'Horizontal' if horiz else 'Vertical'}",
+                f"{var}l.Padding = UDim.new(0, {int(round(float(el.get('gap', 8))))})",
+                f"{var}l.Parent = {var}",
+            ]
+            for i, raw_item in enumerate(el.get("items") or []):
+                title = (raw_item.get("title") or raw_item.get("label") or f"Item {i + 1}") if isinstance(raw_item, dict) else str(raw_item)
+                lines += [
+                    f'local {var}_i{i} = Instance.new("TextLabel")',
+                    f'{var}_i{i}.Name = "Item{i}"',
+                    f"{var}_i{i}.Size = UDim2.new(1, -12, 0, {int(round(float(el.get('item_height', 38))))})",
+                    f"{var}_i{i}.BackgroundColor3 = Color3.fromRGB(30, 41, 59)",
+                    f"{var}_i{i}.TextColor3 = Color3.fromRGB(226, 232, 240)",
+                    f'{var}_i{i}.Text = {json.dumps(str(title), ensure_ascii=False)}',
+                    f"{var}_i{i}.TextSize = {int(round(float(el.get('size', 13))))}",
+                    f"{var}_i{i}.Parent = {var}",
+                ]
         else:
             t = node["info"]
             col = _first_color_hexlike(t["color"], colors)
@@ -852,6 +1041,41 @@ def _write_unity(c: dict, nodes: list, folder: Path, name: str, colors: dict) ->
                           f"-unity-slice-right: {b['right']}", f"-unity-slice-bottom: {b['bottom']}",
                           f"-unity-slice-scale: {round(1 / node['scale'], 4)}px"]
             uxml.append(f'        <ui:VisualElement name="{node["id"]}" class="{cls}" picking-mode="Ignore" />')
+        elif node["kind"] == "input":
+            el = node["el"]
+            from .widgets import widget_colors_summary
+            wc = widget_colors_summary(el, colors)
+            rad = float(el.get("radius", 8) if not isinstance(el.get("radius"), list) else el["radius"][0])
+            rules += [
+                f"background-color: rgba({wc['bg'][0]}, {wc['bg'][1]}, {wc['bg'][2]}, {wc['bg'][3] / 255:.3f})",
+                f"border-color: rgba({wc['border'][0]}, {wc['border'][1]}, {wc['border'][2]}, {wc['border'][3] / 255:.3f})",
+                f"border-width: {wc['border_width']:.1f}px",
+                f"border-radius: {rad:.1f}px",
+                f"color: rgba({wc['text'][0]}, {wc['text'][1]}, {wc['text'][2]}, {wc['text'][3] / 255:.3f})",
+                f"font-size: {float(el.get('size', 15)):.0f}px",
+            ]
+            pw = ' password="true"' if str(el.get("input_type", "")).lower() == "password" else ""
+            ro = ' readonly="true"' if el.get("readonly") else ""
+            val = html.escape(str(el.get("value") or ""), quote=True)
+            uxml.append(f'        <ui:TextField name="{node["id"]}" class="{cls}" value="{val}"{pw}{ro} />')
+        elif node["kind"] == "scroll":
+            el = node["el"]
+            from .widgets import widget_colors_summary
+            wc = widget_colors_summary(el, colors)
+            rad = float(el.get("radius", 10) if not isinstance(el.get("radius"), list) else el["radius"][0])
+            rules += [
+                f"background-color: rgba({wc['bg'][0]}, {wc['bg'][1]}, {wc['bg'][2]}, {wc['bg'][3] / 255:.3f})",
+                f"border-color: rgba({wc['border'][0]}, {wc['border'][1]}, {wc['border'][2]}, {wc['border'][3] / 255:.3f})",
+                f"border-width: {wc['border_width']:.1f}px",
+                f"border-radius: {rad:.1f}px",
+                f"padding: {float(el.get('padding', 10)):.0f}px",
+            ]
+            mode = {"horizontal": "Horizontal", "both": "VerticalAndHorizontal"}.get(str(el.get("direction", "vertical")).lower(), "Vertical")
+            uxml.append(f'        <ui:ScrollView name="{node["id"]}" class="{cls}" mode="{mode}">')
+            for i, raw_item in enumerate(el.get("items") or []):
+                title = (raw_item.get("title") or raw_item.get("label") or f"Item {i + 1}") if isinstance(raw_item, dict) else str(raw_item)
+                uxml.append(f'            <ui:Label name="{node["id"]}_item_{i}" text="{html.escape(str(title), quote=True)}" />')
+            uxml.append("        </ui:ScrollView>")
         else:
             t = node["info"]
             col = _first_color_hexlike(t["color"], colors)
@@ -883,29 +1107,316 @@ def _write_unity(c: dict, nodes: list, folder: Path, name: str, colors: dict) ->
     return [a, b]
 
 
+def _pascal_id(name: str) -> str:
+    out = re.sub(r"[^0-9a-zA-Z]+", " ", str(name)).title().replace(" ", "") or "Screen"
+    return out if out[0].isalpha() else "Screen" + out
+
+
+def _write_godot_controller(c: dict, nodes: list, folder: Path, name: str) -> Path | None:
+    """Emit a Godot 4 GDScript controller wiring data bindings, interactions, sfx signals and gamepad focus."""
+    ix = c.get("interactions") or []
+    data = c.get("data") or {}
+    binds = c.get("bindings") or []
+    focus = c.get("focus_order") or []
+    inputs = [n for n in nodes if n["kind"] == "input"]
+    if not (ix or data or binds or focus or inputs):
+        return None
+    node_ids = {n["id"]: _ident_node(n["id"]) for n in nodes}
+    lines = [
+        f"# {name}_controller.gd  -  generated by game-ui-mcp from canvas '{c['id']}'",
+        "extends Control", "",
+        "signal navigate_requested(target: String, mode: String)",
+        "signal sfx_requested(event_name: String)",
+        "signal state_changed(state_name: String, active: bool)", "",
+        f"var data: Dictionary = {json.dumps(data, ensure_ascii=False)}",
+        "var _states: Dictionary = {}", "",
+        "func _ready() -> void:",
+    ]
+    valid_focus = [node_ids[f] for f in focus if f in node_ids]
+    if valid_focus:
+        for i, nid in enumerate(valid_focus):
+            nxt = valid_focus[(i + 1) % len(valid_focus)]
+            prv = valid_focus[(i - 1) % len(valid_focus)]
+            lines += [
+                f'\tvar f_{i} := get_node_or_null("{nid}")',
+                f"\tif f_{i} is Control:",
+                f"\t\tf_{i}.focus_mode = Control.FOCUS_ALL",
+                f'\t\tf_{i}.focus_neighbor_bottom = NodePath("../{nxt}")',
+                f'\t\tf_{i}.focus_neighbor_top = NodePath("../{prv}")',
+            ]
+        lines.append(f'\tif get_node_or_null("{valid_focus[0]}") is Control: get_node("{valid_focus[0]}").grab_focus()')
+    for rule in ix:
+        rid = rule["id"]
+        target_node = node_ids.get(rid) or (node_ids.get(slugify(rid[6:], "piece")) if rid.startswith("group:") else None)
+        if rule["trigger"] == "click" and target_node:
+            lines += [
+                f'\tvar n_{_ident_node(target_node)} := get_node_or_null("{target_node}")',
+                f"\tif n_{_ident_node(target_node)} is Control:",
+                f"\t\tn_{_ident_node(target_node)}.mouse_filter = Control.MOUSE_FILTER_STOP",
+                f'\t\tn_{_ident_node(target_node)}.gui_input.connect(func(ev): if ev is InputEventMouseButton and ev.pressed: _run_rule({json.dumps(rule, ensure_ascii=False)}))',
+            ]
+    for n in inputs:
+        nid = _ident_node(n["id"])
+        bkey = n["el"].get("bind") or n["id"]
+        lines += [
+            f'\tvar inp_{nid} := get_node_or_null("{nid}")',
+            f"\tif inp_{nid} is LineEdit:",
+            f'\t\tinp_{nid}.text_changed.connect(func(v): set_data({{"{bkey}": v}}))',
+        ]
+    lines += ["\tset_data(data)", ""]
+    lines += [
+        "func set_data(patch: Dictionary) -> void:",
+        "\tdata.merge(patch, true)",
+    ]
+    for n in nodes:
+        if n["kind"] == "text" and "{" in str(n["info"].get("text", "")):
+            tpl = str(n["el"].get("text", ""))
+            lines += [
+                f'\tvar lbl_{_ident_node(n["id"])} := get_node_or_null("{_ident_node(n["id"])}")',
+                f"\tif lbl_{_ident_node(n['id'])} is Label:",
+                f"\t\tvar txt_{_ident_node(n['id'])} := {json.dumps(tpl, ensure_ascii=False)}",
+                "\t\tfor k in data: txt_" + _ident_node(n["id"]) + ' = txt_' + _ident_node(n["id"]) + '.replace("{" + str(k) + "}", str(data[k]))',
+                f"\t\tlbl_{_ident_node(n['id'])}.text = txt_{_ident_node(n['id'])}",
+            ]
+    for b in binds:
+        lines.append(f"\t# binding: {b['target']}.{b['property']} = {b['expr']}")
+    lines += [
+        "", "func _run_rule(rule: Dictionary) -> void:",
+        '\tif rule.has("sfx"): sfx_requested.emit(str(rule["sfx"]))',
+        '\tvar act := str(rule.get("action", ""))',
+        '\tif act in ["navigate", "overlay", "back", "url"]: navigate_requested.emit(str(rule.get("target", "back")), act)',
+        '\telif act == "set_state": _states[rule["state"]] = true; state_changed.emit(rule["state"], true)',
+        '\telif act == "clear_state": _states.erase(rule["state"]); state_changed.emit(rule["state"], false)',
+        '\telif act == "toggle_state":',
+        '\t\tvar on := not _states.get(rule["state"], false)',
+        '\t\t_states[rule["state"]] = on; state_changed.emit(rule["state"], on)',
+    ]
+    out = folder / f"{name}_controller.gd"
+    out.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return out
+
+
+def _write_unity_controller(c: dict, nodes: list, folder: Path, name: str) -> Path | None:
+    """Emit a Unity UI Toolkit C# MonoBehaviour controller for data bindings, interactions and sfx events."""
+    ix = c.get("interactions") or []
+    data = c.get("data") or {}
+    binds = c.get("bindings") or []
+    focus = c.get("focus_order") or []
+    inputs = [n for n in nodes if n["kind"] == "input"]
+    if not (ix or data or binds or focus or inputs):
+        return None
+    cls = _pascal_id(name) + "Controller"
+    lines = [
+        f"// {cls}.cs  -  generated by game-ui-mcp from canvas '{c['id']}'",
+        "using System;",
+        "using System.Collections.Generic;",
+        "using UnityEngine;",
+        "using UnityEngine.UIElements;", "",
+        "[RequireComponent(typeof(UIDocument))]",
+        f"public class {cls} : MonoBehaviour",
+        "{",
+        "    public event Action<string, string> OnNavigate;",
+        "    public event Action<string> OnSfx;",
+        "    public event Action<string, bool> OnStateChanged;", "",
+        "    private VisualElement _root;",
+        "    private readonly Dictionary<string, object> _data = new Dictionary<string, object>();",
+        "    private readonly HashSet<string> _states = new HashSet<string>();", "",
+        "    private void OnEnable()",
+        "    {",
+        "        _root = GetComponent<UIDocument>().rootVisualElement;",
+    ]
+    for k, v in data.items():
+        lit = f'"{v}"' if isinstance(v, str) else ("true" if v is True else "false" if v is False else f"{v}f")
+        lines.append(f'        _data["{k}"] = {lit};')
+    for rule in ix:
+        rid = rule["id"]
+        tgt = slugify(rid[6:], "piece") if rid.startswith("group:") else rid
+        sfx_call = f'OnSfx?.Invoke("{rule["sfx"]}"); ' if rule.get("sfx") else ""
+        act = rule["action"]
+        if act in ("navigate", "overlay", "back", "url"):
+            body = f'{sfx_call}OnNavigate?.Invoke("{rule.get("target", "back")}", "{act}");'
+        elif act == "set_state":
+            body = f'{sfx_call}_states.Add("{rule["state"]}"); OnStateChanged?.Invoke("{rule["state"]}", true);'
+        elif act == "clear_state":
+            body = f'{sfx_call}_states.Remove("{rule["state"]}"); OnStateChanged?.Invoke("{rule["state"]}", false);'
+        elif act == "toggle_state":
+            body = f'{sfx_call}bool on = !_states.Contains("{rule["state"]}"); if (on) _states.Add("{rule["state"]}"); else _states.Remove("{rule["state"]}"); OnStateChanged?.Invoke("{rule["state"]}", on);'
+        else:
+            body = f'{sfx_call}// action: {act}'
+        if rule["trigger"] == "click":
+            lines += [
+                f'        var el_{slugify(tgt, "n")} = _root.Q<VisualElement>("{tgt}");',
+                f'        if (el_{slugify(tgt, "n")} != null) {{ el_{slugify(tgt, "n")}.pickingMode = PickingMode.Position; el_{slugify(tgt, "n")}.RegisterCallback<ClickEvent>(_ => {{ {body} }}); }}',
+            ]
+    for n in inputs:
+        tid = slugify(n["id"], "inp")
+        bkey = n["el"].get("bind") or n["id"]
+        lines += [
+            f'        var inp_{tid} = _root.Q<TextField>("{n["id"]}");',
+            f'        if (inp_{tid} != null) inp_{tid}.RegisterValueChangedCallback(ev => SetData("{bkey}", ev.newValue));',
+        ]
+    lines += [
+        "        Refresh();",
+        "    }", "",
+        "    public void SetData(string key, object value) { _data[key] = value; Refresh(); }", "",
+        "    public void Refresh()",
+        "    {",
+    ]
+    for n in nodes:
+        if n["kind"] == "text" and "{" in str(n["el"].get("text", "")):
+            tpl = str(n["el"].get("text", "")).replace("\\", "\\\\").replace('"', '\\"')
+            lines += [
+                f'        var lbl_{slugify(n["id"], "t")} = _root.Q<Label>("{n["id"]}");',
+                f'        if (lbl_{slugify(n["id"], "t")} != null) {{ string s = "{tpl}"; foreach (var kv in _data) s = s.Replace("{{" + kv.Key + "}}", kv.Value?.ToString() ?? ""); lbl_{slugify(n["id"], "t")}.text = s; }}',
+            ]
+    for b in binds:
+        lines.append(f'        // binding: {b["target"]}.{b["property"]} = {b["expr"]}')
+    lines += ["    }", "}"]
+    out = folder / f"{cls}.cs"
+    out.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return out
+
+
+def _write_unity_ugui(c: dict, nodes: list, folder: Path, name: str, colors: dict) -> Path:
+    """Emit a Unity uGUI (Canvas + RectTransform + Image + Text) editor builder script."""
+    W, H = float(c["width"]), float(c["height"])
+    cls = _pascal_id(name) + "UGuiBuilder"
+    lines = [
+        f"// {cls}.cs  -  generated by game-ui-mcp from canvas '{c['id']}' ({int(W)}x{int(H)})",
+        "// Put in Assets/Editor/ and run Tools -> GameUI -> Build " + cls + " to create a uGUI Canvas.",
+        "#if UNITY_EDITOR",
+        "using UnityEditor;",
+        "using UnityEngine;",
+        "using UnityEngine.UI;", "",
+        f"public static class {cls}",
+        "{",
+        f'    [MenuItem("Tools/GameUI/Build {cls}")]',
+        "    public static void Build()",
+        "    {",
+        f'        var root = new GameObject("{name}", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));',
+        "        var canvas = root.GetComponent<Canvas>();",
+        "        canvas.renderMode = RenderMode.ScreenSpaceOverlay;",
+        "        var scaler = root.GetComponent<CanvasScaler>();",
+        "        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;",
+        f"        scaler.referenceResolution = new Vector2({int(W)}, {int(H)});",
+        "        scaler.matchWidthOrHeight = 1f;",
+    ]
+    for idx, node in enumerate(nodes):
+        x0, y0, x1, y1 = node["box"]
+        w, h = x1 - x0, y1 - y0
+        pin = node["pin"]
+        px, py = pin.get("x", "left"), pin.get("y", "top")
+        ax0, ax1 = (1.0, 1.0) if px == "right" else (0.5, 0.5) if px == "center" else (0.0, 1.0) if px == "stretch" else (0.0, 0.0)
+        ay0, ay1 = (0.0, 0.0) if py == "bottom" else (0.5, 0.5) if py == "middle" else (0.0, 1.0) if py == "stretch" else (1.0, 1.0)
+        var = f"n{idx}"
+        if node["kind"] == "image":
+            lines += [
+                f'        var {var} = new GameObject("{node["id"]}", typeof(RectTransform), typeof(Image));',
+                f"        {var}.transform.SetParent(root.transform, false);",
+                f'        var {var}Img = {var}.GetComponent<Image>();',
+                f'        {var}Img.type = Image.Type.{"Sliced" if node.get("nine") else "Simple"};',
+                f'        // Assign sprite "{node["file"]}" to {var}Img.sprite',
+            ]
+        elif node["kind"] == "input":
+            el = node["el"]
+            from .widgets import widget_colors_summary
+            wc = widget_colors_summary(el, colors)
+            ph = str(el.get("placeholder") or "").replace("\\", "\\\\").replace('"', '\\"')
+            val = str(el.get("value") or "").replace("\\", "\\\\").replace('"', '\\"')
+            lines += [
+                f'        var {var} = new GameObject("{node["id"]}", typeof(RectTransform), typeof(Image), typeof(InputField));',
+                f"        {var}.transform.SetParent(root.transform, false);",
+                f"        {var}.GetComponent<Image>().color = new Color({wc['bg'][0]/255:.3f}f, {wc['bg'][1]/255:.3f}f, {wc['bg'][2]/255:.3f}f, {wc['bg'][3]/255:.3f}f);",
+                f'        var {var}Inp = {var}.GetComponent<InputField>();',
+                f'        var {var}TxtGo = new GameObject("Text", typeof(RectTransform), typeof(Text));',
+                f"        {var}TxtGo.transform.SetParent({var}.transform, false);",
+                f"        var {var}Txt = {var}TxtGo.GetComponent<Text>(); {var}Txt.text = \"{val}\"; {var}Txt.fontSize = {int(round(float(el.get('size', 15))))};",
+                f"        {var}Inp.textComponent = {var}Txt;",
+                f'        var {var}PhGo = new GameObject("Placeholder", typeof(RectTransform), typeof(Text));',
+                f"        {var}PhGo.transform.SetParent({var}.transform, false);",
+                f'        var {var}Ph = {var}PhGo.GetComponent<Text>(); {var}Ph.text = "{ph}"; {var}Inp.placeholder = {var}Ph;',
+            ]
+            if str(el.get("input_type", "")).lower() == "password":
+                lines.append(f"        {var}Inp.contentType = InputField.ContentType.Password;")
+        elif node["kind"] == "scroll":
+            el = node["el"]
+            from .widgets import widget_colors_summary
+            wc = widget_colors_summary(el, colors)
+            horiz = str(el.get("direction", "vertical")).lower() == "horizontal"
+            lines += [
+                f'        var {var} = new GameObject("{node["id"]}", typeof(RectTransform), typeof(Image), typeof(Mask), typeof(ScrollRect));',
+                f"        {var}.transform.SetParent(root.transform, false);",
+                f"        {var}.GetComponent<Image>().color = new Color({wc['bg'][0]/255:.3f}f, {wc['bg'][1]/255:.3f}f, {wc['bg'][2]/255:.3f}f, {wc['bg'][3]/255:.3f}f);",
+                f"        var {var}Sr = {var}.GetComponent<ScrollRect>(); {var}Sr.vertical = {'false' if horiz else 'true'}; {var}Sr.horizontal = {'true' if horiz else 'false'};",
+                f'        var {var}Content = new GameObject("Content", typeof(RectTransform), typeof({"HorizontalLayoutGroup" if horiz else "VerticalLayoutGroup"}), typeof(ContentSizeFitter));',
+                f"        {var}Content.transform.SetParent({var}.transform, false);",
+                f"        {var}Sr.content = {var}Content.GetComponent<RectTransform>();",
+            ]
+        else:
+            t = node["info"]
+            col = _first_color_hexlike(t["color"], colors)
+            txt = str(t["text"]).replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
+            lines += [
+                f'        var {var} = new GameObject("{node["id"]}", typeof(RectTransform), typeof(Text));',
+                f"        {var}.transform.SetParent(root.transform, false);",
+                f"        var {var}Txt = {var}.GetComponent<Text>();",
+                f'        {var}Txt.text = "{txt}";',
+                f"        {var}Txt.fontSize = {int(round(t['size']))};",
+                f"        {var}Txt.color = new Color({col[0] / 255:.3f}f, {col[1] / 255:.3f}f, {col[2] / 255:.3f}f, {col[3] / 255:.3f}f);",
+            ]
+        lines += [
+            f"        var {var}Rt = {var}.GetComponent<RectTransform>();",
+            f"        {var}Rt.anchorMin = new Vector2({ax0:.2f}f, {ay0:.2f}f);",
+            f"        {var}Rt.anchorMax = new Vector2({ax1:.2f}f, {ay1:.2f}f);",
+            f"        {var}Rt.pivot = new Vector2(0f, 1f);",
+            f"        {var}Rt.sizeDelta = new Vector2({w:.1f}f, {h:.1f}f);",
+            f"        {var}Rt.anchoredPosition = new Vector2({x0 - ax0 * W:.1f}f, {-y0 + (1.0 - ay1) * H:.1f}f);",
+        ]
+    lines += [
+        "        Selection.activeGameObject = root;",
+        "    }",
+        "}",
+        "#endif",
+    ]
+    out = folder / f"{cls}.cs"
+    out.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return out
+
+
 @tool
 def export_screen(canvas: str, engine: str, out_dir: str | None = None, name: str | None = None,
                   scale: float = 1, bake_text: bool = False, language: str | None = None,
                   godot_res_path: str | None = None):
-    """Turn a screen mockup into a real engine UI: image pieces + a scene / script that rebuilds the
-    layout with native text, keeping each element's pin (set_pin) so it adapts to other resolutions.
+    """Turn a screen mockup into a real engine or native desktop UI: image pieces + scene/view/script
+    rebuilding the layout with native text, Input fields, Scroll views and responsive pins.
+    When the canvas has interactions, data bindings or focus_order, also emits a ready controller/ViewModel.
 
-    engine: "godot" (.tscn with TextureRect / NinePatchRect / Label nodes and anchors), "roblox"
-      (a LocalScript building a ScreenGui with ImageLabels, TextLabels + UIStroke, scaled to screen
-      height), "unity" (UI Toolkit .uxml + .uss with absolute positions, 9-slice and text styles),
-      or "json" (pieces + layout only).
+    engine:
+      Game engines:
+        - "godot"      (.tscn with LineEdit/ScrollContainer + optional _controller.gd)
+        - "roblox"     (LocalScript with ScreenGui + TextBox/ScrollingFrame)
+        - "unity"      (UI Toolkit .uxml + .uss with TextField/ScrollView + optional Controller.cs)
+        - "unity-ugui" (C# uGUI Canvas / RectTransform / InputField / ScrollRect editor builder)
+      C# / .NET & C++ desktop UI frameworks:
+        - "wpf"        (C# .NET Framework 4.8 & .NET 8/9 WPF .xaml + .xaml.cs + INotifyPropertyChanged ViewModel)
+        - "avalonia"   (Cross-platform .NET 8/9 Avalonia .axaml + .axaml.cs + ViewModel)
+        - "winui"      (Windows App SDK / WinUI 3 .xaml + .xaml.cs + ViewModel)
+        - "qt-qml"     (C++ Qt 6 Quick .qml with TextField, ScrollView, properties & signals)
+        - "imgui"      (C++17 Dear ImGui self-contained _ui.hpp header with State struct, InputText & BeginChild)
+      Generic:
+        - "json"       (pieces + layout JSON only)
     Pieces: every element group becomes one image (so group each widget), ungrouped elements one image
-    each. Text stays live text (translatable, crisp) unless bake_text=true; arc text is always baked.
-    Pieces pinned "stretch" get 9-slice margins when their centre allows it. Fonts used are copied next
-    to the scene. scale: export pieces at 2x for high-DPI. godot_res_path: where the folder will live
-    in the Godot project (default res://ui/<name>).
+    each. Text, input and scroll widgets stay native unless bake_text=true (text only). Pieces pinned
+    "stretch" get 9-slice margins when their centre allows it. scale: export pieces at 2x for high-DPI.
     """
+    from .desktop_export import DESKTOP_ENGINES, write_desktop
     st = store()
     c = st.get(canvas)
     st.require_glyphs(c, language)
     engine = engine.lower()
-    if engine not in ("godot", "roblox", "unity", "json"):
-        raise ValueError("engine must be 'godot', 'roblox', 'unity' or 'json'")
+    valid_engines = ("godot", "roblox", "unity", "unity-ugui", "json") + DESKTOP_ENGINES
+    if engine not in valid_engines:
+        raise ValueError(f"engine must be one of {', '.join(valid_engines)}")
     scale = max(0.5, min(4.0, float(scale)))
     base = slugify(name or c["id"], "screen")
     folder = _out_dir(out_dir, f"screens/{base}")
@@ -925,7 +1436,7 @@ def export_screen(canvas: str, engine: str, out_dir: str | None = None, name: st
                     node["img"] = small
                     small.save(folder / node["file"])
                     node["nine"] = {k: b[k] for k in ("left", "top", "right", "bottom")}
-        else:
+        elif node["kind"] == "text":
             src = node["info"].get("_font_path")
             if src and Path(src).is_file():
                 dst = folder / Path(src).name
@@ -934,34 +1445,54 @@ def export_screen(canvas: str, engine: str, out_dir: str | None = None, name: st
                     fonts_copied.append(dst.name)
                 node["font_file"] = dst.name
     layout = {"canvas": {"id": c["id"], "width": c["width"], "height": c["height"]}, "scale": scale,
+              "data": c.get("data"), "bindings": c.get("bindings"), "interactions": c.get("interactions"),
+              "focus_order": c.get("focus_order"),
               "nodes": [{k: v for k, v in {
                   "kind": n["kind"], "id": n["id"], "x": round(n["box"][0], 2), "y": round(n["box"][1], 2),
                   "width": round(n["box"][2] - n["box"][0], 2), "height": round(n["box"][3] - n["box"][1], 2),
                   "pin": n["pin"] or {"x": "left", "y": "top"}, "file": n.get("file"), "nine_slice": n.get("nine"),
                   "members": n.get("members"),
                   "text": {k: v for k, v in n["info"].items() if not k.startswith("_")} if n["kind"] == "text" else None,
+                  "widget": ({k: v for k, v in n["el"].items() if k not in ("type", "id", "x", "y", "width", "height")}
+                             if n["kind"] in ("input", "scroll") else None),
               }.items() if v is not None} for n in nodes]}
+    layout = {k: v for k, v in layout.items() if v is not None}
     (folder / f"{base}.screen.json").write_text(json.dumps(layout, ensure_ascii=False, indent=1), encoding="utf-8")
     files = [f"{base}.screen.json"]
     nxt = "Use the pieces and layout JSON in your engine."
     if engine == "godot":
         out = _write_godot(c, nodes, folder, godot_res_path or f"res://ui/{base}", base, colors)
         files.append(out.name)
+        ctrl = _write_godot_controller(c, nodes, folder, base)
+        if ctrl:
+            files.append(ctrl.name)
         nxt = (f"Copy the folder to {godot_res_path or f'res://ui/{base}'} in your Godot 4 project and instance "
-               f"{out.name} under a CanvasLayer. Labels are real text; anchors follow the pins.")
+               f"{out.name} under a CanvasLayer. Labels, LineEdit and ScrollContainer are native; anchors follow pins.")
     elif engine == "roblox":
         out = _write_roblox(c, nodes, folder, base, colors)
         files.append(out.name)
         nxt = ("Upload the PNGs in Studio, paste their ids into IMAGES at the top of the script, and put the "
-               "LocalScript in StarterPlayerScripts. Fonts are mapped to the closest built-in Roblox family.")
+               "LocalScript in StarterPlayerScripts. TextBox and ScrollingFrame are native Roblox instances.")
     elif engine == "unity":
         outs = _write_unity(c, nodes, folder, base, colors)
         files += [o.name for o in outs]
+        ctrl = _write_unity_controller(c, nodes, folder, base)
+        if ctrl:
+            files.append(ctrl.name)
         nxt = (f"Put the folder under Assets/, create a UIDocument with {base}.uxml and a PanelSettings set to "
                f"Scale With Screen Size, reference {c['width']}x{c['height']}, match = 1.")
-    result: dict = {"folder": str(folder), "files": files,
+    elif engine == "unity-ugui":
+        out = _write_unity_ugui(c, nodes, folder, base, colors)
+        files.append(out.name)
+        nxt = (f"Put {out.name} in Assets/Editor/ and run Tools -> GameUI -> Build {_pascal_id(base)}UGuiBuilder "
+               "to create a ready uGUI Canvas with RectTransform anchors, InputFields and ScrollRects.")
+    elif engine in DESKTOP_ENGINES:
+        outs, nxt = write_desktop(engine, c, nodes, folder, base, colors)
+        files += [o.name for o in outs]
+    result: dict = {"folder": str(folder), "engine": engine, "files": files,
                     "pieces": [n["id"] for n in nodes if n["kind"] == "image"],
-                    "texts": [n["id"] for n in nodes if n["kind"] == "text"], "next": nxt}
+                    "texts": [n["id"] for n in nodes if n["kind"] == "text"],
+                    "widgets": [n["id"] for n in nodes if n["kind"] in ("input", "scroll")], "next": nxt}
     if fonts_copied:
         result["fonts_copied"] = fonts_copied
     notes = []
@@ -977,3 +1508,118 @@ def export_screen(canvas: str, engine: str, out_dir: str | None = None, name: st
     if warnings:
         result["warnings"] = sorted(set(warnings))[:10]
     return result
+
+
+@tool
+def export_pbr_maps(canvas: str, out_dir: str | None = None, name: str | None = None, scale: float = 1,
+                    engine: str = "generic", normal_format: str | None = None, include_background: bool = False,
+                    godot_res_path: str | None = None):
+    """Export real-time engine PBR texture maps straight from a 2D UI canvas so game engines (Unity URP/HDRP,
+    Unreal Engine, Godot 4 CanvasTexture + Light2D, Blender, Three.js) can dynamically light your UI.
+
+    Writes: <name>_beauty.png (final lit render), <name>_albedo.png (unlit base colour), <name>_normal.png
+    (exact tangent-space normal map), <name>_roughness.png, <name>_metallic.png, <name>_ao.png,
+    <name>_height.png, <name>_orm.png (R=AO, G=Roughness, B=Metallic), <name>_emissive.png and <name>_pbr.json.
+    engine: "generic" | "unity" | "unreal" | "godot".
+      - "unreal" automatically uses DirectX (-Y) normals unless normal_format is passed.
+      - "godot" also writes a ready Godot 4 <name>.canvas_texture.tres wired to diffuse + normal + specular.
+    normal_format: "opengl" (+Y green, Unity/Godot/Blender/glTF) or "directx" (-Y green, Unreal).
+    """
+    st = store()
+    c = st.get(canvas)
+    eng = str(engine or "generic").lower()
+    if eng not in ("generic", "unity", "unreal", "godot"):
+        raise ValueError("engine must be 'generic', 'unity', 'unreal' or 'godot'")
+    nfmt = str(normal_format or ("directx" if eng == "unreal" else "opengl")).lower()
+    if nfmt not in ("opengl", "directx"):
+        raise ValueError("normal_format must be 'opengl' or 'directx'")
+    sc = max(0.25, min(4.0, float(scale)))
+    base = slugify(name or c["id"], "pbr")
+    folder = _out_dir(out_dir, f"pbr/{base}")
+    r = st.renderer(c, sc)
+    maps = r.render_pbr_maps(normal_format=nfmt, include_background=include_background)
+    files: dict[str, str] = {}
+    for key, img in maps.items():
+        fname = f"{base}_{key}.png"
+        img.save(folder / fname, optimize=True)
+        files[key] = fname
+    extras: list[str] = []
+    if eng == "godot":
+        import numpy as _np
+        from PIL import Image as _Image
+        r_arr = (255 - _np.asarray(maps["roughness"].convert("L"), dtype=_np.uint8))
+        sm_name = f"{base}_smoothness.png"
+        _Image.fromarray(r_arr, "L").save(folder / sm_name, optimize=True)
+        files["smoothness"] = sm_name
+        res = (godot_res_path or f"res://ui/pbr/{base}").rstrip("/")
+        if not re.fullmatch(r"res://[A-Za-z0-9_\-/.]*", res) or ".." in res:
+            raise ValueError("godot_res_path must be a res:// path without '..'")
+        tres = (
+            '[gd_resource type="CanvasTexture" load_steps=4 format=3]\n\n'
+            f'[ext_resource type="Texture2D" path="{res}/{files["albedo"]}" id="1_albedo"]\n'
+            f'[ext_resource type="Texture2D" path="{res}/{files["normal"]}" id="2_normal"]\n'
+            f'[ext_resource type="Texture2D" path="{res}/{sm_name}" id="3_spec"]\n\n'
+            '[resource]\n'
+            'diffuse_texture = ExtResource("1_albedo")\n'
+            'normal_texture = ExtResource("2_normal")\n'
+            'specular_texture = ExtResource("3_spec")\n'
+            'specular_shininess = 0.65\n'
+        )
+        tname = f"{base}.canvas_texture.tres"
+        (folder / tname).write_text(tres, encoding="utf-8")
+        extras.append(tname)
+    elif eng == "unreal":
+        ue_py = (
+            f"# {base}_import_pbr.py - generated by game-ui-mcp for Unreal Engine 5.5-5.8\n"
+            "import os\nimport unreal\n\n"
+            "SRC = os.path.dirname(os.path.abspath(__file__))\n"
+            f'DEST = "/Game/UI/PBR/{base}"\n'
+            f"MAPS = {json.dumps(files, indent=2)}\n\n"
+            "def run(src=SRC, dest=DEST):\n"
+            "    tasks = []\n"
+            "    by_stem = {}\n"
+            "    for role, fname in MAPS.items():\n"
+            "        fpath = os.path.join(src, fname)\n"
+            "        if not os.path.isfile(fpath):\n"
+            "            continue\n"
+            "        t = unreal.AssetImportTask()\n"
+            '        t.set_editor_property("filename", fpath)\n'
+            '        t.set_editor_property("destination_path", dest)\n'
+            '        t.set_editor_property("automated", True)\n'
+            '        t.set_editor_property("replace_existing", True)\n'
+            '        t.set_editor_property("save", True)\n'
+            "        tasks.append(t)\n"
+            "        by_stem[os.path.splitext(fname)[0]] = role\n"
+            "    if not tasks:\n"
+            "        return\n"
+            "    unreal.AssetToolsHelpers.get_asset_tools().import_asset_tasks(tasks)\n"
+            "    for t in tasks:\n"
+            '        for p in t.get_editor_property("imported_object_paths"):\n'
+            "            tex = unreal.load_asset(p)\n"
+            "            if not isinstance(tex, unreal.Texture2D):\n"
+            "                continue\n"
+            "            role = by_stem.get(tex.get_name(), 'albedo')\n"
+            "            if role == 'normal':\n"
+            '                tex.set_editor_property("compression_settings", unreal.TextureCompressionSettings.TC_NORMALMAP)\n'
+            '                tex.set_editor_property("srgb", False)\n'
+            "            elif role in ('orm', 'roughness', 'metallic', 'ao', 'height'):\n"
+            '                tex.set_editor_property("compression_settings", unreal.TextureCompressionSettings.TC_MASKS)\n'
+            '                tex.set_editor_property("srgb", False)\n'
+            "            else:\n"
+            '                tex.set_editor_property("compression_settings", unreal.TextureCompressionSettings.TC_DEFAULT)\n'
+            '                tex.set_editor_property("srgb", True)\n'
+            "            unreal.EditorAssetLibrary.save_loaded_asset(tex)\n\n"
+            "run()\n"
+        )
+        uname = f"{base}_import_pbr.py"
+        (folder / uname).write_text(ue_py, encoding="utf-8")
+        extras.append(uname)
+    meta = {"canvas": c["id"], "engine": eng, "normal_format": nfmt, "scale": sc,
+            "size": [maps["albedo"].width, maps["albedo"].height],
+            "channel_packing": {"orm": {"r": "ao", "g": "roughness", "b": "metallic"}},
+            "files": files, "extras": extras}
+    mfile = f"{base}_pbr.json"
+    (folder / mfile).write_text(json.dumps(meta, indent=2), encoding="utf-8")
+    return {"folder": str(folder), "engine": eng, "normal_format": nfmt,
+            "size": [maps["albedo"].width, maps["albedo"].height],
+            "files": files, "manifest": mfile, "extras": extras}

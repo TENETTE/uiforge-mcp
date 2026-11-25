@@ -40,28 +40,28 @@ from .store import Store, slugify
 INSTRUCTIONS = """\
 Draw game and app UI (panels, buttons, bars, icons, HUDs, whole screens) as layered vector elements on
 canvases, look at them with `preview`, fix them, then export for Unity / Unreal / Godot / Roblox / Figma.
-Local and deterministic: no image model. There are no ready-made components or icons: build everything
-from these primitives (icons with add_path / add_svg) and judge the result yourself.
+Local and deterministic: no image model. Build icons with add_path / add_svg and AAA bordered panels
+fast with add_frame (rpg_gold, scifi_hud, cyber_tech, glass_card, medieval_iron, luxury_minimal, cartoon_thick).
 
-Workflow: set_theme (colour tokens, named styles, modes) -> create_canvas -> batch / add_* -> preview ->
-review_canvas -> fix with update_element -> export (export_asset, export_png, export_svg, export_layers...).
-Interactive screens: create_animation / set_state, then set_interaction (hover, click, keys) -> export_web
-or export_react. Unsure of a direction? make_variations shows alternatives.
-Always call preview after a group of changes and actually look at the image before exporting.
+Workflow: set_theme (tokens, styles, modes, HDRI environment) -> create_canvas / import_screenshot ->
+batch / add_* (add_frame, add_input, add_scroll...) -> preview -> review_canvas -> update_element ->
+export (export_asset, export_pbr_maps, export_png, export_svg, export_layers, export_atlas...).
+Interactive / data-driven UI: set_binding (variables & expressions), create_animation / set_state,
+set_interaction (hover, click, keys, sfx) -> export_web, export_react (CSS / Tailwind / TypeScript),
+export_animation (dotlottie v2 state machine / lottie / mp4 / webm / spritesheet), or export_screen
+(Unity UI Toolkit / uGUI, Godot, Roblox, C# .NET WPF / Avalonia / WinUI, C++ Qt QML / Dear ImGui).
+Use live_preview("start") so the human watches edits live. Always call preview before exporting.
 
-Coordinates: canvas units = pixels at 1x, origin top-left, y down; later elements draw on top
-(reorder_element changes that). Colours: "#rrggbb", "#rrggbbaa", "rgba()", "hsl()", CSS names or "$token"
-from the theme; append "@0.5" for alpha ("$primary@0.6").
-Fill: a colour, a gradient {"type":"linear","angle":90,"stops":[[0,"#3b82f6"],[1,"#1d4ed8"]]} (also radial,
-conic), a pattern (stripes, dots, grid, hex, carbon, brushed, clouds), an image, a "shader" formula you
-write, or a list of fills stacked bottom to top.
-Style keys: fill, stroke {color, width, align, dash, sides}, shadow, glow, inner_shadow, inner_glow, bevel,
-light (3D lighting), blur, backdrop_blur (frosted glass), mask, adjust, opacity, blend, noise.
+Coordinates: canvas units = pixels at 1x, origin top-left, y down; later elements draw on top.
+Colours: "#rrggbb", "#rrggbbaa", "rgba()", "hsl()", CSS names or "$token"; append "@0.5" for alpha.
+Fill: colour, gradient (linear, radial, conic, diamond), pattern (stripes, dots, grid, hex, carbon,
+brushed, clouds), image, "shader" formula, or a list of fills stacked bottom to top.
+Style keys: material (39 Cook-Torrance PBR presets), pbr (metallic, roughness, clearcoat, ior,
+anisotropy, sss, studio, env_map, shine), fill, stroke, shadow, glow, inner_shadow, inner_glow, bevel,
+light, glass, blur, backdrop_blur, mask, adjust, opacity, blend, noise, texture.
 
-Full reference: call guide(topic) before using a feature you have not used yet in this session.
-Topics: fills, shader, style (glass, progressive blur, noise, texture, masks), design (booleans, live auto
-layout, variants and slots, tokens, palettes, restyle, path ops, vectorize), layers, geometry, text (lists,
-OpenType, emoji, text on a path), reuse, review, animation (Lottie), export (PDF, website, SVG, engines).
+Full reference: call guide(topic) before using an unfamiliar feature.
+Topics: fills, shader, style, design, layers, geometry, text, reuse, review, animation, export.
 """
 
 mcp = _Server("game-ui-mcp", instructions=INSTRUCTIONS)
@@ -352,7 +352,8 @@ def update_canvas(canvas: str, name: str | None = None, width: int | None = None
                   background: str | dict | None = None, clear_background: bool = False,
                   safe_area: list[float] | None = None, vars: dict | None = None, colors: dict | None = None,
                   language: str | None = None, pixel_art: bool | dict | None = None, mode: str | None = None,
-                  focus_order: list[str] | None = None):
+                  focus_order: list[str] | None = None, environment: dict | None = None,
+                  quality: str | None = None, style_preset: str | None = None):
     """Change canvas settings. Elements keep their coordinates when width/height change (use
     resize_canvas to move pinned elements with the edges).
 
@@ -367,6 +368,12 @@ def update_canvas(canvas: str, name: str | None = None, width: int | None = None
     mode: theme variable mode for this canvas only (see set_theme modes); "" follows the theme's mode.
     focus_order: element ids in the order a gamepad / keyboard moves focus (accessibility and console UI);
       written to export_spec, export_web (tab order) and export_screen notes. [] clears it.
+    environment: canvas-level PBR IBL environment override, e.g. {"env_map": "scene.hdr", "rotation": 45,
+      "intensity": 1.2, "studio": "warm"}. Supports Radiance .hdr, OpenEXR .exr, or equirectangular PNG/JPG.
+      Pass {} to clear the canvas override and inherit the workspace theme environment.
+    quality: per-canvas quality tier override ("simple" | "standard" | "advanced" | "aaa"; "" resets).
+    style_preset: per-canvas style preset ("kids" | "cartoon" | "stylized" | "minimal" | "web_saas" |
+      "scifi" | "dark_fantasy" | "realistic" | "photorealistic"; "" resets).
     """
     st = store()
     c = st.get(canvas)
@@ -420,10 +427,51 @@ def update_canvas(canvas: str, name: str | None = None, width: int | None = None
         else:
             c["pixel_art"] = pixel_art if isinstance(pixel_art, dict) else True
             st.renderer(c, 0.25).render()
+    env_cfg = _maybe_json(environment)
+    if env_cfg is not None:
+        if not isinstance(env_cfg, dict):
+            raise ValueError('environment must be an object, e.g. {"env_map": "scene.hdr", "rotation": 45}')
+        if not env_cfg:
+            c.pop("environment", None)
+        else:
+            merged_env = dict(c.get("environment") or {})
+            for ek, ev in env_cfg.items():
+                if ev is None:
+                    merged_env.pop(ek, None)
+                else:
+                    merged_env[ek] = ev
+            if merged_env.get("env_map"):
+                ep = Path(str(merged_env["env_map"])).expanduser()
+                if not ep.is_file():
+                    raise ValueError(f"environment.env_map file not found: {ep}")
+                merged_env["env_map"] = str(ep.resolve())
+            if merged_env:
+                c["environment"] = merged_env
+            else:
+                c.pop("environment", None)
+    if quality is not None or style_preset is not None:
+        from . import profiles
+        prof = dict(c.get("profile") or {})
+        if quality is not None:
+            nq = profiles.normalize_quality(quality)
+            if nq:
+                prof["quality"] = nq
+            else:
+                prof.pop("quality", None)
+        if style_preset is not None:
+            nsp = profiles.normalize_style_preset(style_preset)
+            if nsp:
+                prof["style_preset"] = nsp
+            else:
+                prof.pop("style_preset", None)
+        if prof:
+            c["profile"] = prof
+        else:
+            c.pop("profile", None)
     st.save_canvas(c)
     out = {"canvas": c["id"], "name": c["name"], "width": c["width"], "height": c["height"],
            "background": c.get("background")}
-    for key in ("safe_area", "vars", "colors", "language", "pixel_art"):
+    for key in ("safe_area", "vars", "colors", "language", "pixel_art", "environment", "profile"):
         if c.get(key):
             out[key] = c[key]
     return out
@@ -963,6 +1011,76 @@ def add_svg(canvas: str, svg: str, x: float = 0, y: float = 0, width: float | No
     return result
 
 
+@tool
+def import_screenshot(path: str, canvas: str | None = None, max_width: int = 1280,
+                      max_elements: int = 60, extract_theme: bool = True, ocr: str = "auto"):
+    """Analyze a UI screenshot (PNG/JPG/WebP) with OpenCV and reconstruct an editable layered canvas.
+
+    Extracts the canvas background, dominant K-means palette, hierarchical cards/buttons/pills/circles
+    (with estimated corner radius, solid or linear gradient fill, and inner border strokes), and text
+    regions (using rapidocr_onnxruntime or pytesseract when installed, else OpenCV morphological text
+    line detection). The resulting canvas is 100% editable vector elements ready for restyling or export.
+
+    path: path to the screenshot image file.
+    canvas: name for the new canvas (defaults to the file stem).
+    max_width: downscale oversized screenshots while keeping aspect ratio (default 1280).
+    max_elements: cap on detected vector shapes to keep the canvas clean and fast (default 60).
+    extract_theme: merge extracted palette colours into theme tokens (ss_bg, ss_c1..c5).
+    ocr: "auto" (use local OCR if installed, else OpenCV heuristic) or "off" (shapes only).
+    """
+    from .screenshot import analyze_screenshot
+    p = Path(path).expanduser()
+    info = analyze_screenshot(p, max_width=int(max_width), max_elements=int(max_elements), ocr=str(ocr or "auto"))
+    st = store()
+    cid = slugify(canvas or p.stem, "screenshot")
+    if cid in st.canvases:
+        n = 2
+        while f"{cid}_{n}" in st.canvases:
+            n += 1
+        cid = f"{cid}_{n}"
+    c = st.create_canvas(cid, info["width"], info["height"], background=info["background"])
+    st.checkpoint(c)
+    created_shapes: list[str] = []
+    created_texts: list[str] = []
+    try:
+        for spec in info["shapes"]:
+            item = dict(spec)
+            etype = item.pop("type")
+            el, _ = st.add_element(c, etype, _prepare(etype, item), checkpoint=False)
+            created_shapes.append(el["id"])
+        for spec in info["texts"]:
+            item = dict(spec)
+            etype = item.pop("type")
+            el, _ = st.add_element(c, etype, _prepare(etype, item), checkpoint=False)
+            created_texts.append(el["id"])
+    except Exception:
+        st.drop_checkpoint(c)
+        raise
+    st.save_canvas(c)
+    theme_tokens = {}
+    if extract_theme and info["palette"]:
+        theme_tokens = {"ss_bg": info["background"]}
+        for i, hx in enumerate(info["palette"][1:], 1):
+            theme_tokens[f"ss_c{i}"] = hx
+        st.set_theme(theme_tokens, None, False)
+    notes = []
+    if info["ocr_engine"] == "opencv_heuristic":
+        notes.append("No OCR backend installed (install rapidocr-onnxruntime or pytesseract for automatic text reading); "
+                     "text boxes were placed with placeholder labels so you can inspect the screenshot and update_element them.")
+    return {
+        "canvas": c["id"],
+        "width": info["width"],
+        "height": info["height"],
+        "background": info["background"],
+        "palette": info["palette"],
+        "theme_tokens": theme_tokens,
+        "shapes_created": len(created_shapes),
+        "texts_created": len(created_texts),
+        "ocr_engine": info["ocr_engine"],
+        "notes": notes,
+    }
+
+
 
 @tool
 def update_element(canvas: str, id: str, props: dict):
@@ -1182,22 +1300,169 @@ def align_elements(canvas: str, ids: list[str], align: str | None = None, distri
 
 
 _BATCH_ADD = {"add_rect": "rect", "add_ellipse": "ellipse", "add_line": "line", "add_polygon": "polygon",
-              "add_arc": "arc",
-              "add_path": "path", "add_text": "text", "add_image": "image"}
+              "add_arc": "arc", "add_path": "path", "add_text": "text", "add_image": "image",
+              "add_input": "input", "add_scroll": "scroll"}
+
+
+@tool
+def add_input(canvas: str, x: float, y: float, width: float = 240, height: float = 42,
+              placeholder: str = "", value: str = "", input_type: str = "text", label: str | None = None,
+              bind: str | None = None, radius: float = 8, corner: str = "round", font: str = "Inter",
+              size: float = 15, weight: int | str = 400, text_color: str = "#f8fafc",
+              placeholder_color: str = "#94a3b8", padding: float = 12, max_length: int | None = None,
+              readonly: bool = False, focused: bool = False, style: str | dict | None = None,
+              fill: str | dict | None = None, stroke: str | dict | None = None,
+              id: str | None = None, group: str | None = None, clip: str | None = None,
+              layer: str | None = None, rotation: float = 0, origin: list[float] | None = None):
+    """Add a first-class interactive text Input field.
+
+    Renders realistically on the canvas (with optional label, placeholder, password dots and focus caret)
+    AND exports as a genuine native input control across platforms:
+      - Web / React: live <input> bound to `bind` / onChange
+      - Godot 4: LineEdit (+ text_changed hook in controller)
+      - Unity UI Toolkit: <ui:TextField> (+ RegisterValueChangedCallback)
+      - Unity uGUI: InputField with Placeholder & Text children
+      - Roblox: TextBox with UICorner + UIStroke
+      - .NET (WPF / Avalonia / WinUI) & C++ (Qt QML / Dear ImGui): TextBox/PasswordBox, TextField, InputText
+    input_type: "text" | "password" | "number" | "email" | "search".
+    bind: optional data key in set_binding(data={...}) for automatic two-way sync.
+    """
+    itype = str(input_type or "text").lower()
+    if itype not in ("text", "password", "number", "email", "search"):
+        raise ValueError("input_type must be text, password, number, email or search")
+    return _add(canvas, "input", dict(
+        x=float(x), y=float(y), width=float(width), height=float(height),
+        placeholder=str(placeholder), value=str(value), input_type=itype, label=label,
+        bind=bind, radius=radius, corner=corner, font=font, size=float(size), weight=weight,
+        text_color=text_color, placeholder_color=placeholder_color, padding=float(padding),
+        max_length=max_length, readonly=bool(readonly) or None, focused=bool(focused) or None,
+        style=_merge_style(style, fill, stroke), id=id, group=group, clip=clip, layer=layer,
+        rotation=rotation or None, origin=origin,
+    ))
+
+
+@tool
+def add_scroll(canvas: str, x: float, y: float, width: float = 280, height: float = 220,
+               items: list | None = None, direction: str = "vertical", radius: float = 10,
+               corner: str = "round", padding: float = 10, gap: float = 8, item_height: float = 38,
+               item_width: float = 120, content_height: float | None = None,
+               content_width: float | None = None, scroll_offset: float = 0.0,
+               show_scrollbar: bool = True, scrollbar_color: str = "#94a3b8@0.58",
+               scrollbar_track: str = "#0f172a@0.5", scrollbar_width: float = 6,
+               item_fill: str = "#1e293b@0.75", item_color: str = "#e2e8f0",
+               subtitle_color: str = "#94a3b8", font: str = "Inter", size: float = 13,
+               style: str | dict | None = None, fill: str | dict | None = None,
+               stroke: str | dict | None = None, id: str | None = None, group: str | None = None,
+               clip: str | None = None, layer: str | None = None, rotation: float = 0,
+               origin: list[float] | None = None):
+    """Add a first-class native Scroll container / scrollable list.
+
+    Renders a clipped viewport with scrollable item rows and a proportional scrollbar on canvas, AND
+    exports as a real native scrollable widget across platforms:
+      - Web / React: overflow-y/x: auto container with styled rows
+      - Godot 4: ScrollContainer + VBoxContainer/HBoxContainer
+      - Unity UI Toolkit: <ui:ScrollView>
+      - Unity uGUI: ScrollRect + Mask + VerticalLayoutGroup + ContentSizeFitter
+      - Roblox: ScrollingFrame + UIListLayout
+      - .NET (WPF / Avalonia / WinUI) & C++ (Qt QML / Dear ImGui): ScrollViewer, ScrollView, BeginChild
+    items: list of strings or objects [{"title": "Iron Sword", "subtitle": "ATK +42", "badge": "x1"}, ...].
+    direction: "vertical" | "horizontal" | "both". scroll_offset: 0..1 preview scroll position.
+    """
+    d = str(direction or "vertical").lower()
+    if d not in ("vertical", "horizontal", "both"):
+        raise ValueError("direction must be vertical, horizontal or both")
+    return _add(canvas, "scroll", dict(
+        x=float(x), y=float(y), width=float(width), height=float(height),
+        items=_maybe_json(items) or [], direction=d, radius=radius, corner=corner,
+        padding=float(padding), gap=float(gap), item_height=float(item_height),
+        item_width=float(item_width), content_height=content_height, content_width=content_width,
+        scroll_offset=float(scroll_offset), show_scrollbar=bool(show_scrollbar),
+        scrollbar_color=scrollbar_color, scrollbar_track=scrollbar_track,
+        scrollbar_width=float(scrollbar_width), item_fill=item_fill, item_color=item_color,
+        subtitle_color=subtitle_color, font=font, size=float(size),
+        style=_merge_style(style, fill, stroke), id=id, group=group, clip=clip, layer=layer,
+        rotation=rotation or None, origin=origin,
+    ))
+
+
+def _add_frame_elements(st: Store, c: dict, args: dict) -> dict:
+    from . import profiles
+    from .frames import frame_operations
+    prof = profiles.resolve_profile(st.theme, c)
+    q = profiles.normalize_quality(args.get("quality")) or prof["quality"]
+    preset = str(args.get("preset", "auto") or "auto").lower().strip()
+    if preset == "auto":
+        preset = prof.get("frame_preset", "rpg_gold")
+    specs, inner = frame_operations(
+        args["x"], args["y"], args["width"], args["height"],
+        preset=preset, ornament=args.get("ornament", "auto"),
+        material=args.get("material"), accent=args.get("accent"), title=args.get("title"),
+        group=args.get("group"), id_prefix=args.get("id_prefix"), layer=args.get("layer"),
+        quality=q,
+    )
+    ids = []
+    warnings: list[str] = []
+    for raw in specs:
+        item = dict(raw)
+        etype = item.pop("type")
+        el, w = st.add_element(c, etype, _prepare(etype, item), checkpoint=False)
+        ids.append(el["id"])
+        warnings.extend(w)
+    out: dict = {"preset": preset, "quality": q, "group": specs[0].get("group"),
+                 "ids": ids, "inner_box": inner}
+    if warnings:
+        out["warnings"] = sorted(set(warnings))
+    return out
+
+
+@tool
+def add_frame(canvas: str, x: float, y: float, width: float, height: float, preset: str = "rpg_gold",
+              ornament: str = "auto", material: str | None = None, accent: str | None = None,
+              title: str | None = None, group: str | None = None, id_prefix: str | None = None,
+              layer: str | None = None, quality: str | None = None):
+    """Build a multi-layered panel/border frame from editable vector shapes and PBR materials in one call.
+
+    preset: "auto" (follows active style_preset), "rpg_gold" (double-stepped gold molding + cubic-Bezier
+      corner filigree + winged ruby crest), "royal_ornate" (bronze + hammered gold molding + woven royal
+      fabric bed + sapphire gems + perimeter beads), "fantasy_parchment" (aged parchment scroll + wood
+      rollers + bronze end-caps + wax seal), "scifi_hud" (cut-corner glass + glowing corner brackets +
+      telemetry ticks + LEDs), "cyber_tech" (carbon twill chassis + dual neon rails + warning chevrons +
+      bolts), "glass_card" (squircle liquid glass), "medieval_iron" (forged iron + stone bed + corner
+      hinge clasps + perimeter rivets), "luxury_minimal" (chrome bezel + dark satin inlay), "cartoon_thick"
+      (glossy outlined badge).
+    ornament: "auto" | "none" | "rivets" | "brackets" | "filigree" | "notches".
+    quality: optional override ("simple" | "standard" | "advanced" | "aaa"); "simple" removes heavy ornaments.
+    material / accent: optional override for the main PBR material name or highlight colour.
+    title: optional header label placed cleanly at the top of the frame.
+    Returns {preset, quality, group, ids, inner_box: [ix, iy, iw, ih]} where inner_box is the safe area.
+    """
+    st = store()
+    c = st.get(canvas)
+    st.checkpoint(c)
+    try:
+        res = _add_frame_elements(st, c, {"x": x, "y": y, "width": width, "height": height, "preset": preset,
+                                          "ornament": ornament, "material": material, "accent": accent, "title": title,
+                                          "group": group, "id_prefix": id_prefix, "layer": layer, "quality": quality})
+    except Exception:
+        st.drop_checkpoint(c)
+        raise
+    st.save_canvas(c)
+    return {"canvas": c["id"], **res}
 
 
 @tool
 def batch(canvas: str, operations: list[dict]):
-    """Run many drawing operations in one call (much faster than one tool call per shape).
+    """Run many drawing, layout, state, binding and interaction operations in one atomic call.
 
     Each operation is {"op": "<tool name>", ...the same arguments that tool takes, without canvas}.
     Supported ops: add_rect, add_ellipse, add_line, add_polygon, add_path, add_arc, add_ticks, add_text,
-    add_image, add_instance, add_svg, create_layer, update_layer, set_layer, create_animation,
-    set_keyframes, update_element, delete_elements, move_elements, reorder_element, duplicate_element,
-    boolean_elements (its op name goes in "operation", since "op" names the batch op).
-    Add ops also accept any extra element property directly (flip_x, scale, skew, fill_rule, visible...).
-    Give elements explicit "id"s so later operations (clip, update, reorder) can refer to them.
-    The batch is atomic: if any operation fails nothing is changed, and the error names the failing op.
+    add_image, add_instance, add_svg, add_frame, add_input, add_scroll, create_layer, update_layer, delete_layer, set_layer,
+    create_animation, set_keyframes, update_element, delete_elements, move_elements, reorder_element,
+    duplicate_element, boolean_elements (use "operation" key), align_elements, arrange_elements, set_pin,
+    set_state, set_binding, set_interaction, set_link.
+    Add ops accept any extra element property directly (flip_x, scale, skew, fill_rule, visible...).
+    Give elements explicit "id"s so later ops (clip, pin, state, binding, interaction) can refer to them.
+    Atomic: if any op fails nothing is changed, and the error names the failing op index.
     """
     st = store()
     c = st.get(canvas)
@@ -1220,6 +1485,8 @@ def batch(canvas: str, operations: list[dict]):
                     results.append(_summary(st, c, el, warnings))
                 elif op == "add_ticks":
                     results.append(_ticks(c, op_args))
+                elif op == "add_frame":
+                    results.append(_add_frame_elements(st, c, op_args))
                 elif op == "create_layer":
                     layer = st.create_layer(c, op_args["name"], _layer_settings(
                         op_args.get("opacity"), op_args.get("blend"), op_args.get("clip"), op_args.get("visible"),
@@ -1234,6 +1501,10 @@ def batch(canvas: str, operations: list[dict]):
                     updated = st.update_layer(c, target, changes, op_args.get("position"), op_args.get("activate"),
                                               checkpoint=False)
                     results.append({"layer": updated["name"]})
+                elif op == "delete_layer":
+                    target = st.get_layer(c, op_args["layer"])
+                    st.delete_layer(c, target, bool(op_args.get("delete_elements", False)), checkpoint=False)
+                    results.append({"deleted_layer": target["name"]})
                 elif op == "set_layer":
                     targets = st.select(c, op_args.get("ids"), op_args.get("group"))
                     name = None if str(op_args["layer"]).strip().lower() == "base" else st.get_layer(c, op_args["layer"])["name"]
@@ -1290,6 +1561,20 @@ def batch(canvas: str, operations: list[dict]):
                                                  op_args.get("color", "#ffffff"), op_args.get("group"),
                                                  op_args.get("id_prefix"), op_args.get("layer"),
                                                  op_args.get("detail", 1)))
+                elif op == "align_elements":
+                    results.append(align_elements(c["id"], **op_args))
+                elif op == "arrange_elements":
+                    results.append(arrange_elements(c["id"], **op_args))
+                elif op == "set_pin":
+                    results.append(set_pin(c["id"], **op_args))
+                elif op == "set_state":
+                    results.append(set_state(c["id"], **op_args))
+                elif op == "set_binding":
+                    results.append(set_binding(c["id"], **op_args))
+                elif op == "set_interaction":
+                    results.append(set_interaction(c["id"], **op_args))
+                elif op == "set_link":
+                    results.append(set_link(c["id"], **op_args))
                 else:
                     raise ValueError(f"unknown op '{op}'")
             except KeyError as exc:
@@ -1490,41 +1775,96 @@ def delete_animation(canvas: str, name: str):
     return {"deleted": key, "animations_left": sorted(st.animations(c))}
 
 
+def _static_plan(c: dict, anim: dict, scale: float, include_background: bool, only: set[str] | None):
+    """Pre-render static element runs once for animations without styled/clipped layers, so multi-frame
+    exports skip re-compositing untouched cards, panels and materials on every frame."""
+    if c.get("layers") or c.get("pixel_art"):
+        return None
+    st = store()
+    moving: set[str] = set()
+    for tr in anim.get("tracks", []):
+        for el in anim_mod.track_targets(c, tr["target"]):
+            moving.add(el["id"])
+    elements = [e for e in c["elements"] if e.get("visible", True) and (only is None or e["id"] in only)]
+    for e in elements:
+        es = resolve_style(e.get("style"), st.theme)
+        if es.get("backdrop_blur") or es.get("glass") or str(es.get("blend", "normal")).lower() == "erase":
+            return None
+        if e.get("clip") and e["clip"] in moving:
+            moving.add(e["id"])
+    if not any(e["id"] not in moving for e in elements):
+        return None
+    base_r = st.renderer(c, scale)
+    segments: list[tuple[str, Any]] = []
+    run: list[str] = []
+    first = True
+    for e in elements:
+        if e["id"] in moving:
+            if run or (first and include_background):
+                img = base_r.render(include_background=first and include_background, only=set(run))
+                segments.append(("img", img))
+                run = []
+                first = False
+            segments.append(("dyn", e["id"]))
+        else:
+            run.append(e["id"])
+    if run or (first and include_background):
+        img = base_r.render(include_background=first and include_background, only=set(run))
+        segments.append(("img", img))
+    return segments, base_r.width, base_r.height, base_r.warnings
+
+
 def _pose(c: dict, anim: dict, t: float, scale: float, include_background: bool = True,
-          only: set[str] | None = None) -> tuple[PILImage.Image, list[str]]:
+          only: set[str] | None = None, plan=None) -> tuple[PILImage.Image, list[str]]:
     st = store()
     frame, warnings = anim_mod.apply_animation(c, anim, t, st.theme.get("colors", {}))
     r = st.renderer(frame, scale)
+    if plan is not None:
+        segments, w, h, base_warn = plan
+        out = PILImage.new("RGBA", (w, h), (0, 0, 0, 0))
+        by_id = {e["id"]: e for e in frame["elements"]}
+        for kind, val in segments:
+            if kind == "img":
+                out = PILImage.alpha_composite(out, val)
+            else:
+                el = by_id.get(val)
+                if el is not None and el.get("visible", True):
+                    res = r.render_element(el)
+                    if res is not None:
+                        layer, ox, oy, blend = res
+                        _composite(out, layer, ox, oy, blend)
+        return out, warnings + base_warn + r.warnings
     return r.render(include_background=include_background, only=only), warnings + r.warnings
 
 
 def _blurred_pose(c: dict, anim: dict, t: float, scale: float, include_background: bool, only, samples: int,
-                  frame_dt: float):
+                  frame_dt: float, plan=None):
     """Motion blur: the average of `samples` poses over half a frame (a 180-degree shutter), premultiplied."""
     import numpy as np
     acc, warns = None, []
     for i in range(samples):
         sub = min(float(anim["duration"]), t + frame_dt * 0.5 * (i / max(1, samples - 1) - 0.5))
-        img, w = _pose(c, anim, max(0.0, sub), scale, include_background, only)
+        img, w = _pose(c, anim, max(0.0, sub), scale, include_background, only, plan=plan)
         warns += w
-        arr = np.asarray(img.convert("RGBa"), dtype=np.float64)
+        arr = np.asarray(img.convert("RGBa"), dtype=np.float32)
         acc = arr if acc is None else acc + arr
-    out = PILImage.fromarray((acc / samples + 0.5).astype(np.uint8), "RGBa").convert("RGBA")
+    out = PILImage.fromarray((acc / np.float32(samples) + np.float32(0.5)).astype(np.uint8), "RGBa").convert("RGBA")
     return out, warns
 
 
 def _poses(c: dict, anim: dict, times: list[float], scale: float, include_background: bool = True,
            only: set[str] | None = None, motion_blur: int = 0, fps: float = 30) -> tuple[list[PILImage.Image], list[str]]:
-    """Render many animation frames at once: Pillow and numpy release the GIL, so threads use every core."""
+    """Render many animation frames at once: static runs are baked once, and threads render dynamic frames."""
     import os
     from concurrent.futures import ThreadPoolExecutor
     workers = max(1, min(len(times), os.cpu_count() or 1, 8))
     samples = max(0, min(16, int(motion_blur or 0)))
+    plan = _static_plan(c, anim, scale, include_background, only) if len(times) > 1 else None
 
     def one(t):
         if samples > 1:
-            return _blurred_pose(c, anim, t, scale, include_background, only, samples, 1.0 / fps)
-        return _pose(c, anim, t, scale, include_background, only)
+            return _blurred_pose(c, anim, t, scale, include_background, only, samples, 1.0 / fps, plan=plan)
+        return _pose(c, anim, t, scale, include_background, only, plan=plan)
 
     if workers == 1:
         done = [one(t) for t in times]
@@ -1614,17 +1954,24 @@ def _encode_video(images: list, rate: float, path: Path, fmt: str) -> None:
                  "-b:v", "0", "-crf", "24", "-row-mt", "1", "-auto-alt-ref", "0"]
     cmd = [exe, "-y", "-loglevel", "error", "-f", "rawvideo", "-pix_fmt", "rgba", "-s", f"{w}x{h}", "-r", f"{rate:g}",
            "-i", "-", *codec, str(path)]
-    data = b"".join(im.convert("RGBA").tobytes() for im in images)
-    done = subprocess.run(cmd, input=data, capture_output=True)
-    if done.returncode != 0:
-        raise ValueError("ffmpeg failed: " + done.stderr.decode("utf-8", "replace")[-400:])
+    proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+    assert proc.stdin is not None
+    try:
+        for im in images:
+            proc.stdin.write(im.convert("RGBA").tobytes())
+        proc.stdin.close()
+    except BrokenPipeError:
+        pass
+    stderr = proc.stderr.read() if proc.stderr else b""
+    if proc.wait() != 0:
+        raise ValueError("ffmpeg failed: " + stderr.decode("utf-8", "replace")[-400:])
 
 
 @tool
 def export_animation(canvas: str, animation: str, format: str = "spritesheet", path: str | None = None,
                      fps: float | None = None, scale: float = 1, background: str | None = None,
                      trim: bool = True, ids: list[str] | None = None, group: str | None = None,
-                     motion_blur: int = 0, repeat: int = 1):
+                     motion_blur: int = 0, repeat: int = 1, state_machine: dict | None = None):
     """Export an animation.
 
     format:
@@ -1644,6 +1991,10 @@ def export_animation(canvas: str, animation: str, format: str = "spritesheet", p
                     Plain shapes and text become real vector shape layers (crisp at any size, solid colour
                     changes animate natively); effects become pictures moved by Lottie; parts whose glow /
                     shape animates become one picture per frame (the result lists each kind).
+      "dotlottie"   dotLottie v2 (.lottie) ZIP archive with manifest.json (version "2"), a/<id>.json
+                    animations, and s/<id>.json interactive State Machine (synthesized from set_interaction,
+                    set_binding and multi-animations, or passed explicitly via state_machine={...}). Pass
+                    animation="all" to bundle every animation of the canvas into one Rive-like .lottie package.
     fps: sampling rate (default: the animation's own). scale: resolution multiplier.
     background: "dark", "light", "checker", "game" or a color to put behind the frames. Without it, sprite
       sheets and frames are transparent; animated files show the canvas background if it has one (a GIF
@@ -1652,15 +2003,39 @@ def export_animation(canvas: str, animation: str, format: str = "spritesheet", p
     motion_blur: 4-8 sub-frame samples per frame blur fast motion like a camera shutter (spins, dashes,
       swipes) in sprite sheets, frames, GIF / APNG / WebP; 0 = off. Costs that many renders per frame.
     ids / group: export only those elements.
+    state_machine: optional explicit dotLottie v2 state machine JSON object (initial, states, interactions, inputs).
     path: output file (or folder for "frames"); relative paths go to the workspace exports folder.
     """
     st = store()
     c = st.get(canvas)
     st.require_glyphs(c, None)
-    key, anim = st.get_animation(c, animation)
     fmt = format.lower()
-    if fmt not in ("json", "spritesheet", "frames", "gif", "apng", "webp", "lottie", "mp4", "webm"):
-        raise ValueError("format must be json, spritesheet, frames, gif, apng, webp, mp4, webm or lottie")
+    if fmt not in ("json", "spritesheet", "frames", "gif", "apng", "webp", "lottie", "dotlottie", "mp4", "webm"):
+        raise ValueError("format must be json, spritesheet, frames, gif, apng, webp, mp4, webm, lottie or dotlottie")
+    if fmt == "dotlottie":
+        from . import lottie
+        if not 0.1 <= float(scale) <= 8:
+            raise ValueError("scale must be between 0.1 and 8")
+        anim_names = sorted((c.get("animations") or {}).keys()) if str(animation).lower() == "all" else [animation]
+        if not anim_names:
+            raise ValueError(f"canvas '{c['id']}' has no animations to bundle; call create_animation first")
+        base_name = f"{c['id']}_all" if str(animation).lower() == "all" else f"{c['id']}_{slugify(animation, 'anim')}"
+        out = Path(path).expanduser() if path else st.exports_dir / "animations" / f"{base_name}.lottie"
+        if not out.is_absolute():
+            out = st.exports_dir / out
+        if out.suffix.lower() != ".lottie":
+            raise ValueError("dotlottie export path must end with .lottie")
+        out.parent.mkdir(parents=True, exist_ok=True)
+        blob, rep = lottie.build_dotlottie(st, c, anim_names, fps, float(scale),
+                                           bool(background) or bool(c.get("background")),
+                                           state_machine=_maybe_json(state_machine))
+        out.write_bytes(blob)
+        res_dl = {"file": str(out), "format": "dotlottie", "spec_version": rep["spec_version"],
+                  "count": rep["count"], "animations": rep["animations"], "bytes": len(blob)}
+        if rep.get("state_machine"):
+            res_dl["state_machine"] = rep["state_machine"]
+        return res_dl
+    key, anim = st.get_animation(c, animation)
     base_name = f"{c['id']}_{key}"
     if fmt == "lottie":
         from . import lottie
@@ -1787,9 +2162,19 @@ def export_animation(canvas: str, animation: str, format: str = "spritesheet", p
 @tool
 def set_theme(colors: dict | None = None, styles: dict | None = None, replace: bool = False,
               modes: dict | None = None, mode: str | None = None, numbers: dict | None = None,
-              tokens: dict | str | None = None, materials: dict | None = None):
-    """Define the design tokens shared by every canvas, so a whole UI kit stays consistent.
+              tokens: dict | str | None = None, materials: dict | None = None,
+              environment: dict | None = None, quality: str | None = None,
+              style_preset: str | None = None, apply_preset_tokens: bool = True):
+    """Define the design tokens, quality tier and visual style preset shared by every canvas.
 
+    quality: output realism & detail tier ("simple" | "standard" | "advanced" | "aaa").
+      - "simple": fast clean flat shading, zero micro-grain, minimal frame ornaments, 2x supersampling (ideal for kids/casual/wireframes).
+      - "standard": balanced bevels, moderate grain, core frame brackets, 3x supersampling (ideal for cartoon/stylized/web apps).
+      - "advanced": full Cook-Torrance GGX PBR, HDR IBL, rich procedural ornaments, 4x supersampling.
+      - "aaa": deepened bevels, heightened edge wear & micro-bump, full ornate details, 4x supersampling.
+    style_preset: design direction ("kids" | "cartoon" | "stylized" | "minimal" | "web_saas" | "scifi" |
+      "dark_fantasy" | "realistic" | "photorealistic"). When apply_preset_tokens=true (default), seeds matching
+      palette colours, spacing/radius numbers, panel/button/title/body styles, studio lighting and default quality.
     modes: Figma-style variable modes - named sets of colour overrides, e.g.
       {"light": {"bg": "#f5f5f7", "text": "#111"}, "colorblind": {"danger": "#ff8800"}}. mode: the active one
       for every canvas ("" = base colours); one canvas can pick its own with update_canvas(mode=...).
@@ -1807,6 +2192,9 @@ def set_theme(colors: dict | None = None, styles: dict | None = None, replace: b
       "light": {...}}) or write it from scratch with a shader fill ({"fill": {"type": "shader", "code": ...,
       "params": {"c": "$primary", "t": 0}}, "light": {...}, "noise": 0.05}). A use like {"material":
       {"name": "mine", "color": ..., "scale": ..., "t": ...}} feeds those into its shader params (c, sc, t).
+    environment: workspace-wide PBR IBL environment lighting for all metallic and glossy materials, e.g.
+      {"env_map": "/path/to/scene.hdr", "rotation": 30, "intensity": 1.15, "studio": "warm"}. Accepts Radiance
+      .hdr, OpenEXR .exr, or equirectangular PNG/JPG files; pass {} to reset to default studio lighting.
     colors: {"bg": "#0d0b14", "primary": "#8b5cf6", ...} -> use anywhere as "$primary" or "$primary@0.5".
     styles: named style objects, usable as style="panel" or {"use": "panel", ...overrides}. A style can
       hold any style key plus text defaults (font, weight, size, letter_spacing, uppercase), e.g.
@@ -1815,6 +2203,7 @@ def set_theme(colors: dict | None = None, styles: dict | None = None, replace: b
     Entries are merged into the existing theme (set a key to null to remove it); replace=true starts over.
     Changing the theme restyles every element that references it.
     """
+    from . import profiles
     st = store()
     colors, numbers = _maybe_json(colors), _maybe_json(numbers)
     styles = _maybe_json(styles)
@@ -1832,10 +2221,18 @@ def set_theme(colors: dict | None = None, styles: dict | None = None, replace: b
             got_colors, got_numbers = read_dtcg(tok)
         colors = {**got_colors, **(colors or {})}
         numbers = {**got_numbers, **(numbers or {})}
-    st.set_theme(colors, styles, replace, _maybe_json(modes), mode, numbers, _maybe_json(materials))
-    return {"colors": st.theme["colors"], "numbers": st.theme.get("numbers", {}), "styles": sorted(st.theme["styles"]),
-            "modes": sorted(st.theme.get("modes") or {}), "mode": st.theme.get("mode"),
-            "materials": sorted(st.theme.get("materials") or {})}
+    st.set_theme(colors, styles, replace, _maybe_json(modes), mode, numbers, _maybe_json(materials),
+                 _maybe_json(environment), quality=quality, style_preset=style_preset,
+                 apply_preset_tokens=bool(apply_preset_tokens))
+    eff_prof = profiles.resolve_profile(st.theme)
+    out = {"colors": st.theme["colors"], "numbers": st.theme.get("numbers", {}), "styles": sorted(st.theme["styles"]),
+           "modes": sorted(st.theme.get("modes") or {}), "mode": st.theme.get("mode"),
+           "materials": sorted(st.theme.get("materials") or {}),
+           "profile": {"quality": eff_prof["quality"], "style_preset": eff_prof.get("style_preset"),
+                       "pbr_mode": eff_prof["pbr_mode"], "ornament_density": eff_prof["ornament_density"]}}
+    if st.theme.get("environment"):
+        out["environment"] = st.theme["environment"]
+    return out
 
 
 @tool
@@ -1887,7 +2284,7 @@ def preview(canvas: str, background: str = "checker", max_size: int = 1024, show
             region: list[float] | None = None, zoom: float | None = None,
             animation: str | None = None, time: float = 0, layers: list[str] | None = None,
             state: str | None = None, language: str | None = None, guides: list[str] | None = None,
-            simulate: str | None = None):
+            simulate: str | None = None, data: dict | None = None):
     """Render a canvas and return the picture so you can check your work. Look at it critically:
     alignment, spacing, contrast, clipped shadows, text overflow.
 
@@ -1907,10 +2304,14 @@ def preview(canvas: str, background: str = "checker", max_size: int = 1024, show
       "grid:8", "columns:12", "thirds", "center", "thumb" (thumb reach on a landscape phone).
     simulate: "protanopia", "deuteranopia", "tritanopia" (colour blindness), "grayscale", "low-contrast"
       (sunlit phone) - check that states and rarities differ by more than hue.
+    data: override bound variables (set_binding) for this preview only, e.g. {"hp": 15} to check low-HP look.
     """
     st = store()
     c = st.get(canvas)
     pose_warnings: list[str] = []
+    if data:
+        from . import binding
+        c = binding.apply_bindings(c, _maybe_json(data))
     if animation:
         _, anim = st.get_animation(c, animation)
         c, pose_warnings = anim_mod.apply_animation(c, anim, float(time), st.theme.get("colors", {}))
@@ -2470,25 +2871,32 @@ def export_web(canvases: list[str] | str, out_dir: str | None = None, layout: st
 
 @tool
 def export_react(canvases: list[str] | str, out_dir: str | None = None, language: str | None = None,
-                 include_background: bool = True, image_scale: float = 2):
-    """Export canvases as React components (JSX + CSS) for a React / Next.js / Vite codebase: one
-    <Name>.jsx and <Name>.css per canvas, a shared styles.css, gameui-runtime.js and an assets folder
-    (images are imported, so the bundler handles them). Same rendering as export_web: real text, CSS boxes,
-    inline SVG, hover / pressed CSS, keyframe animations and set_interaction rules. Navigation calls the
-    component's onNavigate(canvasId, mode) prop. Copy the folder into the project and import a component."""
+                 include_background: bool = True, image_scale: float = 2, css: str = "css",
+                 typescript: bool = False):
+    """Export canvases as React components (JSX or TypeScript TSX + CSS or Tailwind utilities) for React / Next.js / Vite:
+    one <Name>.jsx/.tsx (and <Name>.css) per canvas, gameui-runtime.js and an assets folder.
+    Supports live data bindings (pass data={{hp: 40}} prop), onNavigate(canvasId, mode), onSfx(name),
+    keyboard + gamepad focus navigation, hover / pressed CSS, keyframe animations and set_interaction rules.
+    css: "css" (default stylesheet per component) or "tailwind" (Tailwind utility classes on elements).
+    typescript: true emits typed .tsx components with <Name>Props interfaces and index.ts."""
     from . import webexport
     st = store()
     names = [canvases] if isinstance(canvases, str) and not canvases.strip().startswith("[") else (_maybe_json(canvases) or [])
     if not names:
         raise ValueError("canvases must name at least one canvas")
+    css_mode = str(css or "css").lower()
+    if css_mode not in ("css", "tailwind"):
+        raise ValueError("css must be 'css' or 'tailwind'")
     pages = [st.get(n) for n in names]
     for c in pages:
         st.require_glyphs(c, language)
     folder = _out_dir(out_dir, f"react/{pages[0]['id']}")
-    report = webexport.build_react(st, pages, folder, language, include_background, image_scale)
+    report = webexport.build_react(st, pages, folder, language, include_background, image_scale,
+                                   css_mode=css_mode, typescript=bool(typescript))
+    stem = Path(report["components"][0]).stem
     result: dict = {"folder": str(folder), "components": report["components"],
-                    "embedded_as_image": report["picture"],
-                    "usage": f"import {report['components'][0][:-4]} from './{folder.name}/{report['components'][0]}';"}
+                    "embedded_as_image": report["picture"], "css": css_mode, "typescript": bool(typescript),
+                    "usage": f"import {stem} from './{folder.name}/{stem}';"}
     if report["notes"]:
         result["notes"] = report["notes"]
     return result
@@ -3026,11 +3434,21 @@ def export_asset(canvas: str, engine: str = "generic", out_dir: str | None = Non
 
 @tool
 def export_atlas(canvases: list[str], path: str | None = None, scale: float = 1, padding: int = 2,
-                 power_of_two: bool = False, max_size: int = 4096, trim: bool = False):
-    """Pack several canvases into one atlas PNG + JSON frame list (icon sets, small HUD pieces).
-    One atlas = one upload on Roblox (use ImageRectOffset / ImageRectSize) and one texture elsewhere.
-    Writes "<name>.png" and "<name>.json" ({"frames": {canvas: {x, y, w, h}}})."""
+                 power_of_two: bool = False, max_size: int = 4096, trim: bool = False,
+                 format: str = "json", godot_res_path: str = "res://ui/generated"):
+    """Pack several canvases into one atlas PNG + metadata (icon sets, small HUD pieces).
+    One atlas = one upload on Roblox (ImageRectOffset / ImageRectSize) and one draw call elsewhere.
+    format:
+      "json"          default {"image", "size", "scale", "frames": {canvas: {x, y, w, h}}}.
+      "texturepacker" standard TexturePacker JSON Hash (Phaser, PixiJS, Cocos, Spine, Defold, GameMaker).
+      "godot"         writes Godot 4 AtlasTexture <id>.atlas.tres files alongside the packed PNG.
+      "unity"         writes Unity bottom-left sprite rects JSON for Multiple-Sprite slicing.
+      "css"           writes <name>.css sprite classes (.sprite-<id>) for web icons.
+    """
     st = store()
+    fmt = str(format or "json").lower()
+    if fmt not in ("json", "texturepacker", "godot", "unity", "css"):
+        raise ValueError("format must be 'json', 'texturepacker', 'godot', 'unity' or 'css'")
     images = []
     warnings: list[str] = []
     for cid in canvases:
@@ -3044,10 +3462,54 @@ def export_atlas(canvases: list[str], path: str | None = None, scale: float = 1,
     atlas, frames = ex.pack_atlas(images, int(padding), int(max_size), power_of_two)
     out = _out_path(path, "atlas.png")
     atlas.save(out)
-    data = {"image": out.name, "size": {"w": atlas.width, "h": atlas.height}, "scale": scale, "frames": frames}
-    ex.write_json(out.with_suffix(".json"), data)
-    result: dict = {"file": str(out), "json": str(out.with_suffix(".json")), "size": [atlas.width, atlas.height],
-                    "frames": frames}
+    extras: list[str] = []
+    if fmt == "texturepacker":
+        tp = {
+            "frames": {
+                f"{k}.png": {"frame": f, "rotated": False, "trimmed": bool(trim),
+                             "spriteSourceSize": {"x": 0, "y": 0, "w": f["w"], "h": f["h"]},
+                             "sourceSize": {"w": f["w"], "h": f["h"]}}
+                for k, f in frames.items()
+            },
+            "meta": {"app": "game-ui-mcp", "version": "0.12.0", "image": out.name, "format": "RGBA8888",
+                     "size": {"w": atlas.width, "h": atlas.height}, "scale": str(scale)},
+        }
+        ex.write_json(out.with_suffix(".json"), tp)
+    elif fmt == "unity":
+        u_sprites = [{"name": k, "rect": {"x": f["x"], "y": atlas.height - f["y"] - f["h"],
+                                          "width": f["w"], "height": f["h"]}, "pivot": {"x": 0.5, "y": 0.5}}
+                     for k, f in frames.items()]
+        ex.write_json(out.with_suffix(".json"), {"image": out.name, "size": {"w": atlas.width, "h": atlas.height},
+                                                 "scale": scale, "unity_sprites": u_sprites, "frames": frames})
+    else:
+        data = {"image": out.name, "size": {"w": atlas.width, "h": atlas.height}, "scale": scale, "frames": frames}
+        ex.write_json(out.with_suffix(".json"), data)
+    if fmt == "godot":
+        if not re.fullmatch(r"res://[A-Za-z0-9_\-/.]*", godot_res_path or "") or ".." in godot_res_path:
+            raise ValueError("godot_res_path must be a res:// path without '..'")
+        res_base = godot_res_path.rstrip("/")
+        for k, f in frames.items():
+            tfile = out.parent / f"{k}.atlas.tres"
+            tfile.write_text(
+                '[gd_resource type="AtlasTexture" load_steps=2 format=3]\n\n'
+                f'[ext_resource type="Texture2D" path="{res_base}/{out.name}" id="1_atlas"]\n\n'
+                '[resource]\n'
+                'atlas = ExtResource("1_atlas")\n'
+                f'region = Rect2({f["x"]}, {f["y"]}, {f["w"]}, {f["h"]})\n',
+                encoding="utf-8",
+            )
+            extras.append(tfile.name)
+    elif fmt == "css":
+        css_lines = [f".sprite{{display:inline-block;background-image:url('{out.name}');background-repeat:no-repeat;}}"]
+        for k, f in frames.items():
+            css_lines.append(f".sprite-{slugify(k, 'icon')}{{width:{f['w']}px;height:{f['h']}px;background-position:-{f['x']}px -{f['y']}px;}}")
+        cfile = out.with_suffix(".css")
+        cfile.write_text("\n".join(css_lines) + "\n", encoding="utf-8")
+        extras.append(cfile.name)
+    result: dict = {"file": str(out), "json": str(out.with_suffix(".json")), "format": fmt,
+                    "size": [atlas.width, atlas.height], "frames": frames}
+    if extras:
+        result["extras"] = extras
     if max(atlas.size) > ex.ROBLOX_MAX:
         result["note"] = f"larger than {ex.ROBLOX_MAX}px: Roblox would downscale it. Split it or lower the scale for Roblox."
     if warnings:
@@ -3133,8 +3595,81 @@ from .tools_delivery import *  # noqa: E402,F401,F403  (registers the hand-off t
 from .tools_design import *  # noqa: E402,F401,F403  (registers guide, palettes, restyle, path ops)
 
 
+def _register_mcp_dx() -> None:
+    """Register native MCP resources and workflow prompts for zero-guesswork AI discovery."""
+    if hasattr(mcp, "resource"):
+        @mcp.resource("gameui://materials")
+        def res_materials() -> str:
+            """All 39 built-in Cook-Torrance PBR material names plus any custom theme materials."""
+            from .materials import NAMES
+            custom = sorted((store().theme.get("materials") or {}).keys())
+            return json.dumps({"builtin": NAMES, "custom": custom}, indent=2)
+
+        @mcp.resource("gameui://workspace")
+        def res_workspace() -> str:
+            """Live summary of canvases, theme tokens and workspace directory."""
+            st = store()
+            return json.dumps({
+                "workspace": str(st.workspace),
+                "rev": st.rev,
+                "canvases": [{"id": c["id"], "width": c["width"], "height": c["height"],
+                              "elements": len(c["elements"])} for c in st.canvases.values()],
+                "theme_colors": sorted((st.theme.get("colors") or {}).keys()),
+                "theme_styles": sorted((st.theme.get("styles") or {}).keys()),
+            }, indent=2)
+
+        @mcp.resource("gameui://guide/{topic}")
+        def res_guide(topic: str) -> str:
+            """Reference manual for one game-ui-mcp topic (fills, shader, style, design, layers, geometry, text, reuse, review, animation, export, all)."""
+            from .reference import TOPICS
+            t = str(topic).strip().lower()
+            if t == "all":
+                return "\n\n".join(f"=== {k} ===\n{v}" for k, v in TOPICS.items() if k != "index")
+            return TOPICS.get(t, TOPICS["index"])
+
+    if hasattr(mcp, "prompt"):
+        @mcp.prompt()
+        def design_game_hud(genre: str = "sci-fi shooter", engine: str = "unity", resolution: str = "1920x1080") -> str:
+            """Step-by-step workflow prompt to design, review, bind and export a production game HUD."""
+            return (
+                f"Design an original AAA {genre} HUD at {resolution} for {engine} using game-ui-mcp.\n"
+                "1. Call live_preview('start') if the user wants to watch live.\n"
+                "2. Set a cohesive token theme with set_theme (1 background, 2 surfaces, 1 primary, 1 accent, semantic states).\n"
+                "3. Create the canvas with safe_area, use add_frame (scifi_hud / rpg_gold / cyber_tech) and Cook-Torrance PBR materials inside batch().\n"
+                "4. Pin every corner widget with set_pin and wire live stats (hp/ammo/level) via set_binding.\n"
+                "5. Inspect with preview(background='game') + preview_resolutions + review_canvas, fix every warning.\n"
+                f"6. Export via export_screen(engine='{engine}') (plus export_pbr_maps for dynamic engine lighting)."
+            )
+
+        @mcp.prompt()
+        def design_rpg_panel(title: str = "Inventory", style_preset: str = "rpg_gold") -> str:
+            """Workflow prompt to build a richly shaded ornate RPG modal with PBR materials and states."""
+            return (
+                f"Create an ornate '{title}' RPG panel using game-ui-mcp.\n"
+                "1. Call set_theme with warm medieval/fantasy palette tokens and Cinzel/Inter typography.\n"
+                f"2. Build the outer frame with add_frame(preset='{style_preset}', title='{title}') and use its returned inner_box.\n"
+                "3. Populate slots with add_instance + variants (common/rare/epic/legendary), faceted gem/ruby/emerald PBR accents, and live auto layout.\n"
+                "4. Add hover/pressed/selected states with set_state and click SFX via set_interaction.\n"
+                "5. Inspect with preview() and review_canvas(), fix issues, then export PNG + PBR normal/roughness/metallic maps via export_pbr_maps()."
+            )
+
+        @mcp.prompt()
+        def audit_and_polish(canvas: str) -> str:
+            """Closed-loop visual and WCAG quality audit prompt for an existing canvas."""
+            return (
+                f"Audit and polish canvas '{canvas}' in game-ui-mcp:\n"
+                "1. Run review_canvas(canvas) and preview(canvas, show_ids=true).\n"
+                "2. Check contrast (WCAG >= 4.5:1 body, 3:1 headings), clipped shadows, half-pixel edges, safe areas, and pseudo-long localization.\n"
+                "3. Fix every warning with batch() / update_element(), then re-verify with preview() and review_canvas() until ok=true."
+            )
+
+
+_register_mcp_dx()
+
+
 def main() -> None:
-    mcp.run()
+    from .cli import cli_main
+    cli_main()
 
 
 if __name__ == "__main__":

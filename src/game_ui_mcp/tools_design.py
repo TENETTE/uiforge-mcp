@@ -482,8 +482,8 @@ def path_ops(canvas: str, id: str, action: str = "flatten", distance: float = 2,
         import pyclipper
         merged = pyclipper.SimplifyPolygons(_ints(shape), pyclipper.PFT_NONZERO)
         polys = merged if act == "flatten" else _offset(_floats(merged), float(distance), join)
-        keep_keys = ("fill", "stroke", "shadow", "glow", "inner_shadow", "inner_glow", "bevel", "light", "opacity",
-                     "blend", "blur", "mask", "adjust")
+        keep_keys = ("fill", "stroke", "shadow", "glow", "inner_shadow", "inner_glow", "bevel", "light", "pbr",
+                     "material", "noise", "texture", "opacity", "blend", "blur", "mask", "adjust")
         new_style = {k: v for k, v in style.items() if k in keep_keys} or {"fill": "#ffffff"}
         replace_source = not keep_original
     elif el["type"] in LINE_TYPES:

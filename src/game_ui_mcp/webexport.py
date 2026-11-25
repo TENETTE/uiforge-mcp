@@ -346,7 +346,7 @@ def _element(ctx: _Ctx, el: dict, svg_doc) -> tuple[str, dict, str] | None:
     r = ctx.r
     el = r._nums(el)
     st = r._nums(resolve_style(el.get("style"), ctx.theme))
-    if el.get("clip") or st.get("glass") or st.get("texture") or st.get("light") or st.get("noise"):
+    if el.get("clip") or st.get("glass") or st.get("texture") or st.get("light") or st.get("pbr") or st.get("noise"):
         return None
     t = el["type"]
     if t == "text":
@@ -391,6 +391,86 @@ def _element(ctx: _Ctx, el: dict, svg_doc) -> tuple[str, dict, str] | None:
             css["border-radius"] = f"{_n(float(el['radius'] if not isinstance(el['radius'], list) else el['radius'][0]))}px"
         css.update(_transform(el, box, r._pivot(el, box)))
         return f'assets/{name}', css, "img"
+    if t == "input":
+        from .widgets import widget_colors_summary
+        wc = widget_colors_summary(el, ctx.colors)
+        x, y = float(el.get("x", 0)), float(el.get("y", 0))
+        w, h = max(16.0, float(el.get("width", 220))), max(20.0, float(el.get("height", 40)))
+        rad = el.get("radius", 8)
+        rad_css = " ".join(f"{_n(float(v))}px" for v in (rad if isinstance(rad, list) else [rad]))
+        bg_r, bg_g, bg_b, bg_a = wc["bg"]
+        bd_r, bd_g, bd_b, bd_a = wc["border"]
+        tx_r, tx_g, tx_b, tx_a = wc["text"]
+        css = {
+            **_box_css(x, y, w, h),
+            "background": f"rgba({bg_r},{bg_g},{bg_b},{_n(bg_a / 255)})",
+            "border": f"{_n(wc['border_width'])}px solid rgba({bd_r},{bd_g},{bd_b},{_n(bd_a / 255)})",
+            "border-radius": rad_css,
+            "color": f"rgba({tx_r},{tx_g},{tx_b},{_n(tx_a / 255)})",
+            "font-family": f"'{el.get('font') or 'Inter'}',sans-serif",
+            "font-size": f"{_n(float(el.get('size', 15)))}px",
+            "padding": f"0 {_n(float(el.get('padding', 12)))}px",
+            "outline": "none",
+        }
+        itype = html.escape(str(el.get("input_type", "text")).lower(), quote=True)
+        val = html.escape(str(el.get("value") or ""), quote=True)
+        ph = html.escape(str(el.get("placeholder") or ""), quote=True)
+        attrs = [f'type="{itype}"', f'defaultValue="{val}"' if False else f'value="{val}"']
+        if ph:
+            attrs.append(f'placeholder="{ph}"')
+        if el.get("bind"):
+            attrs.append(f'data-bind="{html.escape(str(el["bind"]), quote=True)}"')
+        if el.get("max_length"):
+            attrs.append(f'maxlength="{int(el["max_length"])}"')
+        if el.get("readonly"):
+            attrs.append("readonly")
+        return " ".join(attrs), css, "input"
+    if t == "scroll":
+        from .widgets import widget_colors_summary
+        wc = widget_colors_summary(el, ctx.colors)
+        x, y = float(el.get("x", 0)), float(el.get("y", 0))
+        w, h = max(16.0, float(el.get("width", 280))), max(20.0, float(el.get("height", 220)))
+        rad = el.get("radius", 10)
+        rad_css = " ".join(f"{_n(float(v))}px" for v in (rad if isinstance(rad, list) else [rad]))
+        bg_r, bg_g, bg_b, bg_a = wc["bg"]
+        bd_r, bd_g, bd_b, bd_a = wc["border"]
+        d = str(el.get("direction", "vertical")).lower()
+        css = {
+            **_box_css(x, y, w, h),
+            "background": f"rgba({bg_r},{bg_g},{bg_b},{_n(bg_a / 255)})",
+            "border": f"{_n(wc['border_width'])}px solid rgba({bd_r},{bd_g},{bd_b},{_n(bd_a / 255)})",
+            "border-radius": rad_css,
+            "padding": f"{_n(float(el.get('padding', 10)))}px",
+            "display": "flex",
+            "flex-direction": "row" if d == "horizontal" else "column",
+            "gap": f"{_n(float(el.get('gap', 8)))}px",
+            "overflow-y": "hidden" if d == "horizontal" else "auto",
+            "overflow-x": "auto" if d in ("horizontal", "both") else "hidden",
+            "font-family": f"'{el.get('font') or 'Inter'}',sans-serif",
+            "scrollbar-width": "thin",
+            "scrollbar-color": f"{ctx.color(el.get('scrollbar_color', '#94a3b8@0.58'))} transparent",
+        }
+        row_h = float(el.get("item_height", 38))
+        ifill = ctx.color(el.get("item_fill", "#1e293b@0.75"))
+        icol = ctx.color(el.get("item_color", "#e2e8f0"))
+        scol = ctx.color(el.get("subtitle_color", "#94a3b8"))
+        fsize = float(el.get("size", 13))
+        parts_html = []
+        for i, raw_item in enumerate(el.get("items") or []):
+            if isinstance(raw_item, dict):
+                title = str(raw_item.get("title") or raw_item.get("label") or f"Item {i + 1}")
+                sub = str(raw_item.get("subtitle") or "")
+                badge = str(raw_item.get("badge") or "")
+            else:
+                title, sub, badge = str(raw_item), "", ""
+            sub_h = f'<div style="font-size:{_n(max(10.0, fsize * 0.82))}px;color:{scol}">{html.escape(sub)}</div>' if sub else ""
+            bdg_h = f'<span style="margin-left:auto;color:#38bdf8;font-weight:700;font-size:{_n(max(10.0, fsize * 0.85))}px">{html.escape(badge)}</span>' if badge else ""
+            parts_html.append(
+                f'<div class="scroll-item" style="min-height:{_n(row_h)}px;flex:0 0 auto;border-radius:6px;background:{ifill};'
+                f'color:{icol};font-size:{_n(fsize)}px;padding:6px 10px;display:flex;align-items:center;gap:8px">'
+                f'<div><div style="font-weight:600">{html.escape(title)}</div>{sub_h}</div>{bdg_h}</div>'
+            )
+        return "".join(parts_html), css, "scroll"
     if t in ("polygon", "path", "boolean") or t in LINE_TYPES:
         return _svg(ctx, el, st, svg_doc)
     return None
@@ -608,6 +688,10 @@ def build(store, canvases: list[dict], out: Path, layout: str, language: str | N
                     body.append(f'<img class="el" id="{eid}" alt="" src="{inner}" style="{decl}"{extra_attrs}>')
                 elif kind == "svg":
                     body.append(f'<div class="el vec" id="{eid}" style="{decl}"{extra_attrs}>{inner}</div>')
+                elif kind == "input":
+                    body.append(f'<input class="el input" id="{eid}" {inner} style="{decl}"{extra_attrs}>')
+                elif kind == "scroll":
+                    body.append(f'<div class="el scroll" id="{eid}" style="{decl}"{extra_attrs}>{inner}</div>')
                 else:
                     body.append(f'<div class="el {kind}" id="{eid}" style="{decl}"{extra_attrs}>{inner}</div>')
             if open_group is not None:
@@ -662,13 +746,15 @@ def build(store, canvases: list[dict], out: Path, layout: str, language: str | N
             for fam, (file, w, var) in ctx.fonts.items())
         all_fonts.update(ctx.fonts)
         cfg = _ix_config(c, ix, pages)
+        has_runtime = bool(ix or c.get("focus_order") or c.get("bindings") or c.get("data"))
         ix_script = ("<script>window.GAMEUI_IX=" + json.dumps(cfg, ensure_ascii=False).replace("</", "<\\/")
-                     + "</script>") if ix else ""
+                     + "</script>") if has_runtime else ""
         report.setdefault("parts", {})[c["id"]] = {
             "file": pages[c["id"]], "fonts_css": fonts_css, "size": size, "bg_css": bg_css,
             "page_css": "".join(page_css), "body": "\n".join(body), "W": W, "H": H, "ix": cfg}
         doc = (f"<!doctype html>\n<html lang=\"{html.escape(language or 'en')}\"><head><meta charset=\"utf-8\">"
                f"<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
+               f"<link rel=\"icon\" href=\"data:,\">"
                f"<title>{html.escape(str(c.get('name') or c['id']))}</title>"
                f"<link rel=\"stylesheet\" href=\"styles.css\"><style>{fonts_css}"
                f".page{{{size};{bg_css}}}{''.join(page_css)}</style></head>"
@@ -701,7 +787,8 @@ def _ix_attrs(key: str, ix_ids: set, clickable: set, existing: str, tab: int) ->
 
 
 def _ix_config(c: dict, ix: list, pages: dict) -> dict:
-    """The page's interaction rules for the runtime (gameuiAttach)."""
+    """The page's interaction rules, focus order, and data bindings for the runtime (gameuiAttach)."""
+    from . import binding
     rules = []
     for rule in ix:
         r = dict(rule)
@@ -718,7 +805,20 @@ def _ix_config(c: dict, ix: list, pages: dict) -> dict:
         rules.append(r)
     anims = {k: {"duration": float(a.get("duration", 1)), "loop": bool(a.get("loop"))}
              for k, a in (c.get("animations") or {}).items()}
-    return {"rules": rules, "anims": anims}
+    binds = []
+    for b in c.get("bindings") or []:
+        try:
+            binds.append({"id": _ident(b["target"]), "prop": b["property"], "js": binding.js_expr(b["expr"])})
+        except Exception:
+            continue
+    text_tpls = {
+        _ident(e["id"]): str(e.get("text", ""))
+        for e in c.get("elements", [])
+        if e.get("type") == "text" and "{" in str(e.get("text", ""))
+    }
+    focus = [_ident(eid) for eid in (c.get("focus_order") or [])]
+    return {"rules": rules, "anims": anims, "focus": focus, "data": dict(c.get("data") or {}),
+            "bindings": binds, "templates": text_tpls}
 
 
 def _link_attrs(target: Any, pages: dict, tab: int) -> str:
@@ -757,11 +857,35 @@ body.fit .page{transform-origin:center center}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 """
 
-RUNTIME_JS = """function gameuiAttach(root, cfg, go) {
+RUNTIME_JS = """function gameuiApplyData(root, cfg, patch) {
+  cfg = cfg || {};
+  var d = Object.assign({}, cfg.data || {}, patch || {});
+  var tpls = cfg.templates || {};
+  Object.keys(tpls).forEach(function (id) {
+    var el = root.querySelector('#' + id);
+    if (el) el.textContent = tpls[id].replace(/\\{([A-Za-z_][\\w.-]*)\\}/g, function (m, k) { return k in d ? String(d[k]) : m; });
+  });
+  (cfg.bindings || []).forEach(function (b) {
+    var el = root.querySelector('#' + b.id);
+    if (!el) return;
+    try {
+      var v = (new Function('d', 'return (' + b.js + ');'))(d);
+      if (b.prop === 'width' || b.prop === 'height') el.style[b.prop] = Math.max(0, Number(v)) + 'px';
+      else if (b.prop === 'opacity') el.style.opacity = String(Math.max(0, Math.min(1, Number(v))));
+      else if (b.prop === 'visible') el.style.display = v ? '' : 'none';
+      else if (b.prop === 'text') el.textContent = String(v);
+      else if (b.prop === 'style.fill' || b.prop === 'fill') el.style.background = String(v);
+      else if (b.prop === 'style.color' || b.prop === 'color') el.style.color = String(v);
+    } catch (e) {}
+  });
+  return d;
+}
+function gameuiAttach(root, cfg, go, onSfx) {
   cfg = cfg || {};
   var rules = cfg.rules || [], anims = cfg.anims || {}, timers = [];
   function act(r) {
     var run = function () {
+      if (r.sfx && onSfx) onSfx(r.sfx, r.id);
       var a = r.action;
       if (a === 'play') {
         var cls = 'p-' + r.animKey;
@@ -785,23 +909,68 @@ RUNTIME_JS = """function gameuiAttach(root, cfg, go) {
       if (el && (!edge || !el.contains(e.relatedTarget))) fire(el.dataset.ix, trigger);
     });
   }
+  function focusables() {
+    var list = (cfg.focus || []).map(function (id) { return root.querySelector('#' + id); }).filter(Boolean);
+    if (!list.length) list = Array.prototype.slice.call(root.querySelectorAll('[data-href],[data-ix],[tabindex]'));
+    return list.filter(function (el) { return el.style.display !== 'none'; });
+  }
+  function moveFocus(step) {
+    var list = focusables();
+    if (!list.length) return;
+    var idx = list.indexOf(document.activeElement);
+    var next = idx < 0 ? (step > 0 ? 0 : list.length - 1) : (idx + step + list.length) % list.length;
+    if (list[next].tabIndex < 0) list[next].tabIndex = 0;
+    list[next].focus();
+  }
   on('pointerover', 'hover', true); on('pointerout', 'leave', true);
   on('pointerdown', 'press'); on('pointerup', 'release'); on('click', 'click');
+  root.addEventListener('input', function (e) {
+    var el = e.target;
+    if (el && el.dataset && el.dataset.bind) {
+      cfg.data = Object.assign({}, cfg.data || {}, {});
+      cfg.data[el.dataset.bind] = el.value;
+      gameuiApplyData(root, cfg, cfg.data);
+    }
+  });
   root.addEventListener('click', function (e) {
     var el = e.target && e.target.closest ? e.target.closest('[data-href]') : null;
     if (el) go(el.dataset.href, el.dataset.mode, el.dataset.to);
   });
   root.addEventListener('keydown', function (e) {
     if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[data-href],[data-ix]')) { e.preventDefault(); e.target.click(); }
+    if (e.key === 'ArrowDown' || e.key === 'ArrowRight') { e.preventDefault(); moveFocus(1); }
+    if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') { e.preventDefault(); moveFocus(-1); }
   });
   function key(e) { fire(null, 'key:' + e.key); }
   document.addEventListener('keydown', key);
+  var gpPrev = {}, raf = 0;
+  function pollGamepad() {
+    var pads = navigator.getGamepads ? navigator.getGamepads() : [];
+    for (var i = 0; i < pads.length; i++) {
+      var gp = pads[i]; if (!gp) continue;
+      var up = (gp.buttons[12] && gp.buttons[12].pressed) || (gp.axes[1] || 0) < -0.5;
+      var dn = (gp.buttons[13] && gp.buttons[13].pressed) || (gp.axes[1] || 0) > 0.5;
+      var lt = (gp.buttons[14] && gp.buttons[14].pressed) || (gp.axes[0] || 0) < -0.5;
+      var rt = (gp.buttons[15] && gp.buttons[15].pressed) || (gp.axes[0] || 0) > 0.5;
+      var ok = gp.buttons[0] && gp.buttons[0].pressed;
+      var bk = gp.buttons[1] && gp.buttons[1].pressed;
+      if ((dn || rt) && !gpPrev.next) moveFocus(1);
+      if ((up || lt) && !gpPrev.prev) moveFocus(-1);
+      if (ok && !gpPrev.ok && document.activeElement && root.contains(document.activeElement)) document.activeElement.click();
+      if (bk && !gpPrev.bk) go('#back', 'back');
+      gpPrev = { next: dn || rt, prev: up || lt, ok: ok, bk: bk };
+      break;
+    }
+    raf = requestAnimationFrame(pollGamepad);
+  }
+  if (typeof requestAnimationFrame === 'function' && navigator.getGamepads) raf = requestAnimationFrame(pollGamepad);
+  if ((cfg.bindings && cfg.bindings.length) || (cfg.data && Object.keys(cfg.data).length)) gameuiApplyData(root, cfg, cfg.data);
   fire(null, 'load');
-  return function () { timers.forEach(clearTimeout); document.removeEventListener('keydown', key); };
+  return function () { timers.forEach(clearTimeout); if (raf) cancelAnimationFrame(raf); document.removeEventListener('keydown', key); };
 }
 """
 
-_APP_JS = """// game-ui-mcp web export: fit-to-window scaling, links, overlays, interactions
+_APP_JS = """// game-ui-mcp web export: fit-to-window scaling, links, overlays, interactions, gamepad nav, data binding
 (function () {
   const page = document.querySelector('.page');
   function fit() {
@@ -827,7 +996,10 @@ _APP_JS = """// game-ui-mcp web export: fit-to-window scaling, links, overlays, 
     location.href = href;
   }
   addEventListener('message', e => { if (e.data === 'close-overlay') document.querySelectorAll('.overlay').forEach(o => o.remove()); });
-  if (page) gameuiAttach(page, window.GAMEUI_IX, (href, mode) => go({ dataset: { href: href, mode: mode } }));
+  if (page) {
+    gameuiAttach(page, window.GAMEUI_IX, (href, mode) => go({ dataset: { href: href, mode: mode } }));
+    window.gameuiSetData = patch => gameuiApplyData(page, window.GAMEUI_IX, patch);
+  }
 """ + RUNTIME_JS + """})();
 """
 
@@ -858,27 +1030,88 @@ def _style_object(css: str) -> str:
     return "{{" + ", ".join(items) + "}}"
 
 
-class _Jsx(HTMLParser):
-    """HTML (from the web export) -> JSX: className, style objects, self-closing tags, imported images."""
+_TW_PROP = {
+    "left": "left", "top": "top", "right": "right", "bottom": "bottom", "width": "w", "height": "h",
+    "border-radius": "rounded", "font-size": "text", "color": "text", "opacity": "opacity",
+    "letter-spacing": "tracking", "line-height": "leading",
+}
+_TW_WEIGHT = {"100": "font-thin", "200": "font-extralight", "300": "font-light", "400": "font-normal",
+              "500": "font-medium", "600": "font-semibold", "700": "font-bold", "800": "font-extrabold", "900": "font-black"}
 
-    def __init__(self, images: dict) -> None:
+
+def _css_to_tailwind(css: str) -> tuple[list[str], str]:
+    """Convert simple CSS declarations to Tailwind utility classes; return (classes, leftover_css)."""
+    parts, depth, cur = [], 0, ""
+    for ch in css:
+        depth += (ch == "(") - (ch == ")")
+        if ch == ";" and depth == 0:
+            parts.append(cur)
+            cur = ""
+        else:
+            cur += ch
+    parts.append(cur)
+    tw, rest = [], []
+    for part in parts:
+        prop, _, val = part.partition(":")
+        prop, val = prop.strip(), val.strip()
+        if not prop or not val:
+            continue
+        clean = re.sub(r"\s+", "_", val)
+        if prop == "font-weight" and val in _TW_WEIGHT:
+            tw.append(_TW_WEIGHT[val])
+        elif prop == "text-align" and val in ("left", "center", "right"):
+            tw.append(f"text-{val}")
+        elif prop == "position" and val in ("absolute", "fixed", "relative"):
+            tw.append(val)
+        elif prop == "background" and re.fullmatch(r"#[0-9a-fA-F]{3,8}|rgba\([^)]+\)|var\(--[^)]+\)", val):
+            tw.append(f"bg-[{clean}]")
+        elif prop in _TW_PROP and " " not in val:
+            tw.append(f"{_TW_PROP[prop]}-[{clean}]")
+        else:
+            rest.append(f"{prop}:{val}")
+    return tw, ";".join(rest)
+
+
+class _Jsx(HTMLParser):
+    """HTML (from the web export) -> JSX: className, style objects (or Tailwind classes), imported images."""
+
+    def __init__(self, images: dict, tailwind: bool = False) -> None:
         super().__init__(convert_charrefs=True)
         self.out: list[str] = []
         self.images = images
+        self.tailwind = tailwind
 
     def _attrs(self, tag: str, attrs: list) -> str:
         res = []
+        extra_tw: list[str] = []
+        cleaned = []
         for name, value in attrs:
+            if name == "style" and self.tailwind and value:
+                tw, rest = _css_to_tailwind(value)
+                extra_tw.extend(tw)
+                if rest:
+                    cleaned.append((name, rest))
+            else:
+                cleaned.append((name, value))
+        has_class = any(n == "class" for n, _ in cleaned)
+        for name, value in cleaned:
             if name == "data-gsvg":
                 res.append(f"dangerouslySetInnerHTML={{{{ __html: SVG_{value} }}}}")
             elif name == "style":
                 res.append(f"style={_style_object(value or '')}")
+            elif name == "class" and extra_tw:
+                base = (value or "").replace("el", "el absolute m-0") if self.tailwind else (value or "")
+                res.append(f"className={{{json.dumps((base + ' ' + ' '.join(extra_tw)).strip(), ensure_ascii=False)}}}")
             elif tag == "img" and name == "src" and value and value.startswith("assets/"):
                 var = self.images.setdefault(value, f"img{len(self.images)}")
                 res.append(f"src={{{var}}}")
+            elif tag == "input" and name == "value":
+                res.append(f"defaultValue={{{json.dumps(value, ensure_ascii=False)}}}")
             else:
                 key = _JSX_ATTR.get(name, name)
                 res.append(key if value is None else f"{key}={{{json.dumps(value, ensure_ascii=False)}}}")
+        if extra_tw and not has_class:
+            res.append(f"className={{{json.dumps(' '.join(extra_tw), ensure_ascii=False)}}}")
         return (" " + " ".join(res)) if res else ""
 
     def handle_starttag(self, tag, attrs):
@@ -898,7 +1131,7 @@ class _Jsx(HTMLParser):
             self.out.append('{" "}')
 
 
-def to_jsx(body: str) -> tuple[str, dict, list[str]]:
+def to_jsx(body: str, tailwind: bool = False) -> tuple[str, dict, list[str]]:
     """(jsx, {asset path: import name}, [svg markup]) for a page body."""
     svgs: list[str] = []
 
@@ -907,15 +1140,17 @@ def to_jsx(body: str) -> tuple[str, dict, list[str]]:
         return f'{m.group(1)} data-gsvg="{len(svgs) - 1}"></div>'
     body = re.sub(r'(<div class="el vec"[^>]*)>(<svg.*?</svg>)</div>', keep, body, flags=re.S)
     images: dict = {}
-    p = _Jsx(images)
+    p = _Jsx(images, tailwind=tailwind)
     p.feed(body)
     p.close()
     return "\n      ".join(p.out), images, svgs
 
 
 def build_react(store, canvases: list[dict], out: Path, language: str | None, include_background: bool,
-                image_scale: float) -> dict:
+                image_scale: float, css_mode: str = "css", typescript: bool = False) -> dict:
     report = build(store, canvases, out, "fit", language, include_background, image_scale)
+    tailwind = css_mode == "tailwind"
+    ext = "tsx" if typescript else "jsx"
     used: set[str] = set()
     components = []
     for c in canvases:
@@ -929,32 +1164,51 @@ def build_react(store, canvases: list[dict], out: Path, language: str | None, in
         cls = f"page-{_ident(c['id'])}"
         (out / f"{name}.css").write_text(part["fonts_css"] + f".{cls}{{{part['size']};{part['bg_css']}}}"
                                          + part["page_css"] + "\n", encoding="utf-8")
-        jsx, images, svgs = to_jsx(part["body"])
+        jsx, images, svgs = to_jsx(part["body"], tailwind=tailwind)
         lines = ["import { useEffect, useRef } from 'react';", "import './styles.css';", f"import './{name}.css';",
-                 "import { gameuiAttach } from './gameui-runtime.js';"]
+                 "import { gameuiAttach, gameuiApplyData } from './gameui-runtime.js';"]
         lines += [f"import {var} from './{path}';" for path, var in images.items()]
         lines += ["", f"const IX = {json.dumps(part['ix'], ensure_ascii=False)};"]
         lines += [f"const SVG_{i} = {json.dumps(s, ensure_ascii=False)};" for i, s in enumerate(svgs)]
-        lines += ["", f"export default function {name}({{ onNavigate }}) {{",
-                  "  const ref = useRef(null);",
+        page_cls = f"page relative overflow-hidden {cls}" if tailwind else f"page {cls}"
+        if typescript:
+            data_fields = "".join(f"  {k}?: any;\n" for k in (c.get("data") or {}).keys())
+            data_ty = f"{{\n{data_fields}  [key: string]: any;\n}}" if data_fields else "Record<string, any>"
+            lines += ["", f"export interface {name}Props {{",
+                      "  onNavigate?: (target: string, mode: string) => void;",
+                      "  onSfx?: (name: string) => void;",
+                      f"  data?: {data_ty};",
+                      "  className?: string;",
+                      "}", ""]
+            sig = f"export default function {name}({{ onNavigate, onSfx, data, className }}: {name}Props) {{"
+            ref_decl = "  const ref = useRef<HTMLElement | null>(null);"
+        else:
+            sig = f"export default function {name}({{ onNavigate, onSfx, data, className }}) {{"
+            ref_decl = "  const ref = useRef(null);"
+        lines += ["", sig, ref_decl,
                   "  useEffect(() => gameuiAttach(ref.current, IX, (href, mode, to) => {",
                   "    if (onNavigate) return onNavigate(to || href, mode);",
                   "    if (mode === 'url') window.open(href, '_blank', 'noopener');",
-                  "  }), [onNavigate]);",
+                  "  }, onSfx), [onNavigate, onSfx]);",
+                  "  useEffect(() => { if (ref.current && data) gameuiApplyData(ref.current, IX, data); }, [data]);",
                   "  return (",
-                  f'    <main ref={{ref}} className="page {cls}" data-w="{_n(part["W"])}" data-h="{_n(part["H"])}">',
+                  f'    <main ref={{ref}} className={{`{page_cls} ${{className || ""}}`.trim()}} data-w="{_n(part["W"])}" data-h="{_n(part["H"])}">',
                   f"      {jsx}",
                   "    </main>",
                   "  );",
                   "}", ""]
-        (out / f"{name}.jsx").write_text("\n".join(lines), encoding="utf-8")
+        (out / f"{name}.{ext}").write_text("\n".join(lines), encoding="utf-8")
         (out / part["file"]).unlink(missing_ok=True)
-        components.append(f"{name}.jsx")
+        components.append(f"{name}.{ext}")
     (out / "app.js").unlink(missing_ok=True)
     css = (out / "styles.css").read_text(encoding="utf-8")
     css = "\n".join(line for line in css.splitlines() if not line.startswith(("html,body", "body.fit", "@view-transition")))
     (out / "styles.css").write_text(css + "\n", encoding="utf-8")
-    (out / "gameui-runtime.js").write_text("export " + RUNTIME_JS, encoding="utf-8")
-    (out / "index.js").write_text("".join(f"export {{ default as {cmp[:-4]} }} from './{cmp}';\n" for cmp in components),
-                                  encoding="utf-8")
+    runtime_esm = RUNTIME_JS.replace("function gameuiApplyData", "export function gameuiApplyData").replace(
+        "function gameuiAttach", "export function gameuiAttach")
+    (out / "gameui-runtime.js").write_text(runtime_esm, encoding="utf-8")
+    idx_ext = "ts" if typescript else "js"
+    (out / f"index.{idx_ext}").write_text(
+        "".join(f"export {{ default as {Path(cmp).stem} }} from './{Path(cmp).stem}';\n" for cmp in components),
+        encoding="utf-8")
     return {"components": components, "picture": report["picture"], "notes": report["notes"]}

@@ -18,13 +18,18 @@ Fill: a color, or a gradient/pattern object:
   Gradients take "space":"oklab" for vivid, even blends between distant hues (default "srgb").
   A list of fills stacks them bottom to top (Figma fill stack): [gradient, {"type":"stripes",...}, "#fff@0.1"].
   Image fill also takes "zoom" (>= 1) and "focus" [fx, fy] to frame a photo inside any shape.
-Ready materials: style {"material": "gold"} or {"material": {"name": "wood", "color": "$primary", "scale": 1,
-  "seed": 2, "t": 0}} adds a procedural fill plus lighting; your own style keys override it. Names: bronze,
-  chrome, copper, fabric, gem, glass, gold, hologram, ice, iron, jelly, lava, leather, marble, neon, paper,
-  plastic, rubber, rust, silver, steel, stone, wood. Animate lava / jelly / hologram with "style.material.t".
-  From scratch: write a shader fill (guide("shader")), or save your own named materials with
-  set_theme(materials={"dark_oak": {"material": "wood", "color": "#4a2c18", "scale": 2},
-  "slime": {"fill": {"type": "shader", ...}, "light": {...}}}) and use them the same way.
+Ready materials (39 built-in, Cook-Torrance GGX PBR with perspective HDR studio IBL & ACES filmic tone mapping):
+  style {"material": "gold"} or {"material": {"name": "wood", "color": "$primary", "scale": 1, "seed": 2,
+  "t": 0, "shine": 0.5}} adds a procedural albedo+bump shader plus physical surface lighting; explicit style keys override it.
+  Metals: gold, silver, chrome, bronze, copper, steel, iron, radial_metal, hammered_gold, rust.
+  Stone & Gems: stone, runic_stone, marble, obsidian, jade, gem, ruby, emerald, lava, ice.
+  Organic & Craft: wood, leather, paper, aged_parchment, fabric, carbon_twill, wax_seal, enamel.
+  Modern & Sci-Fi: glass, liquid_glass, hologram, energy_shield, foil_holographic, neon, plastic,
+  candy_gloss, clay_3d, rubber, jelly.
+  Animate lava / jelly / hologram / runic_stone / energy_shield / foil_holographic with "style.material.t",
+  or sweep a highlight across any lit material with "style.material.shine" (0..1).
+  From scratch: write a shader fill (guide("shader")), pair with style.pbr or style.light, or save custom materials with
+  set_theme(materials={"dark_oak": {"material": "wood", "color": "#4a2c18", "scale": 2}, ...}).
 Images: add_image takes crop, cutout (removes a flat background), zoom / focus (pan and zoom), animated
   GIF / APNG / WebP or sheet {"cols", "rows", "count"} with frame (keyframe "frame" to play it). Images move
   with sub-pixel precision, so slow pans and slides stay smooth.
@@ -33,11 +38,13 @@ Images: add_image takes crop, cutout (removes a flat background), zoom / focus (
 Shader fill (a fill object):
   {"type":"shader","code":"...","params":{...}} - your own per-pixel formula when no preset fits (plasma,
     energy, hologram scanlines, marble, wood, rust, ripples, scales, cracks, warped patterns...). Write plain
-    statements that end by assigning r, g, b (0..1) and optionally a. Inputs: x, y (units from the box's
-    top-left), u, v (0..1 across the box), w, h (box size), px (pixels per unit), pi. Functions: sin cos tan
-    asin acos atan atan2 sqrt abs exp log pow floor ceil round fract mod min max sign clamp mix step
-    smoothstep length hypot where, noise(x,y[,seed]) (0..1 smooth), fbm(x,y,octaves[,seed]) (fractal),
-    voronoi(x,y[,seed]) (distance to nearest cell point), rand(x,y[,seed]). No if/loops: use where().
+    statements that end by assigning r, g, b (0..1), optionally a (alpha) and height (0..1 surface bump fed
+    into style.light for physically lit grain / cracks / pores). Inputs: x, y (units from box top-left),
+    u, v (0..1 across box), w, h (box size), px (pixels per unit), pi, d (signed distance inward from the
+    shape edge in units), edge (0 at border -> 1 inside). Functions: sin cos tan asin acos atan atan2 sqrt
+    abs exp log pow floor ceil round fract mod min max sign clamp mix step smoothstep length hypot where,
+    noise(x,y[,seed]), fbm(x,y,octaves[,seed]), ridged(x,y,octaves[,seed]), turbulence(x,y,octaves[,seed]),
+    voronoi(x,y[,seed]), rand(x,y[,seed]). No if/loops: use where(). Compiled to fused CUDA on GPU.
     params: numbers become names; colour strings ("$primary", "#ff8800") become name_r name_g name_b name_a.
     Animate any param with set_keyframes, property "style.fill.params.<name>" (e.g. a time param t).
     Example (energy core): {"type":"shader","params":{"c":"#38bdf8","t":0},"code":
@@ -52,8 +59,14 @@ Style object (every key optional; `style` may also be a theme style name, or {"u
     erase (cuts a hole through what is already on the same layer: windows, notches, cut-out lettering),
   shadow {color, blur, dx, dy, spread, knockout}, glow {color, blur, strength, spread},
   inner_shadow {color, blur, dx, dy}, inner_glow {color, blur}, bevel {size, highlight, shadow},
-  light {angle, altitude, size, depth, profile: round|chisel, highlight, shadow, gloss, soften} - lights the
-    shape as a raised 3D surface (angle = where the light comes from; 225 = top-left),
+  pbr {metallic, roughness, clearcoat, clearcoat_roughness, ior, anisotropy, brush_angle ("radial" or deg),
+    sss, emissive, wear, profile: round|chamfer|machined|dome|facet|engraved|flat, bevel_size, bevel_depth,
+    crown, bump_strength, ao, env, env_rotation, studio: bright|warm|dark|sunset|cyberpunk, env_map (path to
+    equirectangular .hdr/.png/.jpg panorama), exposure, angle, altitude, shine} - full linear-HDR
+    Cook-Torrance GGX PBR + perspective HDRI + ACES filmic tone mapping (also works on merged layers),
+  light {angle, altitude, size, depth, profile: round|chisel|machined|pillow|engraved, highlight, shadow,
+    gloss, env, env_rotation, anisotropy, brush_angle, fresnel, bump_strength, shine, soften} - stylized 2.5D
+    surface bevel lighting (angle = where the light comes from; 225 = top-left; shine = 0..1 sheen sweep),
   mask: a fill spec whose alpha fades the element out (e.g. a linear gradient from opaque to "#000@0");
     mask_mode "luminance" uses its brightness instead. An element's clip_mode "luminance" masks it by the
     brightness of the clip target instead of its shape.
@@ -152,16 +165,23 @@ property "motion" travels along a path: values 0..1, path {"d": "M 0 0 C ...", "
 export_animation motion_blur 4-8 averages sub-frames (camera shutter) for fast spins and swipes.
 Lottie: plain shapes and text become vector shape layers; effects move as pictures; animated glow /
 shape becomes one picture per frame (the result lists which).
-Interactions (a state machine): set_interaction(canvas, id, trigger, action) - triggers load, hover, leave,
-press, release, click, key:<Key>, end:<animation>; actions play / stop an animation, set / clear / toggle a
-canvas state, navigate / overlay / back / url, with an optional delay. They run in export_web and
-export_react and are listed in the json animation export for engine code.
+Interactions & Data Binding:
+  set_interaction(canvas, id, trigger, action, ..., sfx="ui_click") - triggers load, hover, leave, press,
+  release, click, key:<Key>, end:<animation>; actions play / stop / set_state / clear_state / toggle_state /
+  navigate / overlay / back / url. Runs in export_web / export_react (with arrow-key & Gamepad API focus
+  navigation) and generates controller code in export_screen (Unity, Godot, Roblox).
+  set_binding(canvas, data={"hp": 75, "max_hp": 100}, target="hp_bar", property="width",
+  expr="clamp(hp / max_hp, 0, 1) * 240") - reactive variables & expressions for bars, colours, visibility and
+  {placeholders}; test live with preview(canvas, data={"hp": 15}); exported to Web, React props & engines.
+  live_preview("start") launches a local browser studio (127.0.0.1 SSE) that auto-reloads on every edit.
 export_animation "mp4" / "webm" writes video (needs ffmpeg); repeat plays a loop several times.
 """,
     "export": """\
 Which export to use:
   export_asset   one engine-ready sprite (engine: unity | unreal | roblox | godot | generic) with 9-slice
                  borders (nine_slice: "auto") and a .gameui.json; write_engine_helpers adds the importer.
+  export_pbr_maps  real-time engine PBR texture map set (beauty, albedo, tangent normal OpenGL/DirectX,
+                 roughness, metallic, ao, height, packed ORM, emissive) + Godot 4 CanvasTexture .tres.
   export_png     PNG / WebP / JPG / ICO at scales [1, 2], exact sizes, or preset "ios" | "android" | "web"
                  for whole density sets; trim, ids / group, state, language.
   export_svg     editable vector SVG for Figma, Penpot, Illustrator, web; image_scale for embedded pictures.
@@ -170,13 +190,29 @@ Which export to use:
                  CSS animations, smart-animate page transitions; layout "fit" or "responsive" (pins).
   export_layers  one image per layer or group (+ layout JSON with positions and pivots); format png | webp |
                  jpg | svg (one layered SVG). For engine-animated parts (needles, fills, glows).
-  export_react   React components (JSX + CSS + runtime) with the same rendering and interactions as export_web.
-  export_psd     layered Photoshop file (opens in Photopea, Krita, GIMP).
-  export_atlas   many canvases packed into one texture + frame JSON.
-  export_animation  sprite sheet, frames, GIF / APNG / WebP, Lottie JSON (apps, web, Lottie players), or
-                 keyframe JSON for engine tweens.
-  export_screen  a whole screen as an engine scene: Godot .tscn, Roblox LocalScript, Unity UXML + USS;
-                 texts stay live engine text, pins become anchors.
+  export_react   React components (JSX or TypeScript TSX via typescript=true; css="css" | "tailwind") with
+                 data props, onNavigate, onSfx & gamepad navigation.
+  export_psd     layered Photoshop file with PackBits RLE compression (opens in Photopea, Krita, GIMP).
+  export_atlas   many canvases packed into one texture + metadata (format: json | texturepacker | godot | unity | css).
+  export_animation  sprite sheet, frames, GIF / APNG / WebP, Lottie JSON, dotLottie v2 (.lottie with
+                 manifest version "2", a/<id>.json animations & s/<id>.json interactive State Machine;
+                 pass animation="all" to bundle all animations), MP4 / WebM video, or engine tween JSON.
+  export_screen  a whole screen with native text, Input and Scroll widgets:
+                 Game engines: "godot" (.tscn + _controller.gd), "roblox" (LocalScript), "unity" (UXML + USS
+                 + Controller.cs), "unity-ugui" (C# Canvas/InputField/ScrollRect builder).
+                 C# / .NET & C++ desktop: "wpf" (.xaml + .xaml.cs + ViewModel), "avalonia" (.axaml), "winui"
+                 (WinUI 3 .xaml), "qt-qml" (C++ Qt 6 .qml), "imgui" (C++17 Dear ImGui _ui.hpp).
+  add_frame      parametric AAA frame builder (9 presets: rpg_gold, royal_ornate, fantasy_parchment,
+                 scifi_hud, cyber_tech, glass_card, medieval_iron, luxury_minimal, cartoon_thick) returning
+                 editable vector ids + safe inner_box.
+  add_input / add_scroll  first-class native text input & scrollable list widgets rendered on canvas and
+                 exported natively to Web/React, Godot, Unity, Roblox, WPF, Avalonia, WinUI, Qt QML & ImGui.
+  import_screenshot  OpenCV screenshot analyzer reconstructing an editable canvas + theme palette tokens.
+  set_theme(quality=..., style_preset=..., environment=...):
+                 quality: "simple" | "standard" | "advanced" | "aaa" (modulates SS, PBR shading, noise & frame detail).
+                 style_preset: "kids" | "cartoon" | "stylized" | "minimal" | "web_saas" | "scifi" |
+                 "dark_fantasy" | "realistic" | "photorealistic" (seeds matching palette, styles, frame & studio).
+                 environment: custom Radiance .hdr & OpenEXR .exr IBL maps for the workspace or canvas.
   make_variations  2-8 alternative directions of a canvas (palette, shape, type) + a comparison sheet.
   export_theme("design.md") / set_theme(tokens="DESIGN.md"): DESIGN.md for AI design and coding agents.
   export_spec / export_theme / export_prototype / export_bitmap_font: developer spec, design tokens
