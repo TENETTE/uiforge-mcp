@@ -1,5 +1,6 @@
 """Pixel effects that need more precision than 8-bit filters: float blur, round dilation,
-surface lighting (emboss), color adjustment, procedural noise and OKLab conversion."""
+2D jump-flood SDF, 2.5D PBR-lite surface lighting (emboss with bump / studio env / anisotropy / fresnel /
+shine), color adjustment, procedural noise, OKLab conversion and refracting liquid glass."""
 
 from __future__ import annotations
 
@@ -11,6 +12,10 @@ from PIL import Image
 from . import gpu
 from .colors import parse_color
 
+try:
+    import cv2
+except ImportError:
+    cv2 = None
 
 
 def _box(a, r: int, axis: int):
@@ -38,10 +43,34 @@ def blur_float(a: np.ndarray, radius: float, passes: int = 3) -> np.ndarray:
         sigma = radius / 2.0
         r = max(1, int(round((math.sqrt(12 * sigma * sigma / passes + 1) - 1) / 2)))
     xp = gpu.module_for(a.size)
-    out = xp.asarray(a, dtype=xp.float64)
-    for _ in range(passes):
-        out = _box(_box(out, r, 0), r, 1)
-    return gpu.to_numpy(out)
+
+    def _run():
+        out = xp.asarray(a, dtype=xp.float64)
+        for _ in range(passes):
+            out = _box(_box(out, r, 0), r, 1)
+        return gpu.to_numpy(out)
+
+    if xp is not np:
+        with gpu.gpu_lock():
+            return _run()
+    return _run()
+
+
+_DISC_CACHE: dict[int, np.ndarray] = {}
+
+
+def _disc_kernel(radius: float) -> np.ndarray:
+    """Exact Euclidean circular structuring element for OpenCV morphological ops."""
+    key = int(round(radius * 100))
+    k = _DISC_CACHE.get(key)
+    if k is None:
+        big = int(math.ceil(radius))
+        ys, xs = np.ogrid[-big:big + 1, -big:big + 1]
+        k = ((xs * xs + ys * ys) <= radius * radius + 1e-9).astype(np.uint8)
+        if len(_DISC_CACHE) > 256:
+            _DISC_CACHE.clear()
+        _DISC_CACHE[key] = k
+    return k
 
 
 def dilate(alpha: np.ndarray, radius: float) -> np.ndarray:
@@ -49,6 +78,9 @@ def dilate(alpha: np.ndarray, radius: float) -> np.ndarray:
     if radius <= 0:
         return alpha
     big = int(math.ceil(radius))
+    if cv2 is not None and big <= 128:
+        return cv2.dilate(np.ascontiguousarray(alpha, dtype=np.uint8), _disc_kernel(radius),
+                          borderType=cv2.BORDER_CONSTANT, borderValue=0)
     h, w = alpha.shape
     levels = max(1, int(math.floor(math.log2(2 * big + 1))) + 1)
     padded = np.pad(alpha, ((0, 0), (big, big + (1 << levels))))
@@ -79,6 +111,10 @@ def dilate(alpha: np.ndarray, radius: float) -> np.ndarray:
 def erode(alpha: np.ndarray, radius: float) -> np.ndarray:
     if radius <= 0:
         return alpha
+    big = int(math.ceil(radius))
+    if cv2 is not None and big <= 128:
+        return cv2.erode(np.ascontiguousarray(alpha, dtype=np.uint8), _disc_kernel(radius),
+                         borderType=cv2.BORDER_CONSTANT, borderValue=0)
     return 255 - dilate(255 - alpha, radius)
 
 
@@ -87,10 +123,89 @@ def grow(alpha: np.ndarray, distance: float) -> np.ndarray:
     return dilate(alpha, distance) if distance > 0 else erode(alpha, -distance) if distance < 0 else alpha
 
 
+def distance_field(alpha: Image.Image | np.ndarray, k: float = 1.0, max_radius_px: int | None = None) -> np.ndarray:
+    """Interior Euclidean distance from the shape edge in canvas units (float32, 0 outside, >0 inside).
 
-def emboss(alpha: Image.Image, spec: dict, colors: dict, k: float) -> Image.Image:
-    """Light a shape as if it were raised: the alpha edge becomes a bevel whose slopes catch light
-    from ``angle``. Returns an RGBA overlay (highlights and shadows) limited to the shape."""
+    Uses OpenCV SIMD C++ exact L2 distance transform when installed (~1 ms at 512x512), falling back to
+    vectorized numpy Jump Flooding.
+    """
+    arr = np.asarray(alpha, dtype=np.uint8)
+    h, w = arr.shape[:2]
+    inside = arr >= 128
+    if not inside.any():
+        return np.zeros((h, w), dtype=np.float32)
+    if cv2 is not None:
+        padded = np.pad(inside.astype(np.uint8), 1, constant_values=0)
+        dist_px = cv2.distanceTransform(padded, cv2.DIST_L2, cv2.DIST_MASK_PRECISE)[1:-1, 1:-1]
+        frac = np.clip(arr.astype(np.float32) / np.float32(255.0) - np.float32(0.5), np.float32(-0.5), np.float32(0.5))
+        dist_px = np.maximum(np.float32(0.0), dist_px + frac)
+        return (dist_px / np.float32(max(1e-6, k))).astype(np.float32)
+    padded = np.pad(inside, 1, constant_values=False)
+    outside = ~padded
+    ys = np.arange(h + 2, dtype=np.float32)[:, None]
+    xs = np.arange(w + 2, dtype=np.float32)[None, :]
+    inf = np.float32(1e6)
+    nx = np.where(outside, np.broadcast_to(xs, (h + 2, w + 2)), inf).astype(np.float32)
+    ny = np.where(outside, np.broadcast_to(ys, (h + 2, w + 2)), inf).astype(np.float32)
+    best_d2 = np.where(outside, np.float32(0.0), np.float32(1e12)).astype(np.float32)
+
+    cap = max_radius_px if max_radius_px is not None else max(h, w)
+    step = 1
+    while step * 2 < cap:
+        step *= 2
+    while step >= 1:
+        for dy in (-step, 0, step):
+            if abs(dy) >= h + 2:
+                continue
+            y_src = slice(max(0, -dy), h + 2 - max(0, dy))
+            y_dst = slice(max(0, dy), h + 2 - max(0, -dy))
+            for dx in (-step, 0, step):
+                if (dx == 0 and dy == 0) or abs(dx) >= w + 2:
+                    continue
+                x_src = slice(max(0, -dx), w + 2 - max(0, dx))
+                x_dst = slice(max(0, dx), w + 2 - max(0, -dx))
+                cx = nx[y_src, x_src]
+                cy = ny[y_src, x_src]
+                ddx = xs[:, x_dst] - cx
+                ddy = ys[y_dst, :] - cy
+                d2 = ddx * ddx + ddy * ddy
+                cur = best_d2[y_dst, x_dst]
+                better = d2 < cur
+                if better.any():
+                    cur[better] = d2[better]
+                    nx[y_dst, x_dst][better] = cx[better]
+                    ny[y_dst, x_dst][better] = cy[better]
+        step //= 2
+    dist_px = np.sqrt(best_d2[1:-1, 1:-1])
+    frac = np.clip(arr.astype(np.float32) / np.float32(255.0) - np.float32(0.5), np.float32(-0.5), np.float32(0.5))
+    dist_px = np.maximum(np.float32(0.0), dist_px + frac)
+    return (dist_px / np.float32(max(1e-6, k))).astype(np.float32)
+
+
+def _studio_env(rx: np.ndarray, ry: np.ndarray, rz: np.ndarray, env_rot: float) -> tuple[np.ndarray, np.ndarray]:
+    """Analytic studio lighting dome: returns (bright softboxes 0..1, dark horizon band 0..1)."""
+    ca, sa = math.cos(env_rot), math.sin(env_rot)
+    rrx = rx * np.float32(ca) - ry * np.float32(sa)
+    rry = rx * np.float32(sa) + ry * np.float32(ca)
+    softbox_top = np.exp(-((rrx + np.float32(0.35)) ** 2 * np.float32(4.5)
+                           + (rry + np.float32(0.45)) ** 2 * np.float32(7.0)))
+    rim_strip = np.exp(-((rrx - np.float32(0.55)) ** 2 * np.float32(10.0)
+                         + (rry - np.float32(0.2)) ** 2 * np.float32(2.5))) * np.float32(0.7)
+    horizon_hi = np.exp(-((rry + np.float32(0.06)) * np.float32(6.0)) ** 2) * np.float32(0.45)
+    horizon_lo = np.exp(-((rry - np.float32(0.28)) * np.float32(4.0)) ** 2) * np.float32(0.65)
+    bright = np.clip(softbox_top + rim_strip + horizon_hi, np.float32(0.0), np.float32(1.0))
+    dark = np.clip(horizon_lo * (np.float32(1.0) - softbox_top), np.float32(0.0), np.float32(1.0))
+    return bright, dark
+
+
+def emboss(alpha: Image.Image, spec: dict, colors: dict, k: float,
+           bump: np.ndarray | None = None, sdf: np.ndarray | None = None) -> Image.Image:
+    """Light a shape as a 2.5D PBR-lite surface.
+
+    Supports bevel profiles (round, chisel, machined, pillow, engraved), optional shader bump height,
+    studio softbox reflections (env / metallic), anisotropic brushed specular (anisotropy / brush_angle),
+    Schlick Fresnel rim highlights (fresnel) and animated diagonal shine sweeps (shine).
+    """
     if not isinstance(spec, dict):
         spec = {}
     size = max(0.5, float(spec.get("size", 6))) * k
@@ -98,47 +213,127 @@ def emboss(alpha: Image.Image, spec: dict, colors: dict, k: float) -> Image.Imag
     angle = math.radians(float(spec.get("angle", 225)))
     altitude = math.radians(max(5.0, min(85.0, float(spec.get("altitude", 40)))))
     profile = str(spec.get("profile", "round")).lower()
-    if profile not in ("round", "chisel"):
-        raise ValueError("light.profile must be 'round' or 'chisel'")
+    if profile not in ("round", "chisel", "machined", "pillow", "engraved"):
+        raise ValueError("light.profile must be 'round', 'chisel', 'machined', 'pillow' or 'engraved'")
     hi_color = parse_color(spec.get("highlight", "#ffffff@0.7"), colors)
     sh_color = parse_color(spec.get("shadow", "#000000@0.6"), colors)
     gloss = max(0.0, float(spec.get("gloss", 0)))
     gloss_power = max(1.0, float(spec.get("gloss_size", 0.25)) ** -1 * 8)
+    env_amt = max(0.0, float(spec.get("env", 0) or 0))
+    env_rot = math.radians(float(spec.get("env_rotation", 0) or 0))
+    aniso = max(0.0, min(0.95, float(spec.get("anisotropy", 0) or 0)))
+    brush_ang = math.radians(float(spec.get("brush_angle", 0) or 0))
+    fresnel_amt = max(0.0, float(spec.get("fresnel", 0) or 0))
+    bump_strength = float(spec.get("bump_strength", 0.45 if bump is not None else 0.0))
+    shine_pos = spec.get("shine")
 
-    a = np.asarray(alpha, dtype=np.float64) / 255.0
-    pad = int(math.ceil(size)) + 2
-    ap = np.pad(a, pad)
-    height = blur_float(ap, size, 1 if profile == "chisel" else 3)
-    height = np.clip((height - 0.5) * 2.0, 0.0, 1.0)
-    soften = float(spec.get("soften", 0)) * k
-    if soften > 0:
-        height = blur_float(height, soften, 3)
-    gy, gx = np.gradient(height)
-    slope = size * depth * (1.0 if profile == "chisel" else 1.6)
-    nx, ny = -gx * slope, -gy * slope
-    norm = np.sqrt(nx * nx + ny * ny + 1.0)
-    nx, ny, nz = nx / norm, ny / norm, 1.0 / norm
-    lx, ly, lz = math.cos(angle) * math.cos(altitude), math.sin(angle) * math.cos(altitude), math.sin(altitude)
+    a = np.asarray(alpha, dtype=np.float32) / np.float32(255.0)
+    h_img, w_img = a.shape
+    if profile in ("machined", "pillow", "engraved"):
+        d_u = sdf if sdf is not None and sdf.shape == a.shape else distance_field(alpha, k)
+        bw = max(0.5, float(spec.get("size", 6)))
+        u = np.clip(d_u / np.float32(bw), np.float32(0.0), np.float32(1.0))
+        if profile == "machined":
+            outer = np.clip(u / np.float32(0.28), np.float32(0.0), np.float32(1.0))
+            mid = np.clip((u - np.float32(0.28)) / np.float32(0.44), np.float32(0.0), np.float32(1.0))
+            inner = np.clip((u - np.float32(0.72)) / np.float32(0.28), np.float32(0.0), np.float32(1.0))
+            height = np.float32(0.55) * np.sqrt(np.maximum(np.float32(0.0), outer * (np.float32(2.0) - outer))) \
+                + np.float32(0.25) * mid + np.float32(0.20) * inner * inner * (np.float32(3.0) - np.float32(2.0) * inner)
+        elif profile == "pillow":
+            p_max = max(bw, float(d_u.max()) if d_u.size else bw)
+            pu = np.clip(d_u / np.float32(max(1.0, p_max)), np.float32(0.0), np.float32(1.0))
+            height = np.sqrt(np.maximum(np.float32(0.0), pu * (np.float32(2.0) - pu)))
+            height = blur_float(height, max(4.0 * k, size * 0.65), 3).astype(np.float32)
+        else:
+            height = np.float32(1.0) - np.sqrt(np.maximum(np.float32(0.0), u * (np.float32(2.0) - u)))
+        soften = float(spec.get("soften", 0.8)) * k
+        if soften > 0 and profile != "pillow":
+            height = blur_float(height, soften, 2).astype(np.float32)
+        gy, gx = np.gradient(height)
+        slope = np.float32(size * depth * (1.3 if profile == "machined" else 1.5))
+    else:
+        pad = int(math.ceil(size)) + 2
+        ap = np.pad(a, pad)
+        height = blur_float(ap, size, 1 if profile == "chisel" else 3).astype(np.float32)
+        height = np.clip((height - np.float32(0.5)) * np.float32(2.0), np.float32(0.0), np.float32(1.0))
+        soften = float(spec.get("soften", 0)) * k
+        if soften > 0:
+            height = blur_float(height, soften, 3).astype(np.float32)
+        gy_full, gx_full = np.gradient(height)
+        crop = (slice(pad, pad + h_img), slice(pad, pad + w_img))
+        gx, gy = gx_full[crop], gy_full[crop]
+        slope = np.float32(size * depth * (1.0 if profile == "chisel" else 1.6))
+
+    nx = -gx * slope
+    ny = -gy * slope
+    if bump is not None and bump_strength > 0 and bump.shape == a.shape:
+        bgy, bgx = np.gradient(bump.astype(np.float32))
+        bs = np.float32(bump_strength * 3.5 * k)
+        nx = nx - bgx * bs
+        ny = ny - bgy * bs
+    norm = np.sqrt(nx * nx + ny * ny + np.float32(1.0))
+    nx, ny, nz = nx / norm, ny / norm, np.float32(1.0) / norm
+
+    lx = np.float32(math.cos(angle) * math.cos(altitude))
+    ly = np.float32(math.sin(angle) * math.cos(altitude))
+    lz = np.float32(math.sin(altitude))
     lit = nx * lx + ny * ly + nz * lz
-    hi = np.clip((lit - lz) / max(1e-6, 1.0 - lz), 0.0, 1.0)
-    sh = np.clip((lz - lit) / max(1e-6, lz), 0.0, 1.0)
-    if gloss > 0:
-        hx, hy, hz = lx, ly, lz + 1.0
-        hn = math.sqrt(hx * hx + hy * hy + hz * hz)
-        hx, hy, hz = hx / hn, hy / hn, hz / hn
-        spec_term = np.clip(nx * hx + ny * hy + nz * hz, 0.0, 1.0) ** gloss_power - hz ** gloss_power
-        hi = np.clip(hi + np.clip(spec_term, 0.0, 1.0) * gloss * 2.0, 0.0, 1.0)
-    crop = (slice(pad, pad + a.shape[0]), slice(pad, pad + a.shape[1]))
-    ha = hi[crop] * (hi_color[3] / 255.0) * a
-    sa = sh[crop] * (sh_color[3] / 255.0) * a
-    total = ha + sa
-    safe = np.where(total > 0, total, 1.0)
-    out = np.empty(a.shape + (4,), dtype=np.float64)
-    for c in range(3):
-        out[..., c] = (hi_color[c] * ha + sh_color[c] * sa) / safe
-    out[..., 3] = np.clip(total, 0.0, 1.0) * 255.0
-    return Image.fromarray(np.clip(out + 0.5, 0, 255).astype(np.uint8), "RGBA")
+    hi = np.clip((lit - lz) / np.float32(max(1e-6, 1.0 - float(lz))), np.float32(0.0), np.float32(1.0))
+    sh = np.clip((lz - lit) / np.float32(max(1e-6, float(lz))), np.float32(0.0), np.float32(1.0))
 
+    if gloss > 0:
+        hx, hy, hz = float(lx), float(ly), float(lz) + 1.0
+        hn = math.sqrt(hx * hx + hy * hy + hz * hz)
+        hx, hy, hz = np.float32(hx / hn), np.float32(hy / hn), np.float32(hz / hn)
+        ndh = np.clip(nx * hx + ny * hy + nz * hz, np.float32(0.0), np.float32(1.0))
+        if aniso > 0:
+            tx, ty = np.float32(math.cos(brush_ang)), np.float32(math.sin(brush_ang))
+            bx_, by_ = -ty, tx
+            ht = (hx - nx * ndh) * tx + (hy - ny * ndh) * ty
+            hb = (hx - nx * ndh) * bx_ + (hy - ny * ndh) * by_
+            ax = np.float32(0.18 * (1.0 - aniso * 0.82))
+            ay = np.float32(0.18 * (1.0 + aniso * 3.2))
+            aniso_spec = np.exp(-((ht / ax) ** 2 + (hb / ay) ** 2)) * np.power(ndh, np.float32(2.0))
+            base_val = math.exp(-(((float(hx) * float(tx) + float(hy) * float(ty)) / float(ax)) ** 2
+                                  + ((float(hx) * float(bx_) + float(hy) * float(by_)) / float(ay)) ** 2)) * (float(hz) ** 2)
+            hi = np.clip(hi + np.clip(aniso_spec - np.float32(base_val * 0.5), np.float32(0.0), np.float32(1.0))
+                         * np.float32(gloss * 1.4), np.float32(0.0), np.float32(1.0))
+        else:
+            spec_core = np.power(ndh, np.float32(gloss_power)) - np.float32(float(hz) ** gloss_power)
+            spec_halo = np.power(ndh, np.float32(max(2.0, gloss_power * 0.25))) - np.float32(float(hz) ** max(2.0, gloss_power * 0.25))
+            spec_term = np.clip(spec_core, np.float32(0.0), np.float32(1.0)) * np.float32(1.8) \
+                + np.clip(spec_halo, np.float32(0.0), np.float32(1.0)) * np.float32(0.45)
+            hi = np.clip(hi + spec_term * np.float32(gloss), np.float32(0.0), np.float32(1.0))
+
+    if env_amt > 0:
+        rx = np.float32(2.0) * nz * nx
+        ry = np.float32(2.0) * nz * ny
+        rz = np.float32(2.0) * nz * nz - np.float32(1.0)
+        eb, ed = _studio_env(rx, ry, rz, env_rot)
+        hi = np.clip(hi + eb * np.float32(env_amt * 0.85), np.float32(0.0), np.float32(1.0))
+        sh = np.clip(sh + ed * np.float32(env_amt * 0.55), np.float32(0.0), np.float32(1.0))
+
+    if fresnel_amt > 0:
+        grazing = np.power(np.clip(np.float32(1.0) - nz, np.float32(0.0), np.float32(1.0)), np.float32(2.2))
+        hi = np.clip(hi + grazing * np.float32(fresnel_amt * 1.35), np.float32(0.0), np.float32(1.0))
+
+    if shine_pos is not None:
+        s_val = float(shine_pos)
+        ys_n = np.linspace(0.0, 1.0, h_img, dtype=np.float32)[:, None]
+        xs_n = np.linspace(0.0, 1.0, w_img, dtype=np.float32)[None, :]
+        diag = (xs_n * np.float32(0.75) + ys_n * np.float32(0.25)) - np.float32(s_val * 1.4 - 0.2)
+        sweep = np.exp(-((diag / np.float32(0.09)) ** 2)) * np.float32(0.85)
+        hi = np.clip(hi + sweep, np.float32(0.0), np.float32(1.0))
+
+    ha = hi * np.float32(hi_color[3] / 255.0) * a
+    sa = sh * np.float32(sh_color[3] / 255.0) * a
+    total = ha + sa
+    safe = np.where(total > np.float32(0.0), total, np.float32(1.0))
+    out = np.empty(a.shape + (4,), dtype=np.float32)
+    for c in range(3):
+        out[..., c] = (np.float32(hi_color[c]) * ha + np.float32(sh_color[c]) * sa) / safe
+    out[..., 3] = np.clip(total, np.float32(0.0), np.float32(1.0)) * np.float32(255.0)
+    return Image.fromarray(np.clip(out + np.float32(0.5), 0, 255).astype(np.uint8), "RGBA")
 
 
 def adjust(img: Image.Image, spec: dict, colors: dict) -> Image.Image:
@@ -146,7 +341,7 @@ def adjust(img: Image.Image, spec: dict, colors: dict) -> Image.Image:
     tint (color; its alpha is the amount), invert."""
     if not isinstance(spec, dict):
         raise ValueError("adjust must be an object like {brightness, contrast, saturation, hue, tint}")
-    arr = np.asarray(img, dtype=np.float64).copy()
+    arr = np.asarray(img, dtype=np.float32).copy()
     rgb = arr[..., :3]
     hue = float(spec.get("hue", 0) or 0)
     if hue:
@@ -154,63 +349,66 @@ def adjust(img: Image.Image, spec: dict, colors: dict) -> Image.Image:
         c, s = math.cos(t), math.sin(t)
         m = np.array([[0.299 + 0.701 * c + 0.168 * s, 0.587 - 0.587 * c + 0.330 * s, 0.114 - 0.114 * c - 0.497 * s],
                       [0.299 - 0.299 * c - 0.328 * s, 0.587 + 0.413 * c + 0.035 * s, 0.114 - 0.114 * c + 0.292 * s],
-                      [0.299 - 0.300 * c + 1.250 * s, 0.587 - 0.588 * c - 1.050 * s, 0.114 + 0.886 * c - 0.203 * s]])
+                      [0.299 - 0.300 * c + 1.250 * s, 0.587 - 0.588 * c - 1.050 * s, 0.114 + 0.886 * c - 0.203 * s]],
+                     dtype=np.float32)
         rgb = rgb @ m.T
     sat = float(spec.get("saturation", 0) or 0)
     if sat:
-        lum = (0.2126 * rgb[..., 0] + 0.7152 * rgb[..., 1] + 0.0722 * rgb[..., 2])[..., None]
-        rgb = lum + (rgb - lum) * max(0.0, 1.0 + sat)
+        lum = (np.float32(0.2126) * rgb[..., 0] + np.float32(0.7152) * rgb[..., 1] + np.float32(0.0722) * rgb[..., 2])[..., None]
+        rgb = lum + (rgb - lum) * np.float32(max(0.0, 1.0 + sat))
     bright = float(spec.get("brightness", 0) or 0)
     if bright:
-        rgb = rgb + bright * 255.0
+        rgb = rgb + np.float32(bright * 255.0)
     contrast = float(spec.get("contrast", 0) or 0)
     if contrast:
-        rgb = (rgb - 127.5) * max(0.0, 1.0 + contrast) + 127.5
+        rgb = (rgb - np.float32(127.5)) * np.float32(max(0.0, 1.0 + contrast)) + np.float32(127.5)
     exposure = float(spec.get("exposure", 0) or 0)
     if exposure:
-        rgb = rgb * (2.0 ** exposure)
+        rgb = rgb * np.float32(2.0 ** exposure)
     temp = float(spec.get("temperature", 0) or 0)
     if temp:
-        rgb = rgb + np.array([1.0, 0.25, -1.0]) * temp * 40.0
+        rgb = rgb + np.array([1.0, 0.25, -1.0], dtype=np.float32) * np.float32(temp * 40.0)
     shadows = float(spec.get("shadows", 0) or 0)
     highlights = float(spec.get("highlights", 0) or 0)
     if shadows or highlights:
-        lum = np.clip((0.2126 * rgb[..., 0] + 0.7152 * rgb[..., 1] + 0.0722 * rgb[..., 2]) / 255.0, 0, 1)[..., None]
-        rgb = rgb + shadows * 110.0 * (1 - lum) ** 2 + highlights * 110.0 * lum ** 2
+        lum = np.clip((np.float32(0.2126) * rgb[..., 0] + np.float32(0.7152) * rgb[..., 1]
+                       + np.float32(0.0722) * rgb[..., 2]) / np.float32(255.0), 0, 1)[..., None]
+        rgb = rgb + np.float32(shadows * 110.0) * (np.float32(1.0) - lum) ** 2 + np.float32(highlights * 110.0) * lum ** 2
     if spec.get("invert"):
-        rgb = 255.0 - rgb
+        rgb = np.float32(255.0) - rgb
     if spec.get("tint"):
         r, g, b, a = parse_color(spec["tint"], colors)
-        amount = a / 255.0
-        rgb = rgb * (1 - amount) + np.array([r, g, b], dtype=np.float64) * amount
+        amount = np.float32(a / 255.0)
+        rgb = rgb * (np.float32(1.0) - amount) + np.array([r, g, b], dtype=np.float32) * amount
     arr[..., :3] = np.clip(rgb, 0, 255)
-    return Image.fromarray((arr + 0.5).astype(np.uint8), "RGBA")
-
+    return Image.fromarray((arr + np.float32(0.5)).astype(np.uint8), "RGBA")
 
 
 def _lattice(ix: np.ndarray, iy: np.ndarray, seed: float) -> np.ndarray:
-    v = np.sin(ix * 127.1 + iy * 311.7 + seed * 74.7) * 43758.5453123
+    v = np.sin(ix * np.float32(127.1) + iy * np.float32(311.7) + np.float32(seed * 74.7)) * np.float32(43758.5453)
     return v - np.floor(v)
 
 
 def fractal_noise(ux: np.ndarray, uy: np.ndarray, scale: float, octaves: int, seed: float) -> np.ndarray:
     """Smooth cloud-like noise in 0..1 at coordinates (ux, uy); ``scale`` is the size of the largest blobs."""
-    total = np.zeros(ux.shape, dtype=np.float64)
-    weight, amp, cell = 0.0, 1.0, max(0.5, scale)
+    ux, uy = ux.astype(np.float32, copy=False), uy.astype(np.float32, copy=False)
+    total = np.zeros(np.broadcast_shapes(ux.shape, uy.shape), dtype=np.float32)
+    weight, amp, cell = np.float32(0.0), np.float32(1.0), np.float32(max(0.5, scale))
     for o in range(max(1, min(8, int(octaves)))):
         x, y = ux / cell, uy / cell
         x0, y0 = np.floor(x), np.floor(y)
         tx, ty = x - x0, y - y0
-        tx, ty = tx * tx * (3 - 2 * tx), ty * ty * (3 - 2 * ty)
+        tx = tx * tx * (np.float32(3.0) - np.float32(2.0) * tx)
+        ty = ty * ty * (np.float32(3.0) - np.float32(2.0) * ty)
         s = seed + o * 17.0
-        top = _lattice(x0, y0, s) * (1 - tx) + _lattice(x0 + 1, y0, s) * tx
-        bottom = _lattice(x0, y0 + 1, s) * (1 - tx) + _lattice(x0 + 1, y0 + 1, s) * tx
-        total += (top * (1 - ty) + bottom * ty) * amp
-        weight += amp
-        amp *= 0.5
-        cell /= 2.0
+        one = np.float32(1.0)
+        top = _lattice(x0, y0, s) * (one - tx) + _lattice(x0 + one, y0, s) * tx
+        bottom = _lattice(x0, y0 + one, s) * (one - tx) + _lattice(x0 + one, y0 + one, s) * tx
+        total += (top * (one - ty) + bottom * ty) * amp
+        weight = np.float32(weight + amp)
+        amp = np.float32(amp * 0.5)
+        cell = np.float32(cell / 2.0)
     return total / weight
-
 
 
 def _to_linear(c: np.ndarray) -> np.ndarray:
@@ -254,7 +452,6 @@ def decode_space(values: np.ndarray, space: str) -> np.ndarray:
     return _from_linear((lms ** 3) @ _M1_INV.T)
 
 
-
 def blur_amount(spec) -> tuple[float, dict | None]:
     """(largest radius, progressive spec or None) of a style.blur / backdrop_blur value."""
     if isinstance(spec, dict):
@@ -268,46 +465,58 @@ def progressive_t(size: tuple[int, int], spec: dict, box_px) -> np.ndarray:
     x0, y0, x1, y1 = box_px
     bw, bh = max(1e-6, x1 - x0), max(1e-6, y1 - y0)
     ang = math.radians(float(spec.get("angle", 90)))
-    ca, sa = math.cos(ang), math.sin(ang)
-    ys, xs = np.mgrid[0:h, 0:w].astype(np.float64)
-    proj = ((xs + 0.5 - (x0 + x1) / 2) * ca + (ys + 0.5 - (y0 + y1) / 2) * sa) / (abs(bw * ca) + abs(bh * sa)) + 0.5
+    ca, sa = np.float32(math.cos(ang)), np.float32(math.sin(ang))
+    xs = np.arange(w, dtype=np.float32)[None, :] + np.float32(0.5)
+    ys = np.arange(h, dtype=np.float32)[:, None] + np.float32(0.5)
+    proj = ((xs - np.float32((x0 + x1) / 2)) * ca + (ys - np.float32((y0 + y1) / 2)) * sa) \
+        / np.float32(abs(bw * float(ca)) + abs(bh * float(sa))) + np.float32(0.5)
     start, end = float(spec.get("start", 0)), float(spec.get("end", 1))
     if abs(end - start) < 1e-6:
         end = start + 1e-6
-    return np.clip((proj - start) / (end - start), 0, 1)
+    return np.clip((proj - np.float32(start)) / np.float32(end - start), np.float32(0.0), np.float32(1.0))
 
 
 def blur_image(img: Image.Image, radius_px: float, t: np.ndarray | None = None) -> Image.Image:
-    """Gaussian blur in premultiplied space; with ``t`` the radius varies per pixel (progressive blur)."""
+    """Gaussian blur in premultiplied space; uses OpenCV SIMD when available."""
     from PIL import ImageFilter
     if radius_px <= 0:
         return img
     pre = img.convert("RGBa")
     if t is None:
+        if cv2 is not None:
+            arr = np.ascontiguousarray(np.asarray(pre), dtype=np.uint8)
+            blurred = cv2.GaussianBlur(arr, (0, 0), sigmaX=float(radius_px), sigmaY=float(radius_px),
+                                       borderType=cv2.BORDER_REPLICATE)
+            return Image.fromarray(blurred, "RGBa").convert("RGBA")
         return pre.filter(ImageFilter.GaussianBlur(radius_px)).convert("RGBA")
     levels = 6
-    stack = [np.asarray(pre, dtype=np.float64)]
+    base = np.asarray(pre, dtype=np.float32)
+    stack = [base]
     for i in range(1, levels):
-        stack.append(np.asarray(pre.filter(ImageFilter.GaussianBlur(radius_px * i / (levels - 1))), dtype=np.float64))
-    f = t * (levels - 1)
-    i0 = np.clip(np.floor(f).astype(int), 0, levels - 2)
+        sig = float(radius_px * i / (levels - 1))
+        if cv2 is not None:
+            stack.append(cv2.GaussianBlur(base, (0, 0), sigmaX=sig, sigmaY=sig, borderType=cv2.BORDER_REPLICATE))
+        else:
+            stack.append(np.asarray(pre.filter(ImageFilter.GaussianBlur(sig)), dtype=np.float32))
+    f = t.astype(np.float32) * np.float32(levels - 1)
+    i0 = np.clip(np.floor(f).astype(np.int32), 0, levels - 2)
     wgt = (f - i0)[..., None]
     out = np.zeros_like(stack[0])
     for i in range(levels - 1):
         m = i0 == i
         if m.any():
-            out[m] = (stack[i][m] * (1 - wgt[m]) + stack[i + 1][m] * wgt[m])
-    return Image.fromarray(np.clip(out + 0.5, 0, 255).astype(np.uint8), "RGBa").convert("RGBA")
+            out[m] = stack[i][m] * (np.float32(1.0) - wgt[m]) + stack[i + 1][m] * wgt[m]
+    return Image.fromarray(np.clip(out + np.float32(0.5), 0, 255).astype(np.uint8), "RGBa").convert("RGBA")
 
 
 def apply_noise(img: Image.Image, spec, seed: int, k: float, colors: dict) -> Image.Image:
     """Grain on a painted fill. A number = mono grain (as before); an object = Figma-style noise:
     {amount, mode: mono | duo | multi, size (grain size in units), colors: [c1, c2] (duo), density (duo)}."""
-    arr = np.asarray(img, dtype=np.float64).copy()
+    arr = np.asarray(img, dtype=np.float32).copy()
     h, w = arr.shape[:2]
     rng = np.random.default_rng(seed)
     if not isinstance(spec, dict):
-        arr[..., :3] = np.clip(arr[..., :3] + rng.normal(0, float(spec) * 128, (h, w, 1)), 0, 255)
+        arr[..., :3] = np.clip(arr[..., :3] + rng.normal(0, float(spec) * 128, (h, w, 1)).astype(np.float32), 0, 255)
         return Image.fromarray(arr.astype(np.uint8), "RGBA")
     amount = max(0.0, min(1.0, float(spec.get("amount", 0.3))))
     mode = str(spec.get("mode", "mono")).lower()
@@ -317,23 +526,23 @@ def apply_noise(img: Image.Image, spec, seed: int, k: float, colors: dict) -> Im
     gh, gw = -(-h // cell), -(-w // cell)
 
     def grid(channels: int) -> np.ndarray:
-        g = rng.normal(0, 1, (gh, gw, channels))
+        g = rng.normal(0, 1, (gh, gw, channels)).astype(np.float32)
         return np.repeat(np.repeat(g, cell, 0), cell, 1)[:h, :w]
 
     if mode == "mono":
-        arr[..., :3] += grid(1) * amount * 128
+        arr[..., :3] += grid(1) * np.float32(amount * 128)
     elif mode == "multi":
-        arr[..., :3] += grid(3) * amount * 128
+        arr[..., :3] += grid(3) * np.float32(amount * 128)
     else:
         cols = spec.get("colors") or ["#000000", "#ffffff"]
-        c1 = np.array(parse_color(cols[0], colors)[:3], dtype=np.float64)
-        c2 = np.array(parse_color(cols[1] if len(cols) > 1 else "#ffffff", colors)[:3], dtype=np.float64)
+        c1 = np.array(parse_color(cols[0], colors)[:3], dtype=np.float32)
+        c2 = np.array(parse_color(cols[1] if len(cols) > 1 else "#ffffff", colors)[:3], dtype=np.float32)
         density = max(0.0, min(1.0, float(spec.get("density", 0.5))))
-        u = np.repeat(np.repeat(rng.random((gh, gw)), cell, 0), cell, 1)[:h, :w]
+        u = np.repeat(np.repeat(rng.random((gh, gw), dtype=np.float32), cell, 0), cell, 1)[:h, :w]
         speck = np.where((u < density)[..., None], c1, c2)
-        arr[..., :3] = arr[..., :3] * (1 - amount) + speck * amount
+        arr[..., :3] = arr[..., :3] * np.float32(1 - amount) + speck * np.float32(amount)
     arr[..., :3] = np.clip(arr[..., :3], 0, 255)
-    return Image.fromarray((arr + 0.5).astype(np.uint8), "RGBA")
+    return Image.fromarray((arr + np.float32(0.5)).astype(np.uint8), "RGBA")
 
 
 def roughen(mask: Image.Image, spec, k: float, origin: tuple[float, float]) -> Image.Image:
@@ -344,54 +553,94 @@ def roughen(mask: Image.Image, spec, k: float, origin: tuple[float, float]) -> I
     amount = max(0.1, float(spec.get("amount", 2)))
     size = max(0.5, float(spec.get("size", 4)))
     seed = float(spec.get("seed", 1))
-    a = np.asarray(mask, dtype=np.float64)
-    soft = blur_float(a, amount * k) / 255.0
+    a = np.asarray(mask, dtype=np.float32)
+    soft = blur_float(a, amount * k).astype(np.float32) / np.float32(255.0)
     h, w = a.shape
-    ys, xs = np.mgrid[0:h, 0:w].astype(np.float64)
-    n = fractal_noise((xs + 0.5) / k + origin[0], (ys + 0.5) / k + origin[1], size, 3, seed)
-    out = np.clip((soft + (n - 0.5) * 0.9 - 0.5) * (amount * k * 2) + 0.5, 0, 1)
-    return Image.fromarray((out * 255 + 0.5).astype(np.uint8), "L")
+    xs = (np.arange(w, dtype=np.float32)[None, :] + np.float32(0.5)) / np.float32(k) + np.float32(origin[0])
+    ys = (np.arange(h, dtype=np.float32)[:, None] + np.float32(0.5)) / np.float32(k) + np.float32(origin[1])
+    n = fractal_noise(xs, ys, size, 3, seed)
+    out = np.clip((soft + (n - np.float32(0.5)) * np.float32(0.9) - np.float32(0.5)) * np.float32(amount * k * 2)
+                  + np.float32(0.5), np.float32(0.0), np.float32(1.0))
+    return Image.fromarray((out * np.float32(255.0) + np.float32(0.5)).astype(np.uint8), "L")
 
 
 def _bilinear(arr: np.ndarray, xs: np.ndarray, ys: np.ndarray) -> np.ndarray:
     h, w = arr.shape[:2]
-    xs, ys = np.clip(xs, 0, w - 1.001), np.clip(ys, 0, h - 1.001)
-    x0, y0 = np.floor(xs).astype(int), np.floor(ys).astype(int)
-    fx, fy = (xs - x0)[..., None], (ys - y0)[..., None]
+    xs = np.clip(xs, np.float32(0.0), np.float32(w - 1.001))
+    ys = np.clip(ys, np.float32(0.0), np.float32(h - 1.001))
+    x0 = np.floor(xs).astype(np.int32)
+    y0 = np.floor(ys).astype(np.int32)
+    fx = (xs - x0)[..., None]
+    fy = (ys - y0)[..., None]
+    one = np.float32(1.0)
     a, b = arr[y0, x0], arr[y0, x0 + 1]
     c, d = arr[y0 + 1, x0], arr[y0 + 1, x0 + 1]
-    return (a * (1 - fx) + b * fx) * (1 - fy) + (c * (1 - fx) + d * fx) * fy
+    return (a * (one - fx) + b * fx) * (one - fy) + (c * (one - fx) + d * fx) * fy
+
+
+def _remap_rgba(arr: np.ndarray, map_x: np.ndarray, map_y: np.ndarray) -> np.ndarray:
+    """Fast SIMD bilinear warp via OpenCV when installed, with NumPy fallback."""
+    if cv2 is not None:
+        return cv2.remap(arr, map_x, map_y, cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE)
+    return _bilinear(arr, map_x, map_y)
 
 
 def glass(backdrop: Image.Image, mask: Image.Image, spec, k: float, colors: dict) -> Image.Image:
-    """Figma-style glass: bends (refraction), splits (dispersion) and frosts what is behind the shape and
-    catches light on its rim. spec: true or {refraction 0..1, depth (units), dispersion 0..1, frost (units),
-    light (angle, deg), intensity 0..1}."""
+    """Refracting liquid glass: SDF lens curvature, chromatic dispersion, Beer-Lambert absorption,
+    optional frost blur, and crisp dual-rim Fresnel specular catchlights."""
     if not isinstance(spec, dict):
         spec = {}
     refraction = float(spec.get("refraction", 0.6))
     depth = max(1.0, float(spec.get("depth", 14))) * k
     dispersion = max(0.0, float(spec.get("dispersion", 0.25)))
     frost = max(0.0, float(spec.get("frost", 0))) * k
-    intensity = max(0.0, float(spec.get("intensity", 0.5)))
+    intensity = max(0.0, float(spec.get("intensity", 0.55)))
+    fresnel = max(0.0, float(spec.get("fresnel", 0.4)))
     ang = math.radians(float(spec.get("light", 225)))
-    m = np.asarray(mask, dtype=np.float64)
-    height = blur_float(m, depth) / 255.0
-    gy, gx = np.gradient(height)
+    m = np.asarray(mask, dtype=np.float32)
+    h, w = m.shape
+    sdf = distance_field(m)
+    t_edge = np.clip(sdf / np.float32(depth), np.float32(0.0), np.float32(1.0))
+    dome = np.sqrt(np.maximum(np.float32(0.0), np.float32(1.0) - (np.float32(1.0) - t_edge) ** np.float32(2.0)))
+    soft = blur_float(m, max(1.5, depth * 0.45)).astype(np.float32) / np.float32(255.0)
+    height = dome * np.float32(0.75) + soft * np.float32(0.25)
+    if cv2 is not None:
+        gx = cv2.Scharr(height, cv2.CV_32F, 1, 0) * np.float32(1.0 / 32.0)
+        gy = cv2.Scharr(height, cv2.CV_32F, 0, 1) * np.float32(1.0 / 32.0)
+    else:
+        gy, gx = np.gradient(height)
     src = backdrop.convert("RGBa")
     if frost > 0:
-        from PIL import ImageFilter
-        src = src.filter(ImageFilter.GaussianBlur(frost / 2))
-    arr = np.asarray(src, dtype=np.float64)
-    h, w = m.shape
-    ys, xs = np.mgrid[0:h, 0:w].astype(np.float64)
-    push = refraction * depth * 6.0
-    out = np.empty_like(arr)
-    for ch, f in enumerate((1 - dispersion, 1.0, 1 + dispersion)):
-        sample = _bilinear(arr, xs + gx * push * f, ys + gy * push * f)
-        out[..., ch] = sample[..., ch]
-    out[..., 3] = _bilinear(arr, xs + gx * push, ys + gy * push)[..., 3]
-    rim = np.clip(-(gx * math.cos(ang) + gy * math.sin(ang)) * depth * 2.5, 0, 1) * intensity
-    out[..., :3] = out[..., :3] + rim[..., None] * (255.0 - out[..., :3]) * (out[..., 3:4] / 255.0)
-    out = Image.fromarray(np.clip(out + 0.5, 0, 255).astype(np.uint8), "RGBa").convert("RGBA")
+        src = blur_image(src, frost / 2)
+    arr = np.asarray(src, dtype=np.float32)
+    xs = np.broadcast_to(np.arange(w, dtype=np.float32)[None, :], (h, w))
+    ys = np.broadcast_to(np.arange(h, dtype=np.float32)[:, None], (h, w))
+    push = np.float32(refraction * depth * 5.2)
+    if dispersion <= 1e-4:
+        out = _remap_rgba(arr, (xs + gx * push).astype(np.float32), (ys + gy * push).astype(np.float32))
+    else:
+        out = np.empty_like(arr)
+        mid = _remap_rgba(arr, (xs + gx * push).astype(np.float32), (ys + gy * push).astype(np.float32))
+        out[..., 1] = mid[..., 1]
+        out[..., 3] = mid[..., 3]
+        pr = np.float32(float(push) * (1.0 - dispersion))
+        pb = np.float32(float(push) * (1.0 + dispersion))
+        out[..., 0] = _remap_rgba(arr, (xs + gx * pr).astype(np.float32), (ys + gy * pr).astype(np.float32))[..., 0]
+        out[..., 2] = _remap_rgba(arr, (xs + gx * pb).astype(np.float32), (ys + gy * pb).astype(np.float32))[..., 2]
+    if spec.get("tint"):
+        tr, tg, tb, ta = parse_color(spec["tint"], colors)
+        thick = np.clip(height, np.float32(0.0), np.float32(1.0))[..., None] * np.float32(ta / 255.0)
+        tint_rgb = np.array([tr / 255.0, tg / 255.0, tb / 255.0], dtype=np.float32)
+        absorb = np.exp(-thick * (np.float32(1.0) - tint_rgb) * np.float32(1.4))
+        out[..., :3] = out[..., :3] * absorb + tint_rgb * np.float32(255.0) * thick * np.float32(0.22)
+    slope = np.hypot(gx, gy) * np.float32(depth * 2.0)
+    lx, ly = np.float32(math.cos(ang)), np.float32(math.sin(ang))
+    dot_dir = -(gx * lx + gy * ly) * np.float32(depth * 2.1)
+    edge_band = np.clip(np.float32(1.0) - sdf / np.float32(max(2.0, depth * 0.55)), np.float32(0.0), np.float32(1.0))
+    rim_top = (np.clip(dot_dir, np.float32(0.0), np.float32(1.0)) ** np.float32(2.2)) * edge_band * np.float32(intensity * 0.95)
+    rim_opp = (np.clip(-dot_dir, np.float32(0.0), np.float32(1.0)) ** np.float32(2.6)) * edge_band * np.float32(intensity * 0.42)
+    rim_fresnel = (np.clip(slope, np.float32(0.0), np.float32(1.0)) ** np.float32(2.8)) * edge_band * np.float32(fresnel * intensity * 0.65)
+    glint = np.clip(rim_top + rim_opp + rim_fresnel, np.float32(0.0), np.float32(0.92))
+    out[..., :3] = out[..., :3] + glint[..., None] * (np.float32(255.0) - out[..., :3]) * (out[..., 3:4] / np.float32(255.0))
+    out = Image.fromarray(np.clip(out + np.float32(0.5), 0, 255).astype(np.uint8), "RGBa").convert("RGBA")
     return Image.composite(out, backdrop, mask)

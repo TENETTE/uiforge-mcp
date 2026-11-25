@@ -1,4 +1,4 @@
-"""Complex text: bidi (python-bidi) + shaping (HarfBuzz) + per-character font fallback.
+"""Complex text: built-in UAX #9 BiDi + shaping (HarfBuzz) + per-character font fallback.
 
 Pillow's own layout on Windows has no Raqm, so Arabic comes out disconnected and left-to-right,
 Indic conjuncts never form and the language tag is ignored. Text that needs any of that goes
@@ -15,7 +15,6 @@ import numpy as np
 from pathlib import Path
 import uharfbuzz as hb
 from PIL import Image
-from bidi import algorithm as _bidi
 
 from . import raster
 from .fonts import BUNDLED_DIR
@@ -178,22 +177,167 @@ def _outline(path: str, var: tuple | None, gid: int) -> tuple:
     return tuple(np.asarray(c, dtype=np.float64) for c in pen.contours if len(c) >= 3)
 
 
+_EXPLICIT = {"LRE", "RLE", "LRO", "RLO", "PDF", "LRI", "RLI", "FSI", "PDI"}
+
+
 def _levels(text: str) -> list[int]:
-    st = _bidi.get_empty_storage()
-    st["base_level"] = _bidi.get_base_level(text)
-    st["base_dir"] = ("L", "R")[st["base_level"]]
-    _bidi.get_embedding_levels(text, st, False, False)
-    _bidi.explicit_embed_and_overrides(st, False)
-    _bidi.resolve_weak_types(st, False)
-    _bidi.resolve_neutral_types(st, False)
-    _bidi.resolve_implicit_levels(st, False)
-    levels = [0] * len(text)
-    it = iter(st["chars"])
-    for i, ch in enumerate(text):
-        if 0x202A <= ord(ch) <= 0x202E or 0x2066 <= ord(ch) <= 0x2069:
-            levels[i] = levels[i - 1] if i else st["base_level"]
-            continue
-        levels[i] = next(it)["level"]
+    """Resolve Unicode UAX #9 Bidirectional embedding levels (pure Python, MIT-clean via stdlib unicodedata)."""
+    n = len(text)
+    if n == 0:
+        return []
+    raw_types = [unicodedata.bidirectional(ch) for ch in text]
+    base = 0
+    for bt in raw_types:
+        if bt == "L":
+            base = 0
+            break
+        if bt in ("R", "AL"):
+            base = 1
+            break
+
+    levels = [base] * n
+    types = list(raw_types)
+    stack: list[tuple[int, str | None, bool]] = [(base, None, False)]
+    for i, bt in enumerate(raw_types):
+        cur_lvl, cur_ovr, _ = stack[-1]
+        if bt in ("RLE", "LRE", "RLO", "LRO"):
+            want_odd = bt in ("RLE", "RLO")
+            nxt = (cur_lvl + 1) if ((cur_lvl + 1) % 2 == (1 if want_odd else 0)) else (cur_lvl + 2)
+            ovr = "R" if bt == "RLO" else "L" if bt == "LRO" else None
+            if nxt <= 125:
+                stack.append((nxt, ovr, False))
+            levels[i] = cur_lvl
+            types[i] = "BN"
+        elif bt == "PDF":
+            if len(stack) > 1 and not stack[-1][2]:
+                stack.pop()
+            levels[i] = stack[-1][0]
+            types[i] = "BN"
+        elif bt in ("RLI", "LRI", "FSI"):
+            levels[i] = cur_lvl
+            types[i] = "ON"
+            want_odd = bt == "RLI"
+            if bt == "FSI":
+                depth = 0
+                for j in range(i + 1, n):
+                    t2 = raw_types[j]
+                    if t2 in ("RLI", "LRI", "FSI"):
+                        depth += 1
+                    elif t2 == "PDI":
+                        if depth == 0:
+                            break
+                        depth -= 1
+                    elif depth == 0 and t2 in ("L", "R", "AL"):
+                        want_odd = t2 in ("R", "AL")
+                        break
+            nxt = (cur_lvl + 1) if ((cur_lvl + 1) % 2 == (1 if want_odd else 0)) else (cur_lvl + 2)
+            if nxt <= 125:
+                stack.append((nxt, None, True))
+        elif bt == "PDI":
+            while len(stack) > 1 and not stack[-1][2]:
+                stack.pop()
+            if len(stack) > 1 and stack[-1][2]:
+                stack.pop()
+            levels[i] = stack[-1][0]
+            types[i] = "ON"
+        else:
+            levels[i] = cur_lvl
+            if cur_ovr is not None and bt not in ("B", "S", "BN"):
+                types[i] = cur_ovr
+
+    run_start = 0
+    while run_start < n:
+        lvl = levels[run_start]
+        run_end = run_start + 1
+        while run_end < n and levels[run_end] == lvl:
+            run_end += 1
+        sor = "R" if lvl % 2 else "L"
+        next_lvl = levels[run_end] if run_end < n else base
+        eor = "R" if max(lvl, next_lvl) % 2 else "L"
+
+        prev_t = sor
+        for i in range(run_start, run_end):
+            if types[i] == "NSM":
+                types[i] = prev_t
+            elif types[i] != "BN":
+                prev_t = types[i]
+
+        strong = sor
+        for i in range(run_start, run_end):
+            if types[i] in ("L", "R", "AL"):
+                strong = types[i]
+            elif types[i] == "EN" and strong == "AL":
+                types[i] = "AN"
+
+        for i in range(run_start, run_end):
+            if types[i] == "AL":
+                types[i] = "R"
+
+        for i in range(run_start, run_end):
+            if types[i] in ("ES", "CS"):
+                p = types[i - 1] if i > run_start else sor
+                q = types[i + 1] if i + 1 < run_end else eor
+                if types[i] == "ES" and p == "EN" and q == "EN":
+                    types[i] = "EN"
+                elif types[i] == "CS" and ((p == "EN" and q == "EN") or (p == "AN" and q == "AN")):
+                    types[i] = p
+
+        i = run_start
+        while i < run_end:
+            if types[i] == "ET":
+                j = i
+                while j < run_end and types[j] == "ET":
+                    j += 1
+                p = types[i - 1] if i > run_start else sor
+                q = types[j] if j < run_end else eor
+                rep = "EN" if (p == "EN" or q == "EN") else "ON"
+                for k_idx in range(i, j):
+                    types[k_idx] = rep
+                i = j
+            else:
+                i += 1
+
+        for i in range(run_start, run_end):
+            if types[i] in ("ES", "ET", "CS"):
+                types[i] = "ON"
+
+        strong = sor
+        for i in range(run_start, run_end):
+            if types[i] in ("L", "R"):
+                strong = types[i]
+            elif types[i] == "EN" and strong == "L":
+                types[i] = "L"
+
+        i = run_start
+        while i < run_end:
+            if types[i] in ("B", "S", "WS", "ON", "BN"):
+                j = i
+                while j < run_end and types[j] in ("B", "S", "WS", "ON", "BN"):
+                    j += 1
+                p = types[i - 1] if i > run_start else sor
+                q = types[j] if j < run_end else eor
+                p_dir = "R" if p in ("R", "AN", "EN") else "L"
+                q_dir = "R" if q in ("R", "AN", "EN") else "L"
+                rep = p_dir if p_dir == q_dir else ("R" if lvl % 2 else "L")
+                for k_idx in range(i, j):
+                    if types[k_idx] != "BN":
+                        types[k_idx] = rep
+                i = j
+            else:
+                i += 1
+
+        for i in range(run_start, run_end):
+            t = types[i]
+            if lvl % 2 == 0:
+                if t == "R":
+                    levels[i] = lvl + 1
+                elif t in ("AN", "EN"):
+                    levels[i] = lvl + 2
+            else:
+                if t in ("L", "EN", "AN"):
+                    levels[i] = lvl + 1
+
+        run_start = run_end
     return levels
 
 

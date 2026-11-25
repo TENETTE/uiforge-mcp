@@ -15,6 +15,7 @@ from __future__ import annotations
 import copy
 import math
 import re
+from collections import OrderedDict
 from typing import Any
 
 from .colors import parse_color, to_hex
@@ -330,29 +331,33 @@ def apply_animation(canvas: dict, animation: dict, t: float, colors: dict) -> tu
     return frame, warnings
 
 
-_PATHS: dict[str, tuple] = {}
+_PATHS: OrderedDict[str, tuple] = OrderedDict()
 
 
 def motion_path(spec: dict) -> tuple:
     """(points, cumulative lengths) of a motion path {"d": svg path} or {"points": [[x, y], ...]}."""
     from . import geometry as geo
     key = repr(spec.get("d") or spec.get("points"))
-    if key not in _PATHS:
-        if spec.get("d"):
-            subs = geo.parse_svg_path(str(spec["d"]), 8.0)
-            if not subs:
-                raise ValueError("motion path d has no drawable segments")
-            pts = [(float(x), float(y)) for x, y in subs[0][0]]
-        elif spec.get("points"):
-            pts = [(float(p[0]), float(p[1])) for p in spec["points"]]
-        else:
-            raise ValueError('a "motion" track needs path {"d": "M 0 0 C ..."} or {"points": [[x, y], ...]}')
-        if len(pts) < 2:
-            raise ValueError("a motion path needs at least 2 points")
-        acc = [0.0]
-        for a, b in zip(pts, pts[1:]):
-            acc.append(acc[-1] + math.hypot(b[0] - a[0], b[1] - a[1]))
-        _PATHS[key] = (pts, acc)
+    if key in _PATHS:
+        _PATHS.move_to_end(key)
+        return _PATHS[key]
+    if spec.get("d"):
+        subs = geo.parse_svg_path(str(spec["d"]), 8.0)
+        if not subs:
+            raise ValueError("motion path d has no drawable segments")
+        pts = [(float(x), float(y)) for x, y in subs[0][0]]
+    elif spec.get("points"):
+        pts = [(float(p[0]), float(p[1])) for p in spec["points"]]
+    else:
+        raise ValueError('a "motion" track needs path {"d": "M 0 0 C ..."} or {"points": [[x, y], ...]}')
+    if len(pts) < 2:
+        raise ValueError("a motion path needs at least 2 points")
+    acc = [0.0]
+    for a, b in zip(pts, pts[1:]):
+        acc.append(acc[-1] + math.hypot(b[0] - a[0], b[1] - a[1]))
+    while len(_PATHS) >= 128:
+        _PATHS.popitem(last=False)
+    _PATHS[key] = (pts, acc)
     return _PATHS[key]
 
 
