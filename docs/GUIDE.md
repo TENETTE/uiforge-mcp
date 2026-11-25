@@ -1,168 +1,147 @@
-# game-ui-mcp - ayrıntılı kılavuz
+# game-ui-mcp — ayrıntılı kılavuz
 
-Kısa tanıtım ve kurulum için [README](../README.md).
+Kısa tanıtım ve kurulum için [README.tr.md](../README.tr.md) (English: [README.md](../README.md)).
+
+## `preview` mı, `live_preview` mı?
+
+İki aracın görevi tamamen farklıdır, ikisi de gereklidir:
+
+| Araç | Kim kullanır? | Ne yapar? |
+| --- | --- | --- |
+| **`preview`** (`readOnlyHint=True`) | **Yapay zekâ ajanı** | Tek bir PNG render edip doğrudan modele verir. Model çizdiğini kendi gözleriyle görüp hizalama, kontrast ve gölge hatalarını düzeltir. `state`, `data`, `animation`/`time`, `region`/`zoom`, `simulate` (renk körlüğü) ve `background="game"` parametrelerini destekler. |
+| **`live_preview`** | **İnsan (sen)** | Yerel `http://127.0.0.1:<port>` adresinde SSE tabanlı canlı bir tarayıcı stüdyosu açar (`live_preview("start")`). Ajan her değişiklik yaptığında tarayıcı otomatik yenilenir; ID katmanı, güvenli alan kılavuzu, arka plan seçimi ve piksel koordinat inceleyici sunar. |
 
 ## Bütün özellikler
 
-- **Şekiller:** dikdörtgen (yuvarlak ya da kesik köşe, eğik), elips, çokgen, yıldız, çizgi (kesikli olabilir), yay, kadran çizgileri, SVG path; konturlarda keskin (miter), yuvarlak ya da pah köşe ve kesikli kontur; `flip_x` / `flip_y` ile aynalama (gölge ve ışık yönü korunur)
-- **Yeniden kullanma ve içe aktarma:** `add_instance` (başka canvas'ı canlı bileşen olarak yerleştirir, istenirse animasyonunun belli bir anıyla), `duplicate_element` ile doğrusal ve dairesel dizi (`count`, `rotate`, `pivot`), `add_svg` ile SVG'yi düzenlenebilir path'lere çevirme (logo, hazır ikon setleri)
-- **Delik açma:** `blend: "erase"` aynı katmandaki şeyleri keser (pencere, çentik, oyma yazı)
-- **Tasarım aracı özellikleri (0.8):** canlı otomatik yerleşim (her değişiklikte yeniden dizilir; doldur / en az / en fazla boyut, ızgarada birden çok hücre), bileşen varyantları, slotlar ve aç / kapa parçalar, sayı token'ları ve W3C DTCG token içe / dışa aktarma, cam (kırılma), kademeli bulanıklık, grenli doku modları, kenar pürüzü, parlaklık maskesi, dolgu başına karışım modu, elmas gradient, ok uçları, incelen ve dalgalı çizgiler, yazıda liste / paragraf / OpenType / değişken eksen / renkli emoji / herhangi bir yol boyunca yazı / yazıyı vektöre çevirme, görseli vektörleştirme, sürüm farkı, benzer elemanları bulma, yazı bul-değiştir, vektör PDF, Lottie ve HTML / CSS web sitesi çıktısı
-- **Figma / Penpot tarzı araçlar:** `boolean_elements` ile birleştir / çıkar / kesiştir / dışla (sonuç gerçek vektör şekil, kontur ve gölge kesilen kenarı izler, işlem sonradan değiştirilebilir); `add_rect(smoothing=...)` ile yumuşatılmış "squircle" köşe; `fill` listesiyle üst üste dolgu yığını; `set_theme(modes=..., mode=...)` ile açık / koyu / takım renkleri gibi değişken modları (canvas başına da seçilebilir, `export_theme` CSS'te `[data-theme]` blokları yazar); `arrange_elements(wrap=true)` ile satır atlayan otomatik yerleşim; `export_svg` ile Figma, Penpot, Illustrator ve Inkscape'te düzenlenebilir vektör SVG (çizgili / noktalı / ızgara desenleri, tek kenar konturlar ve gölgeler de vektör; gömülen resimlerin keskinliği `image_scale` ile); `export_png(preset="ios" | "android" | "web")` ile tek çağrıda tüm yoğunluk seti; `style.backdrop_blur` ile arkadakini bulanıklaştıran buzlu cam; `stroke.sides` ile dikdörtgenin yalnızca seçili kenarlarına kontur (sekme alt çizgisi, ayraç); `add_text(max_lines=..., decoration=...)` ile "..." ile kırpma ve altı / üstü çizili yazı; `canvas_version` ile isimli sürüm kaydetme ve geri dönme
-- **Öz denetim:** `review_canvas` kenarda kesilen gölgeyi, düşük yazı kontrastını (WCAG), çok küçük yazıyı, eksik glifi, yarım piksele düşen bulanık kenarları, bozuk katman ve animasyonları bulur; `inspect_pixels` tam renk okur; `view_image` diskteki bir referans görseli gösterir ve renk paletini çıkarır; `fit_canvas` canvas'ı boyanan alana göre daraltır ya da genişletir
-- **Katmanlar:** her katmanın kendi opaklığı, karışım modu (multiply, screen, overlay, soft-light, erase... 13 mod) ve stili var; `clip` ile alttaki katmana kırpılır (taşmadan serbest gölge ve ışık boyama); katman stili içindeki her şeyi tek şekil sayar (ortak kontur, ortak gölge)
-- **Işık ve gölgeleme:** yönlü ışıkla kabartma (`light`: açı, pah, profil, parlaklık), çoklu ve aralıklı kontur, kademeli gölge, gradient maskeyle söndürme (`mask`), renk düzeltme (`adjust`: parlaklık, kontrast, doygunluk, ton)
-- **Stil:** düz renk, linear / radial / conic gradient (isteğe bağlı OKLab geçişi), çizgili / noktalı / ızgara / petek / karbon / fırçalı metal / bulut dokusu, kendi görselinle dolgu, kenar çizgisi (iç, orta, dış), gölge, glow, iç gölge, bevel, bulanıklık, opaklık, bir pivot etrafında döndürme, başka bir şekle kırpma (`clip`)
-- **Shader dolgusu:** hazır doku yetmediğinde model kendi piksel formülünü yazar (`{"type": "shader", "code": "..."}`): plazma, enerji, hologram tarama çizgisi, mermer, ahşap, pas, dalga, hücre, çatlak. `noise`, `fbm`, `voronoi`, `smoothstep`, `mix`... hazır; parametreler animasyonla canlanır. Kod yalnızca aritmetik ve izinli fonksiyonlardan oluşabilir (import, dosya, nitelik erişimi yok), yani makineye dokunamaz
-- **Gösterge:** `add_arc` + `add_ticks` ile devir saati, hız göstergesi, turbo, segmentli LED sıraları; ibre için pivot'lu döndürme
-- **Yazı:** 10 gömülü font (Inter, Barlow Condensed, Bebas Neue, Michroma, JetBrains Mono, Rajdhani, Orbitron, Cinzel, Fredoka, Bangers) + bilgisayardaki fontlar, italik, satır kaydırma, genişliğe sığdırma, kontur, daire üstüne dizme (`arc`), Türkçe büyük harf (`uppercase: "tr"`)
-- **Çok dilli yazı:** Arapça, Farsça, İbranice, Hint yazıları (Devanagari, Bengalce, Tamilce), Tayca ve CJK HarfBuzz + python-bidi ile şekillenir (bitişik harf, sağdan sola, rakamlar soldan sağa, birleşik harfler); fontta olmayan harfler gömülü Noto ya da sistem fontundan gelir; `lang` ile Japonca / Çince / Korece Han biçimleri doğru seçilir; CJK satır kırma yasaklı karakter kurallarıyla (kinsoku); hiçbir fontun çizemediği harf varsa export reddedilir
-- **İkon:** hazır set yok; model 24'lük ızgarada `add_path` ile çizer ya da bir SVG'yi `add_svg` ile alır
-- **Ekran ve cihaz:** hazır boyutlar (`preset`: 1080p, 4K, 21:9, Steam Deck, Switch, iPhone, iPad, Android, mobil oyun, TV) ve güvenli alanları; önizlemede güvenli alan, TV kenar payı, ızgara, sütun, üçte bir, baş parmak erişimi kılavuzları; renk körlüğü (protanopi, döteranopi, tritanopi), gri ton ve güneş altında düşük kontrast simülasyonu; HUD'u gerçek bir oyun ekran görüntüsünün üstünde görme
-- **Çok çözünürlük:** elemanları kenara sabitleme (`set_pin`: sol / orta / sağ / esnet / oranla), `resize_canvas` ile başka boyuta uyarlama, `preview_resolutions` ile hepsini yan yana görme
-- **Etkileşim durumları:** `set_state` ile hover, pressed, disabled, selected, focused (gamepad); önizleme, denetim ve dışa aktarma duruma göre; motor slotları otomatik (Unity SpriteState, Godot TextureButton, Roblox HoverImage / PressedImage)
-- **Veri ve şablon:** yazıda `{yer_tutucu}`, canvas'a özel renk token'ları, `generate_from_template` ile tek şablondan onlarca kart / rozet / seviye ikonu; bileşen kopyalarına ayrı yazı, renk ve durum
-- **Yerelleştirme:** `set_strings` ile dil tabloları, her yerde `language`, 35% uzatıp aksanlayan `pseudo`, 100% uzatan `pseudo-long` ve sağdan sola zorlayan `pseudo-rtl` dilleri, taşan yazıyı bulan denetim; `export_screen` / `export_spec` motor uyarıları verir (TextMeshPro + RTL, Unreal Full Shaping, Godot metin sunucusu verisi, Roblox font kapsamı)
-- **Yerleşim ve üretim:** satır / sütun / ızgara yerleşimi ve içeriğe göre büyüyen kutu (`arrange_elements`), tohumlu rastgele dağıtma (`scatter`: kıvılcım, konfeti, yıldız; istenirse senkronsuz parıldama animasyonu), animasyonda sırayla gecikme (`stagger`), canvas'lar arası kopyalama, redo
-- **Pixel art:** kenar yumuşatmasız çizim, palet ya da renk sayısı sınırı, büyütmede tam piksel
-- **Teslim:** 9-slice germe testi, geliştirici spec'i (ölçülü görsel + JSON), tema token'ları (CSS, Unity USS, C#, GDScript, Luau, JSON), tıklanabilir HTML prototip (ekranlar arası geçiş, hover / basılı hal), ekranı motor sahnesine çevirme (Godot `.tscn`, Roblox LocalScript, Unity UXML + USS; yazılar gerçek yazı olarak kalır), bitmap font (BMFont `.fnt`), uygulama ikonu (ICO, boyut seti), PNG / WebP / JPG
-- **Animasyon:** keyframe + ease ile her özellik canlandırılır (konum, ölçek, dönme, opaklık, renk, efekt, yay açısı, yazı); film şeridi önizlemesi; sprite sheet, kare dizisi, GIF / APNG / WebP ya da motorun kendi tween'i için keyframe JSON çıktısı
-- **Tema:** renk token'ları (`$primary`) ve isimli stiller; bütün kit tutarlı kalır
-- **Önizleme:** AI çizdiğini resim olarak geri görür (yakınlaştırma, eleman kutuları, oyun sahnesi arka planı)
-- **Dışa aktarma:** PNG (1x, 2x), otomatik 9-slice, atlas, katman katman PNG + yerleşim JSON'u, düzenlenebilir katmanlı PSD, Unity / Unreal / Roblox / Godot için hazır değerler ve yardımcı dosyalar
+- **Şekiller:** dikdörtgen (yuvarlak, squircle `smoothing`, kesik köşe, eğik), elips, çokgen, yıldız, çizgi (ok ucu, incelen/dalgalı fırça, kesikli), yay, kadran çizgileri, SVG path; konturlarda keskin (`miter`), yuvarlak veya pah köşe, tek kenar konturu (`stroke.sides`); `flip_x` / `flip_y` ile aynalama (gölge ve ışık yönü korunur)
+- **Fotogerçekçi Cook-Torrance GGX PBR materyaller (39 hazır + özel):** lineer-HDR Cook-Torrance GGX BRDF, perspektif kameralı 360° HDR stüdyo ışık çadırı (yumuşak softbox + negatif dolgu kontrast şeritleri), ACES filmic ton eşleme, şeffaf vernik (`clearcoat`), doğrusal ve radyal fırçalı anizotropi (`radial_metal`), yüzey altı saçılım (`sss`), mikro-kabartma (`height` bump), kenar AO ve HDR ışıma (`emissive`). `style.pbr` doğrudan özelleştirilebilir veya `set_theme(materials=...)` ile projeye özel materyaller kaydedilebilir.
+- **Shader dolgusu (Fused CUDA + CPU):** hazır materyal yetmediğinde model kendi piksel formülünü yazar (`{"type": "shader", "code": "..."}`). `noise`, `fbm`, `ridged`, `turbulence`, `voronoi`, `rand`, `d` (kenar mesafesi SDF), `edge` hazır; isteğe bağlı `height` çıktısı `style.pbr` ve `style.light`'a mikro-kabartma verir. NVIDIA GPU'da AST tek bir birleşik CUDA C++ çekirdeğine derlenir; CPU ile bit-birebir aynı gürültü hash'i kullanır.
+- **Sıvı cam ve efektler:** OpenCV SIMD (`cv2.remap` + `cv2.distanceTransform`) ile lens kırılmalı, renk saçılımlı, Beer-Lambert emilimli ve Fresnel kenarlı `glass` / `liquid_glass`; buzlu cam (`backdrop_blur`), kademeli bulanıklık, grenli doku (`noise`), kenar aşındırma (`texture`), parlaklık maskesi (`mask_mode`), çoklu dolgu yığını, OKLab gradient.
+- **Canlı veri bağlama ve durum makinesi:** `set_binding` ile değişkenler (`data={"hp": 75, "max_hp": 100}`) ve kum havuzlu ifadelerle bar genişliği, renk, görünürlük ve `{yer_tutucu}` metinleri canlı bağlanır; `preview(canvas, data=...)` ile anında test edilir. `set_interaction` ile `load`, `hover`, `press`, `click`, `key:*`, `end:*` tetikleri ve `sfx` ses kancaları tanımlanır; Web/React'te ok tuşu + Web Gamepad API odağıyla, Unity/Godot/Roblox'ta üretilen kontrolcü betikleriyle çalışır.
+- **Tasarım aracı özellikleri:** canlı otomatik yerleşim (`arrange_elements(..., live=true)`: satır, sütun, ızgara, `wrap`, `hug`, `fill`, `span`), gerçek vektör `boolean_elements` (`pyclipper`), `path_ops` (`offset`, `outline_stroke`, `flatten`, `simplify`), bileşenler (`add_instance`, varyantlar, slotlar, gizle/göster), `make_variations` (tek çağrıda 2–8 alternatif yön), `make_palette` (OKLCH + WCAG), `restyle`, `find_elements`, `vectorize_image`, `canvas_version` (kaydet / geri dön / diff), W3C DTCG ve `DESIGN.md` içe/dışa aktarma.
+- **Katmanlar:** her katmanın kendi opaklığı, 13 karışım modu (`multiply`, `screen`, `overlay`, `erase`...) ve katman stili var; `clip: true` alttaki katmana kırpar.
+- **Öz denetim:** `review_canvas` kesilen gölgeyi, düşük WCAG kontrastını, küçük yazıyı, eksik glifi, yarım pikseli, bozuk hizalamayı ve token dışı renkleri bulur; `inspect_pixels` tam renk okur; `view_image` referans görseli ve baskın paletini verir; `fit_canvas` kenar payını ayarlar.
+- **Yazı ve yerelleştirme:** 10 gömülü OFL font + sistem/çalışma klasörü fontları, Arapça/İbranice/Hintçe/Tayca/CJK için HarfBuzz + python-bidi şekillendirme ve gömülü Noto yedeği, renkli emoji, OpenType özellikleri (`tnum`, `smcp`), değişken eksenler, çember/yol üstü yazı, `uppercase: "tr"`, `set_strings` dil tabloları ve `pseudo` / `pseudo-long` / `pseudo-rtl` stres testi.
+- **Animasyon ve video:** keyframe + ease (`spring-out`, `back-out`, cubic-bezier) + yol üstü hareket (`motion`) + hareket bulanıklığı (`motion_blur`). Statik katman ön-pişirme + paralel iş parçacıklarıyla hızlı render. Çıktı: vektör Lottie JSON, doğrudan `ffmpeg` akışıyla MP4 / saydam WebM, sprite sheet, kare dizisi, GIF / APNG / WebP, DOTween ve Roblox TweenService JSON.
+- **Teslim ve motor sahneleri:** Unity (9-slice + `GameUiImporter.cs`, UI Toolkit `.uxml`/`.uss` + `Controller.cs`, **uGUI C# Builder** `unity-ugui`), Godot 4 (`.tscn` + gamepad/veri/SFX'li `_controller.gd` + `.stylebox.tres`), Unreal (Box brush + Python importer), Roblox (`LocalScript` + `GameUiAssets.luau`), **React (`css="css"` veya `"tailwind"`)**, responsive Web sitesi, düzenlenebilir SVG, **PackBits RLE sıkıştırmalı katmanlı PSD**, çok sayfalı vektör PDF, iOS/Android/Web boyut setleri, ICO, BMFont, spec ve prototip.
 
 ## Dosyalar nereye gidiyor
 
-Varsayılan çalışma klasörü `C:\Users\SEN\GameUI`:
+- Proje kökünde `.gameui/` klasörü varsa server **otomatik olarak** orayı kullanır (Git dostu, anahtarları sıralı JSON).
+- Yoksa varsayılan çalışma klasörü `~/GameUI` (Windows'ta `C:\Users\SEN\GameUI`) veya `GAME_UI_MCP_DIR` ortam değişkenidir.
 
-| Klasör | İçerik |
+| Klasör / Dosya | İçerik |
 | --- | --- |
-| `projects/` | Canvas'lar (JSON). Oturum kapansa da kalır. |
+| `projects/` | Canvas'lar (sıralı JSON). Oturum kapansa da kalır. |
 | `exports/` | Yol verilmeden yapılan dışa aktarmalar |
-| `fonts/` | Buraya attığın `.ttf` / `.otf` dosyaları font listesine girer |
-| `theme.json` | Renk token'ları ve stiller |
+| `fonts/` | Buraya attığın `.ttf` / `.otf` dosyaları otomatik yüklenir |
+| `theme.json` | Renk token'ları, modlar, sayı token'ları, stiller ve özel materyaller |
 | `strings.json` | Dil tabloları (`set_strings`) |
 
-Başka bir klasör için `GAME_UI_MCP_DIR` ortam değişkenini ayarla (config'te `"env": {"GAME_UI_MCP_DIR": "D:\\UI"}`).
-
-## Tool'lar
+## Tool'lar (89 adet + 3 MCP Kaynağı + 3 Prompt)
 
 | Grup | Tool'lar |
 | --- | --- |
-| Canvas | `create_canvas`, `list_canvases`, `get_canvas`, `update_canvas`, `duplicate_canvas`, `delete_canvas`, `fit_canvas`, `resize_canvas`, `canvas_version` |
-| Katman | `create_layer`, `update_layer`, `delete_layer`, `set_layer` |
-| Çizim | `add_rect`, `add_ellipse`, `add_line`, `add_polygon`, `add_path`, `add_arc`, `add_ticks`, `add_text`, `add_image`, `add_instance`, `add_svg` |
-| Düzenleme | `update_element`, `delete_elements`, `duplicate_element`, `boolean_elements`, `path_ops`, `restyle`, `find_elements`, `vectorize_image`, `move_elements`, `reorder_element`, `align_elements`, `arrange_elements`, `scatter`, `copy_elements`, `set_pin`, `batch`, `undo`, `redo` |
-| Durum, veri, dil | `set_state`, `delete_state`, `generate_from_template`, `set_strings`, `get_strings` |
-| Denetim | `review_canvas`, `inspect_pixels`, `view_image`, `preview_nine_slice` |
-| Animasyon | `create_animation`, `set_keyframes`, `delete_keyframes`, `get_animations`, `delete_animation`, `preview_animation`, `export_animation` |
-| Tema ve bilgi | `set_theme`, `get_theme`, `make_palette`, `list_fonts`, `measure_text`, `guide` |
-| Önizleme | `preview`, `preview_resolutions`, `contact_sheet` |
-| Dışa aktarma | `export_png`, `export_svg`, `export_pdf`, `export_web`, `export_asset`, `export_layers`, `export_psd`, `export_atlas`, `export_bitmap_font`, `write_engine_helpers` |
-| Teslim | `export_spec`, `export_theme`, `set_link`, `export_prototype`, `export_screen` |
+| **Canvas (9)** | `create_canvas`, `list_canvases`, `get_canvas`, `update_canvas`, `duplicate_canvas`, `delete_canvas`, `fit_canvas`, `resize_canvas`, `canvas_version` |
+| **Katman (4)** | `create_layer`, `update_layer`, `delete_layer`, `set_layer` |
+| **Çizim ve Çerçeveler (12)** | `add_rect`, `add_ellipse`, `add_line`, `add_polygon`, `add_path`, `add_arc`, `add_ticks`, `add_text`, `add_image`, `add_instance`, `add_svg`, **`add_frame`** |
+| **Düzenleme (18)** | `update_element`, `delete_elements`, `duplicate_element`, `boolean_elements`, `path_ops`, `restyle`, `find_elements`, `vectorize_image`, `move_elements`, `reorder_element`, `align_elements`, `arrange_elements`, `scatter`, `copy_elements`, `set_pin`, `batch`, `undo`, `redo` |
+| **Veri, durum, dil (6)** | `set_binding`, `set_state`, `delete_state`, `generate_from_template`, `set_strings`, `get_strings` |
+| **Denetim ve canlı stüdyo (5)** | `live_preview`, `review_canvas`, `inspect_pixels`, `view_image`, `preview_nine_slice` |
+| **Animasyon (7)** | `create_animation`, `set_keyframes`, `delete_keyframes`, `get_animations`, `delete_animation`, `preview_animation`, `export_animation` |
+| **Tema ve bilgi (6)** | `set_theme`, `get_theme`, `make_palette`, `list_fonts`, `measure_text`, `guide` |
+| **Önizleme ve keşif (4)** | `preview`, `preview_resolutions`, `contact_sheet`, `make_variations` |
+| **Dışa aktarma (12)** | `export_png`, `export_svg`, `export_pdf`, `export_web`, `export_react`, `export_asset`, **`export_pbr_maps`**, `export_layers`, `export_psd`, `export_atlas`, `export_bitmap_font`, `write_engine_helpers` |
+| **Teslim ve motorlar (6)** | `export_spec`, `export_theme`, `set_link`, `set_interaction`, `export_prototype`, `export_screen` |
 
-Stil nesnesi kısaca:
+- **MCP Kaynakları:** `gameui://materials`, `gameui://workspace`, `gameui://guide/{topic}`.
+- **MCP Prompt'ları:** `design_game_hud`, `design_rpg_panel`, `audit_and_polish`.
+- **Yeni çıktı yetenekleri:** `export_pbr_maps` (Albedo / Tangent Normal OpenGL & DirectX / Roughness / Metallic / AO / Height / ORM + Godot 4 `CanvasTexture .tres`), `export_animation(format="dotlottie")` (`animation="all"` ile tek `.lottie` arşivi), `export_atlas(format="texturepacker" | "godot" | "unity" | "css" | "json")`, `export_react(typescript=true)` (`.tsx`).
+- **Lisanslar:** Tam bağımlılık ve gömülü SIL OFL-1.1 font dökümü için [THIRD_PARTY_LICENSES.md](../THIRD_PARTY_LICENSES.md). HarfBuzz + yerleşik saf Python MIT UAX #9 BiDi kullanılır (LGPL `python-bidi` kaldırıldı).
+
+## Stil ve PBR nesnesi
 
 ```json
 {
-  "fill": {"type": "linear", "angle": 90, "stops": [[0, "#a78bfa"], [1, "#5b21b6"]]},
-  "stroke": {"color": "$primary@0.6", "width": 2, "align": "inside", "join": "miter", "dash": [8, 4]},
-  "shadow": {"color": "#000000@0.5", "blur": 12, "dy": 6},
+  "material": {"name": "gold", "scale": 1.0, "shine": 0.45},
+  "pbr": {
+    "metallic": 0.98, "roughness": 0.16, "clearcoat": 0.0,
+    "profile": "machined", "bevel_size": 7.5, "crown": 0.30,
+    "studio": "warm", "env": 1.38, "exposure": 1.05
+  },
+  "stroke": {"color": "$primary@0.6", "width": 2, "align": "inside", "join": "miter"},
+  "shadow": {"color": "#000000@0.5", "blur": 14, "dy": 6},
   "glow": {"color": "$accent", "blur": 16},
-  "inner_shadow": {"color": "#000@0.6", "blur": 8, "dy": 2},
-  "bevel": {"size": 2},
   "opacity": 1.0
 }
 ```
 
-Renkler: `#rrggbb`, `#rrggbbaa`, `rgba(...)`, `hsl(...)`, CSS renk adları (`gold`, `crimson`...), `$token`; sonuna `@0.5` eklenince alfa olur.
-
-Açılar (yay, kadran çizgisi, conic gradient): derece, 0 = saat 3 yönü, saat yönünde artar. Klasik bir gösterge 135'ten 405'e süpürür.
+- `material` tek başına hem prosedürel albedo + bump shader'ını hem de `pbr` ayarlarını kurar; ayrıca yazılan `pbr`, `light`, `stroke`, `shadow` anahtarları materyali ezer.
+- `"pbr": null` veya `"light": null` materyalin 3B ışıklandırmasını kapatıp ham dokuyu bırakır.
+- Renkler: `#rrggbb`, `#rrggbbaa`, `rgba(...)`, `hsl(...)`, CSS adları (`gold`, `crimson`...), `$token`; sonuna `@0.5` eklenince alfa olur.
+- Açılar (yay, kadran çizgisi, conic gradient): derece, 0 = saat 3 yönü, saat yönünde artar. Klasik kadran 135 → 405 süpürür.
 
 ## Katmanlar
 
-Canvas, alttan üste dizilen katmanlardan oluşur. `create_layer` yeni katmanı aktif yapar; sonraki elemanlar ona gider. Katman oluşturulmadan çizilenler en alttaki örtük `base` katmanında kalır.
+`create_layer` yeni katmanı aktif yapar; sonraki elemanlar ona gider. Katman oluşturulmadan çizilenler örtük `base` katmanında kalır.
 
 ```json
 [{"op": "create_layer", "name": "body"},
  {"op": "add_ellipse", "cx": 120, "cy": 116, "rx": 80, "fill": "#c81e3a"},
  {"op": "create_layer", "name": "shade", "clip": true, "blend": "multiply"},
  {"op": "add_ellipse", "cx": 120, "cy": 196, "rx": 70, "ry": 26, "fill": "#2a0410@0.7", "style": {"blur": 22}},
- {"op": "create_layer", "name": "ring", "style": {"light": {"angle": 225, "size": 5, "gloss": 0.8}}}]
+ {"op": "create_layer", "name": "ring", "style": {"material": "gold"}}]
 ```
 
-- `clip: true`: katman yalnızca altındaki katmanın pikselleri üstünde görünür. Gölge ve ışık şekilleri tabandan taşmaz.
-- `style`: katmanın birleşik görüntüsüne uygulanır (kontur, gölge, glow, `light`, bulanıklık, `adjust`, `mask`).
-- `export_layers` her katmanı ayrı PNG / WebP / JPG olarak ya da tek bir katmanlı SVG içinde verir (clip'li katmanlar varsayılan olarak tabanına gömülür); `export_psd` yığını Photoshop, Photopea, Krita ve GIMP'te açılan katmanlı dosya olarak kaydeder.
+- `clip: true`: yalnızca altındaki katmanın pikselleri üstünde görünür.
+- `export_layers` her katmanı/grubu ayrı PNG/WebP/JPG ya da katmanlı SVG olarak verir; `export_psd` PackBits RLE sıkıştırmalı katmanlı PSD kaydeder (Photoshop, Photopea, Krita, GIMP).
 
-## Animasyon
-
-Bir animasyon, canvas'a bağlı bir keyframe kümesidir. Her iz (track) bir elemanın ya da bir grubun tek bir özelliğini zaman içinde değiştirir:
+## Animasyon, etkileşim ve veri bağlama
 
 ```json
 {"animation": "appear", "target": "group:btn", "property": "scale", "pivot": [180, 64],
  "keyframes": [[0, 0.55], [0.28, 1, "back-out"]]}
 ```
 
-- **Özellikler:** yardımcılar `dx`, `dy`, `scale`, `scale_x`, `scale_y`, `opacity`; her sayısal eleman özelliği (`x`, `width`, `rotation`, `end_angle`, `dash_offset`, ...); stil yolları (`style.glow.blur`, `style.fill`, `style.stroke.color`); adım adım değişenler (`text`, `visible`).
-- **Ease:** `linear`, `step`, `ease-in/out/in-out` ve stil + yön: `sine`, `quad`, `cubic`, `quart`, `quint`, `expo`, `circ`, `back`, `elastic`, `bounce` × `in`, `out`, `in-out` (ör. `back-out`); ya da cubic-bezier `[x1, y1, x2, y2]`. Bir keyframe'deki ease o keyframe'e varışı şekillendirir.
-- **Önizleme:** `preview_animation` animasyonu zaman etiketli kareler halinde yan yana gösterir; model hareketi buradan okur.
-- **Çıktı (`export_animation`):** `json` (motorun kendi tween'i için; ease'lerin Roblox TweenService ve DOTween adlarıyla), `spritesheet`, `frames`, `gif`, `apng`, `webp`.
+- **Veri bağlama:** `set_binding("hud", data={"hp": 75, "max_hp": 100}, target="hp_bar", property="width", expr="clamp(hp / max_hp, 0, 1) * 240")`. Farklı değerlerle anlık test: `preview("hud", data={"hp": 15})`.
+- **Etkileşim:** `set_interaction("menu", "play_btn", "click", "navigate", target="game", sfx="ui_click")`.
+- **Çıktılar:** `export_animation` (`json`, `lottie`, `spritesheet`, `frames`, `gif`, `apng`, `webp`, `mp4`, `webm`), `export_react(css="css" | "tailwind")`, `export_web`, `export_screen`.
 
 ## Motorlara aktarma
 
-`export_asset` PNG'nin yanına `<ad>.gameui.json` yazar ve klasördeki `game_ui_manifest.json` dosyasını günceller. `nine_slice: "auto"` esneyecek orta bölgeyi kendisi bulur ve dokuyu küçültür.
-
-| Motor | 9-slice değeri | Yardımcı (`write_engine_helpers`) |
+| Motor | Sahne / Sprite çıktısı | Yardımcılar ve kontrolcü |
 | --- | --- | --- |
-| Unity | Sprite border (L, B, R, T) | `GameUiImporter.cs`: yanında `.gameui.json` olan her PNG'yi UI sprite olarak ayarlar |
-| Unreal | Brush `Draw As: Box`, Margin (L, T, R, B, 0-1) | `import_game_ui.py`: texture'ları UI ayarlarıyla içe aktarır, margin'leri log'a yazar |
-| Roblox | `SliceCenter`, `SliceScale` | `GameUiAssets.luau`: `GameUi.apply(imageLabel, "ad")` |
-| Godot 4 | `NinePatchRect` patch margin / `StyleBoxTexture` texture margin (L, T, R, B px) | her 9-slice asset için `<ad>.stylebox.tres` |
+| **Unity (UI Toolkit & uGUI)** | `export_screen(engine="unity")` → `.uxml` + `.uss` + `Controller.cs`; `engine="unity-ugui"` → C# `Canvas`/`RectTransform` oluşturucu | `GameUiImporter.cs` (`.gameui.json` okur, 9-slice ayarlar), C# token'lar |
+| **Godot 4** | `export_screen(engine="godot")` → `.tscn` + `_controller.gd` (veri bağlama, `sfx_requested` sinyali, gamepad `focus_neighbor_*`) | `<ad>.stylebox.tres`, GDScript token'lar |
+| **Unreal Engine** | `export_asset(engine="unreal")` (normalize Box margin) | `import_game_ui.py` (Editör Python betiği) |
+| **Roblox** | `export_screen(engine="roblox")` → `LocalScript` ScreenGui oluşturucu | `GameUiAssets.luau` (`SliceCenter` / `SliceScale`), Luau token'lar |
 
-**Bütün bir ekran** için `export_screen`: her `group` bir görsel parça olur, yazılar motorun kendi yazısı olarak kalır (çevrilebilir, keskin), `set_pin` ile verilen sabitlemeler motorun anchor'larına çevrilir. Godot'ta `.tscn` sahnesi (TextureRect / NinePatchRect / Label), Roblox'ta ScreenGui kuran LocalScript (ekran yüksekliğine göre ölçeklenir), Unity'de UI Toolkit `.uxml` + `.uss` üretir; kullanılan fontlar yanına kopyalanır.
+## Performans ve GPU
 
-Hareketli parçalar (ibre, dolan yay) için `export_layers`: her `group` ayrı PNG olur, `<ad>.layout.json` her parçanın konumunu ve dönme merkezini verir. Assetto Corsa (CSP Lua) gibi PNG kullanan her ortamda bu çıktılar doğrudan kullanılabilir.
+- **OpenCV C++ SIMD (varsayılan):** `opencv-python-headless` ile `distance_field` (`cv2.distanceTransform`, 512×512'de ~2.8 ms), Scharr normal gradyanları, `cv2.GaussianBlur`, morfolojik disk dilasyon/erozyon ve `cv2.remap` cam kırılması doğrudan AVX2/NEON SIMD ile çalışır.
+- **Fused CUDA 12 (`[gpu]`):** `pip install -e ".[gpu]"` (CuPy) ile 65.536 piksel üstü shader dolguları tek bir CUDA C++ çekirdeğine derlenir (`1024×1024 fbm+voronoi` RTX 4060 Ti'da ~3–6 ms). `GAME_UI_MCP_GPU=0` GPU'yu kapatır; CPU ile aynı görsel sonuç üretilir.
+- **Önbellek ve akış:** 128 MB LRU eleman render önbelleği, bounding-box kırpma, animasyonda statik katman ön-pişirme, `ffmpeg` stdin akışı ve PackBits RLE PSD sıkıştırma.
 
-Roblox'ta görselleri Studio'ya kendin yüklemen gerekir (server internete çıkmaz); asset id'lerini sonra `write_engine_helpers(roblox_ids=...)` ile işlersin.
+## Bilinen sınırlar
 
-## Sınırlar
+- Karakter portresi, illüstrasyon veya fotoğraf üretmez (görüntü modeli değildir); bunları `add_image` ile eklersin.
+- `add_svg` metin, filtre, maske, `<use>` ve CSS sınıflarını almaz (`notes` ile bildirir).
+- Instance iç içe en fazla 6 seviye olabilir.
+- `export_screen` Unreal için `.uasset` UMG dosyası üretmez (binary format); parçalar + `.screen.json` + Python importer kullanılır.
+- PSD'de katman adı, opaklık, karışım modu, görünürlük ve clip korunur; efektler ve vektörler piksel katmanı olarak gömülür.
+- `backdrop_blur` ve `glass` aynı canvas içinde altta çizilen katmanları kırar/bulanıklaştırır; gerçek 3B oyun sahnesi için motor tarafında `BackgroundBlur` gerekir.
+- Web/SVG/PDF/Lottie çıktılarında shader, PBR materyal ve cam efektleri elemanın yüksek çözünürlüklü görseli olarak gömülür; düz şekiller ve metinler gerçek vektör/HTML kalır.
+- 87 tool MCP istemcisine yüklenir; uzun referanslar `INSTRUCTIONS` (~2.2k karakter) yerine talep üzerine `guide(topic)` ile verilir.
 
-- Karakter portresi, illüstrasyon, fotoğraf gibi şeyleri üretmez. Bunlar için hazır bir görseli `add_image` ile yerleştirebilirsin.
-- Katman stilindeki kontur (`create_layer(style={"stroke":...})`) köşelerde her zaman yuvarlaktır; keskin köşe için konturu elemana ver.
-- `add_svg` metin, filtre, maske, `<use>` ve CSS sınıflarını almaz (atladıklarını `notes` ile söyler); `gradientTransform` yok sayılır.
-- Instance'lar iç içe en fazla 6 seviye olabilir; bir canvas kendini (dolaylı da olsa) içeremez.
-- Arka planı bulanıklaştıran gerçek "buzlu cam" PNG'ye gömülemez; o efekt motor tarafında yapılır (Unreal'da `BackgroundBlur`). Burada camın koyu, yarı saydam hali çizilir.
-- PSD'de katman adı, opaklık, karışım modu, görünürlük ve clip korunur; katman stilleri ve katmandaki elemanlar piksele gömülür (vektör ya da canlı efekt olarak kalmaz). `erase` modundaki bir katman PSD'de karşılığı olmadığı için gizli katman olarak kaydedilir. Dosya sıkıştırılmadan yazılır, büyük canvas'larda boyut büyür.
-- Motorlar multiply / screen gibi karışım modlarını düz görselle uygulayamaz; bu yüzden clip'li gölge ve ışık katmanları dışa aktarılırken tabana gömülür.
-- Animasyon çıktısı veri ve görseldir; motor içinde oynatan kodu (TweenService, DOTween, UMG) model yazar. Büyük canvas'larda kare kare çıktı yavaştır (1920×1080 ve 80 eleman için kare başına yaklaşık 1 sn).
-- Yazıda harf aralığı verilince kerning uygulanmaz.
-- Orbitron fontunda Ğ / ğ yok; tool böyle durumlarda uyarı döndürür.
-- `export_screen` Unreal için sahne üretmez (UMG dosyası dışarıdan yazılamıyor); Unreal'da parçalar + `.screen.json` kullanılır. Roblox'ta özel font yüklenemediği için yazılar en yakın hazır Roblox fontuyla eşleştirilir. Gradient'li yazı motora ilk rengiyle gider (`bake_text` ile görsel olarak gömülebilir).
-- Pixel-art modu yazıyı da keskinleştirir ama gömülü fontlar piksel font değildir; gerçek piksel yazı için `fonts/` klasörüne bir piksel font koy.
-- 82 tool var; MCP istemcisi hepsinin tanımını modele yükler (yaklaşık 25 bin token).
-- `backdrop_blur` yalnızca aynı canvas'ta altta çizilmiş şeyleri bulanıklaştırır (oyundaki gerçek sahneyi değil; motorda buzlu cam için `BackgroundBlur` gibi motor özelliği gerekir). Stilli, clip'li ya da yarı saydam bir katmandaysa yalnızca o katmanın içindekileri görür. `scale_x` / `flip` verilmiş elemanlarda bulanık alan ölçeklenmemiş şekle göre kesilir.
-- `stroke.sides` yalnızca dikdörtgenlerde çalışır.
-- Web çıktısında cam, ışık, doku, shader ve özel desenler o elemanın resmi olarak gider; animasyonlarda yalnızca hareket, dönme, ölçek ve saydamlık CSS olur.
-- Lottie'de sade şekil ve yazılar vektör katman olur (renk değişimi dahil); efektli parçalar resim olarak hareket eder; glow ya da şekli değişen parçalar kare başına bir resim olur (dosya büyür).
-- `vectorize_image` düz renkli çizimlerde iyi sonuç verir; fotoğraflar posterize olur.
-- Figma ve Penpot dosyası içe aktarma yok (Figma hesabınız ve internet gerekir; proje tamamen yerel).
-- `export_svg`: shader / desen dolgusu, `light`, iç gölge, bulanıklık, özel karışım modları, clip'li ya da stilli katmanlar, görseller ve yay üstü yazı SVG'ye o elemanın resmi olarak gömülür; `erase` SVG'de karşılığı olmadığı için atlanır (delik için `boolean_elements` kullan). Dış konturlar SVG'de dolgunun altına çizilir; yarı saydam dolguda konturun iç yarısı görünür.
-- Animasyon kareleri işlemcinin çekirdeklerinde paralel çizilir (8 çekirdekte yaklaşık 1,7 kat hız); Python'un kilidi yüzünden tam çekirdek sayısı kadar hızlanmaz.
-
-## Geliştirme
+## Geliştirme ve test
 
 ```powershell
 .venv\Scripts\pip install -e ".[dev]"
-.venv\Scripts\python -m pytest
+.venv\Scripts\python -m pytest -q
 ```
 
-GPU: `[gpu]` kurulumu `gpu.py` üzerinden CuPy kullanır; shader dolgusu ve 250 bin pikselden büyük bulanıklıklar (gölge, glow, iç gölge, `light`) ekran kartında hesaplanır, geri kalan her şey (şekil tarama, yazı, birleştirme) CPU'da kalır. Ekran kartında shader iş sınırı 20 kat yüksektir. CuPy yoksa ya da CUDA açılamazsa her şey numpy ile aynı sonucu verir; `GAME_UI_MCP_GPU=0` GPU'yu kapatır. Ölçüm (RTX 4060 Ti): 1080p, 8 katmanlı fbm + voronoi shader CPU'da 4,0 sn, GPU'da 0,44 sn; 4K bulanıklık 1,8 sn yerine 0,16 sn. İlk kullanımda CuPy kernel'leri derler (bir kerelik ~15-20 sn, sonra diskte önbellekte kalır); küçük işler zaten CPU'da kalır.
-
-Çizim motoru Pillow + numpy üzerine kurulu: şekiller 4 kat çözünürlükte piksel merkezine göre taranır, sonra küçültülür; efektler çıkış çözünürlüğünde uygulanır. Latin / Yunan / Kiril yazı Pillow ile çizilir; şekillendirme ya da yedek font gereken yazı `shaping.py` içinde HarfBuzz (uharfbuzz) ve python-bidi ile dizilir, glif konturları aynı tarayıcıyla çizilir (Pillow'un Windows tekerleklerinde Raqm olmadığı için). Sınırlar: Tay / Lao / Khmer için sözlüklü kelime bölme yok (taşan kelime harf kümesi sınırından bölünür), renkli emoji tek renk çizilir, yay üstü yazı yalnızca Latin / Yunan / Kiril.
-
-`tests/test_stress.py`: 4K canvas, 500 eleman, 50 dil satırı, 3 kez render + export (çıktılar birebir aynı olmalı). `review_canvas` kontrast için her yazının arkasını yalnızca çevresindeki elemanlarla yeniden çizer (64 birimden uzağa uzanan dev glow'lar hesaba girmez); bu ekranda ~3 sn. MCP Python SDK'nın 1.x ve 2.x sürümleriyle çalışır.
+Mimari, doğrulama betikleri ve yol haritası için [DEVELOPMENT.md](DEVELOPMENT.md).
 
 ## Fontlar
 
-`src/game_ui_mcp/assets/fonts/` altındaki fontlar SIL Open Font License ile dağıtılır; her klasörde `OFL.txt` bulunur. `noto/` klasöründe Noto Sans Arabic, Hebrew, Devanagari, Bengali, Tamil ve Thai (Regular + Bold, hintsiz, ~1,1 MB) var; CJK fontları büyük olduğu için gömülmez, sistemdekiler kullanılır (Windows: Yu Gothic, Microsoft YaHei / JhengHei, Malgun Gothic).
+`src/game_ui_mcp/assets/fonts/` altındaki fontlar SIL Open Font License ile dağıtılır (`OFL.txt`). `noto/` altında Arapça, İbranice, Devanagari, Bengalce, Tamil ve Tayca gömülüdür; CJK fontları sistemden gelir.

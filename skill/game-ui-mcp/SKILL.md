@@ -1,26 +1,43 @@
 ---
 name: game-ui-mcp
-description: Oyun ve uygulama arayüzü (menü, HUD, buton, panel, bar, gösterge, ikon, amblem, uygulama ikonu, mobil ekran, web sayfası) tasarlarken, canlandırırken ve teslim ederken game-ui-mcp server'ını kullanır. Tema, token ve DESIGN.md, katmanlar, ışık, hazır ve kendi materyallerin, görsel animasyonu, canlı otomatik yerleşim, bileşen varyantları, tasarım alternatifleri, keyframe animasyon ve etkileşim (durum makinesi), öz denetim; Unity, Unreal, Roblox, Godot için 9-slice ve sahne, PNG / SVG / PDF / PSD, Lottie, MP4 / WebM, HTML / CSS web sitesi, React bileşenleri ve iOS / Android boyut setleri.
+description: Oyun, C#/.NET (WPF, Avalonia, WinUI), C++ (Qt QML, Dear ImGui), mobil ve web/React arayüzleri (menü, HUD, buton, panel, bar, gösterge, ikon, form, kaydırılabilir liste, ekran görüntüsünden düzenleme) tasarlarken, canlandırırken ve teslim ederken game-ui-mcp server'ını kullanır. Seçilebilir kalite seviyeleri (simple/standard/advanced/aaa) ve 9 stil profili (kids, cartoon, stylized, minimal, web_saas, scifi, dark_fantasy, realistic, photorealistic), Cook-Torrance PBR + HDR/EXR IBL, 9 prosedürel çerçeve, yerel Input/Scroll bileşenleri, dotLottie v2 durum makinesi, Unity/Unreal/Godot/Roblox + WPF/Avalonia/WinUI/Qt/ImGui + React TSX/Tailwind çıktıları.
 ---
 
 # game-ui-mcp ile arayüz tasarlamak
 
-`game-ui-mcp` görsel üreten bir model değildir: her piksel senin çağırdığın şekil, yazı, efekt ve keyframe'lerden gelir. Hazır "buton", "panel" ya da "ikon" tool'u yoktur, yalnızca temel gereçler vardır. Ürünü sen tasarlarsın; aşağıdaki tarifler kopyalanacak şablon değil, başlangıç noktasıdır. Kalite, tasarım kararlarına ve kendi çıktına bakıp düzeltmene bağlıdır.
+`game-ui-mcp` görsel üreten bir difüzyon modeli değildir: her piksel senin çağırdığın deterministik vektör şekil, yazı, PBR materyal, widget ve keyframe'lerden çizilir. Kalite, baştan doğru **kalite seviyesi + stil profili** seçmene, `batch` ile temiz kurmana ve `preview` + `review_canvas` ile gerçekten bakıp düzeltmene bağlıdır.
 
-Tool'lar listede yoksa (`create_canvas`, `preview` görünmüyorsa) server bağlı değildir: kullanıcıya bağlaması gerektiğini söyle, çizmiş gibi davranma. Server talimatları istemcide kısaltılabilir; bir özelliği ilk kez kullanmadan önce `guide(topic)` ile tam referansı oku (konular: fills, shader, style, design, layers, geometry, text, reuse, review, animation, export).
+Tool'lar listede yoksa (`create_canvas`, `preview` görünmüyorsa) server bağlı değildir: kullanıcıya `game-ui-mcp setup <istemci> --write` ile bağlamasını söyle, çizmiş gibi davranma. İlk kez kullanacağın her özellik için `guide(topic)` oku (`fills`, `shader`, `style`, `design`, `layers`, `geometry`, `text`, `reuse`, `review`, `animation`, `export`).
 
-## Çalışma sırası
+## 1. Kalite ve Stil Seçimi (Zorunlu İlk Karar)
 
-1. **Brief.** Hedef (Unity / Unreal / Roblox / Godot / web / React / mobil uygulama / baskı), ekran boyutu, hangi parçalar lazım ve **stil ailesi**: gerçekçi mi (yarış, simülasyon, AAA) stilize mi (cartoon, arcade, sci-fi, fantastik). Eksikse en fazla 2-3 soru sor; "sen karar ver" denirse karar ver ve ne seçtiğini yaz.
-2. **Tasarım sistemi.** İlk iş `set_theme`: renk token'ları, isimli stiller, gerekiyorsa modlar ve sayı token'ları ("Tema ve tasarım sistemi"). Kullanıcının DESIGN.md'si varsa `set_theme(tokens="…/DESIGN.md")`.
-3. **Yön seçimi (isteğe bağlı).** Yön belirsizse ilk ekranı kabaca kur, `make_variations(canvas, count=3)` ile palet / şekil / yazı alternatifleri üret, karşılaştırma resmini kullanıcıya göster, seçileni geliştir, diğerlerini `delete_canvas` ile sil.
-4. **Canvas.** Her asset kendi gerçek boyutunda ayrı canvas; ekran tasarımı tek canvas (1920×1080, telefon için `preset`).
-5. **Çiz.** Kat kat (taban → gölge → ışık → detay → yazı), her geçiş ayrı katmanda. `batch` kullan ve elemanlara açık `id` ver; tek tek `add_*` yavaştır. İçeriği değişecek her şeyi (buton, liste, envanter) canlı yerleşimle kur.
-6. **Bak ve düzelt.** `preview` resmine gerçekten bak, sonra `review_canvas`. Her `warn` maddesini düzelt, tekrar bak. En az bir düzeltme turu yapmadan export etme ("Kontrol turu").
-7. **Durumlar ve varyantlar.** Hover / pressed / disabled / focused için `set_state`; boyut, renk gibi varyantlar için `prop=değer` adlı durumlar.
-8. **Hareket ve etkileşim.** `create_animation` + `set_keyframes`, `preview_animation` film şeridi; sonra hangi olayda hangi animasyonun / durumun çalışacağını `set_interaction` ile bağla ("Animasyon", "Etkileşim").
-9. **Tutarlılık.** `contact_sheet` ile kiti yan yana gör. Beğenilen hali `canvas_version(action="save")` ile kaydet; kötü giden denemeyi `restore` et, `diff` ile neyin değiştiğine bak.
-10. **Teslim.** Hedefe göre doğru çıktıyı seç ("Çıktı seçimi"), sonra gerekiyorsa motor tarafındaki kodu yaz.
+Her tasarım AAA veya aşırı süslü **olmamalıdır**! Kullanıcının hedefine göre ilk iş `set_theme(style_preset=..., quality=...)` çağır (veya tek canvas için `update_canvas(quality=..., style_preset=...)`):
+
+| Kullanıcı İsteği | `style_preset` | `quality` | Gerçek Motor Etkisi |
+| --- | --- | --- | --- |
+| Çocuk oyunu, eğitim uygulaması, sade prototip | `"kids"` | `"simple"` | Düz/temiz gölgeleme, 0 gren, sade çerçeve, 2× SS, yuvarlak şeker köşeler, `Fredoka` |
+| Çizgi film, arcade, mobil casual | `"cartoon"` | `"standard"` | Kalın kontur, cel gölge, dengeli bevel, 3× SS, `Bangers`/`Fredoka` |
+| Stilize RPG / indie oyun | `"stylized"` | `"standard"` | Dengeli PBR/bevel, çekirdek köşe süsleri, 3× SS |
+| Minimal uygulama, sade web | `"minimal"` | `"standard"` | Düz temiz yüzey, 1 px ince çizgi, geniş yumuşak gölge, `Inter` |
+| Web SaaS, C# WPF / Avalonia / Qt masaüstü uygulaması | `"web_saas"` | `"standard"` | Modern yüksek okunabilirlikli kartlar, `add_input`/`add_scroll`, `Inter` + `JetBrains Mono` |
+| Bilim kurgu, taktik HUD, siberpunk | `"scifi"` | `"advanced"` | Tam Cook-Torrance PBR, kesik köşeli `scifi_hud`/`cyber_tech`, 4× SS |
+| Karanlık fantastik / ortaçağ RPG | `"dark_fantasy"` | `"aaa"` | Maksimum kübik Bézier filigran (`royal_ornate`/`rpg_gold`), perçin, derin pah + kenar aşınması |
+| Gerçekçi yarış, simülasyon | `"realistic"` | `"advanced"` | Karbon twill, radyal fırçalı metal, `Barlow Condensed` + `JetBrains Mono` |
+| Fotogerçekçi vitrin / stüdyo PBR | `"photorealistic"` | `"aaa"` | En derin mikro-pürüzlülük, belirgin kenar aşınması, HDRI IBL (`environment`) |
+
+> **Özel HDR / EXR Ortam Haritası:** Kullanıcının kendi sahne HDRI dosyası varsa `set_theme(environment={"env_map": "yol.hdr", "rotation": 45, "intensity": 1.2})` ver (`.hdr` ve `.exr` destekli). Tüm PBR materyaller tek seferde o sahne ışığını yansıtır.
+
+## 2. Çalışma Sırası (Gereksiz Tool Çağrısı Yapmadan)
+
+1. **Brief & Profil:** Hedef platformu (Unity / Unreal / Godot / Roblox / WPF / Avalonia / WinUI / Qt / ImGui / Web / React), ekran boyutunu ve doğru `style_preset` + `quality` seçimini belirle. Eksikse en fazla 2 soru sor.
+2. **Tema:** Tek çağrıda `set_theme(style_preset=..., quality=...)` ile palet, sayı token'ları ve isimlendirilmiş stilleri başlat (kullanıcının `DESIGN.md` veya DTCG JSON'u varsa `tokens=...`, ekran görüntüsü varsa `import_screenshot(path=...)` kullan!).
+3. **Canvas & Toplu Çizim:** Tek tek `add_*` yerine mutlaka `batch` kullan ve elemanlara anlamlı `id` ver.
+   - Çerçeve/panel gerekiyorsa `add_frame(preset="auto", title=...)` kullan — aktif stile uygun çerçeveyi kurar ve `inner_box` güvenli alanını döner.
+   - Metin girişi veya kaydırılabilir liste gerekiyorsa düz `rect` çizme; doğrudan `add_input` ve `add_scroll` kullan ki tüm motorlarda ve WPF/Qt/React'ta gerçek yerel bileşene dönüşsün!
+4. **Canlı Önizleme (isteğe bağlı):** Kullanıcı izlemek isterse `live_preview("start", canvas=...)` başlat.
+5. **Bak, Denetle, Düzelt:** `preview` resmine bak + `review_canvas` çalıştır. Her `warn` maddesini tek bir `batch` / `update_element` turunda düzelt. Hata alırsan hata mesajındaki çözüm önerisini oku, aynı hatalı çağrıyı asla tekrarlama!
+6. **Durumlar, Veri Bağlama & Hareket:** Hover/press/disabled için `set_state`, dinamik bar/metinler için `set_binding`, animasyon için `create_animation` + `set_keyframes`, tetikleyiciler için `set_interaction`.
+7. **Doğru Çıktı ile Teslim:** Aşağıdaki "Çıktı seçimi" tablosundan hedefe en uygun tek aracı çağır.
 
 ## Tema ve tasarım sistemi
 
@@ -119,14 +136,14 @@ Tipik yığın (alttan üste): `ground` (bulanık zemin gölgesi) → `body` (an
 
 Önce ışık yönünü seç ve bütün kitte aynı tut (alışılmış olan sol üst: `angle: 225`; 0 = sağ, 90 = alt, 180 = sol, 270 = üst).
 
-- **`light`:** şekli kabartma gibi aydınlatır. `size` pah, `depth` kuvvet, `profile: "chisel"` metal / oyma, `"round"` plastik / cam, `gloss` parlak yansıma. `bevel` yalnızca ince üst-alt çizgidir.
+- **`pbr` ve `light`:** `style.pbr` gerçek lineer-HDR Cook-Torrance GGX + perspektif HDR stüdyo yansıması + ACES ton eşleme uygular (`metallic`, `roughness`, `clearcoat`, `ior`, `anisotropy`, `brush_angle`, `sss`, `emissive`, `profile: "round" | "chamfer" | "machined" | "dome" | "facet" | "engraved"`, `crown`, `studio: "bright" | "warm" | "dark"`, `shine`). Stilize hızlı kabartma için `light` (`profile`, `gloss`, `env`, `fresnel`, `shine`). `bevel` yalnızca ince üst-alt çizgidir.
 - **İki kademeli gölge:** `shadow` listesi: yakın keskin (blur 3-5, dy 2-3, alfa 0.5) + uzak yumuşak (blur 18-30, dy 8-14, alfa 0.3-0.5).
 - **Çoklu kontur:** `stroke` liste olabilir, `offset` boşluk bırakır. Tek kenar için `sides: ["bottom"]` (sekme alt çizgisi, ayraç).
-- **Cam:** `backdrop_blur` arkadakini buzlu yapar; `glass` (refraction, depth, dispersion, frost, light) arkadakini büker ve kenarına ışık verir. Hafif beyaz dolgu (`#ffffff@0.06-0.12`), ince açık kontur, gölgede `knockout: true`.
+- **Cam:** `backdrop_blur` arkadakini buzlu yapar; `glass` (refraction, depth, dispersion, frost, light) SDF mercek eğrisiyle arkadakini büker ve kenarına Fresnel parlaması verir. Hafif beyaz dolgu (`#ffffff@0.06-0.12`), ince açık kontur, gölgede `knockout: true`.
 - **Bulanıklık:** `blur` bütün elemanı yumuşatır; `{"radius", "angle", "start", "end"}` ile kademeli bulanıklık (keskinden yumuşağa). `feather` yalnızca kenarı yumuşatır (yumuşak ışık lekesi, sis, ışık hüzmesi).
 - **Doku ve gren:** `noise` (sayı ya da `{mode: mono | duo | multi, amount, size}`) film / baskı hissi; `texture` kenarları pürüzlendirir (yıpranmış, damga, yırtık); `clouds`, `hex`, `carbon`, `brushed` dolguları; kendi görselin `{"type":"image","path":...,"fit":"tile"}`. Dokuyu düşük alfayla, tercihen clip katmanında kullan.
 - **Maske:** `mask` elemanı gradient ile söndürür (yalnızca alfa önemli); `mask_mode: "luminance"` parlaklığı kullanır. Bir elemanı başka bir şekle kırpmak için `clip`, parlaklığa göre kırpmak için `clip_mode: "luminance"`.
-- **Hazır materyal:** `style: {"material": "gold"}` ya da `{"material": {"name": "wood", "color": "$primary", "scale": 1.5, "seed": 3}}`. Seçenekler: gold, silver, chrome, bronze, copper, steel, iron, rust, wood, stone, marble, leather, fabric, paper, lava, ice, gem, plastic, rubber, jelly, glass, neon, hologram. Işık ve dolguyu birlikte verir; kendi yazdığın anahtarlar (ör. `light`, `stroke`) üstüne yazar. Lava, jelly ve hologram `style.material.t` ile canlanır.
+- **Hazır materyal (39 adet, Cook-Torrance GGX PBR):** `style: {"material": "gold"}` ya da `{"material": {"name": "wood", "color": "$primary", "scale": 1.5, "seed": 3, "shine": 0.5}}`. Metaller: gold, silver, chrome, bronze, copper, steel, iron, radial_metal, hammered_gold, rust; taş/mücevher: stone, runic_stone, marble, obsidian, jade, gem, ruby, emerald, lava, ice; organik/zanaat: wood, leather (dikişli), paper, aged_parchment, fabric, carbon_twill, wax_seal, enamel; modern/sci-fi: glass, liquid_glass, hologram, energy_shield, foil_holographic, neon, plastic, candy_gloss, clay_3d, rubber, jelly. `pbr` anahtarlarıyla parlaklık/pürüzlülük/stüdyo ışığı ezilebilir; `lava`, `jelly`, `hologram`, `runic_stone`, `energy_shield`, `foil_holographic` `style.material.t` ile, parlama şeridi `style.material.shine` ile canlanır.
 - **Kendi materyalin:** kitte tekrar eden yüzeyi bir kez tanımla: `set_theme(materials={"dark_oak": {"material": "wood", "color": "#4a2c18", "scale": 2, "light": {...}}})` (hazırdan türet) ya da `{"fill": {"type": "shader", "code": "...", "params": {"c": "$primary", "t": 0}}, "light": {...}, "noise": 0.04}` (sıfırdan). Sonra her yerde `{"material": "dark_oak"}`; `{"name": ..., "color": ..., "scale": ..., "t": ...}` shader'ın `c`, `sc`, `t` parametrelerine gider. Shader yazımı için "Shader dolgusu".
 - **Renk:** `adjust` yeniden çizmeden düzeltir (brightness, contrast, saturation, exposure, temperature, shadows, highlights, hue, tint). Hover `brightness: 0.08`, disabled `saturation: -0.8`. Uzak renkler arası gradient için `"space": "oklab"` (gri-çamur geçişi olmaz).
 - **Dolgu yığını:** `fill` liste olabilir (alttan üste); her katmana ayrı `blend` verilebilir (gradient + `overlay` ile parlaklık).
@@ -172,7 +189,8 @@ Düz tek dikdörtgen "programcı işi" görünür. Bir yüzey alttan üste: göv
 - **Bileşen:** tekrar eden parçayı (slot çerçevesi, tuş, madalya, buton) kendi canvas'ında bir kez çiz, başka yerlere `add_instance(source=...)` ile koy. Kaynak değişince bütün kopyalar değişir ve her boyutta keskin kalır.
 - **Durumlar:** tek canvas bütün durumları taşır: `set_state("btn", "hover", "face", {"style": {"glow": {...}}})`. Ad olarak hover, pressed, disabled, selected, focused (gamepad) kullan; motor ve web çıktısı bunları tanır. `preview(state=...)` ile bak.
 - **Varyantlar:** boyut / ton gibi seçenekler için `prop=değer` adlı durumlar (`set_state("btn", "size=large", ...)`), kullanırken `add_instance(variant={"size": "large", "tone": "danger"})`. İsteğe bağlı parçalar `hide=["icon"]` / `show=[...]`; değişen içerik için kaynakta bir yer tutucu çiz ve `slots={"icon": "gem"}` ile başka canvas'ı içine yerleştir.
-- **Veri:** yazıda `{yer_tutucu}`; değerleri canvas `vars`, bileşen kopyası `vars` ya da `generate_from_template(template, rows)` (tek şablondan onlarca kart / rozet) verir. Dil tabloları `set_strings`; her çıktı `language` alır.
+- **Veri ve canlı bağlama:** yazıda `{yer_tutucu}` ve dinamik özellikler için `set_binding(canvas, data={"hp": 75, "max_hp": 100}, target="hp_bar", property="width", expr="clamp(hp / max_hp, 0, 1) * 240")`. Farklı değerleri `preview(canvas, data={"hp": 15})` ile dene; Web/React ve motor controller'larına otomatik aktarılır. Şablondan onlarca kart üretmek için `generate_from_template(template, rows)`. Dil tabloları `set_strings`; her çıktı `language` alır.
+- **Canlı izleme:** Kullanıcı çizimi tarayıcıda canlı görmek isterse `live_preview("start")` yerel (`127.0.0.1`) otomatik yenilenen önizleme stüdyosu açar.
 
 ## Şekil gereçleri
 
@@ -290,17 +308,21 @@ Hazır dolgular yetmiyorsa formülü kendin yaz: `{"type":"shader","code":"...",
 | Hedef | Çıktı |
 | --- | --- |
 | Unity / Unreal / Roblox / Godot sprite | `export_asset(engine=..., nine_slice="auto")` + bir kez `write_engine_helpers` |
-| Bütün bir ekran motor sahnesi olarak | `export_screen(engine="godot" | "roblox" | "unity")`: yazılar canlı motor yazısı, pin'ler anchor |
+| Gerçek zamanlı motor ışığıyla canlı 2B/3B UI (Normal/ORM/CanvasTexture) | `export_pbr_maps(engine="godot" | "unity" | "unreal" | "generic")` |
+| Hızlı AAA çerçeve / panel kurulumu | `add_frame(preset="rpg_gold" | "royal_ornate" | "fantasy_parchment" | "scifi_hud" | "cyber_tech" | "glass_card" | "medieval_iron" | "luxury_minimal" | "cartoon_thick")` (`inner_box` döner) |
+| Yerel metin girişi & kaydırılabilir liste | `add_input(...)`, `add_scroll(...)` — Web/React, Godot, Unity, Roblox, WPF, Avalonia, WinUI, Qt QML ve ImGui'de yerel bileşen olur |
+| Ekran görüntüsünden düzenlenebilir canvas | `import_screenshot(path=...)` — OpenCV kontur/palet + isteğe bağlı OCR ile vektörleştirir |
+| Bütün bir ekran motor veya masaüstü sahnesi olarak | `export_screen(engine="godot" | "roblox" | "unity" | "unity-ugui" | "wpf" | "avalonia" | "winui" | "qt-qml" | "imgui")`: yazılar, input ve scroll yerel bileşendir; C# ViewModel / GDScript / C++ kodu üretir |
+| Sprite atlası (Phaser/Pixi/Godot/Unity/CSS) | `export_atlas(format="texturepacker" | "godot" | "unity" | "css" | "json")` |
 | Motorda ayrı oynayacak parçalar (ibre, dolgu) | `export_layers` (her parça + pivot'lu `layout.json`) |
 | Mobil uygulama / web görseli | `export_png(preset="ios" | "android" | "web")`, ikon için `format="ico"` ya da `sizes` |
 | Figma / Penpot / Illustrator'da düzenleme, sınırsız büyütme | `export_svg` (`embedded_as_image` resim olanları söyler; büyük baskıda `image_scale: 4`) |
 | Baskı, müşteri sunumu, kit kitabı | `export_pdf([...])` (çok sayfa, yazı vektör) |
-| React / Next.js / Vite projesi | `export_react([...])`: her canvas `<Ad>.jsx` + `.css`, görseller import edilir, etkileşimler çalışır, gezinme `onNavigate(canvasId, mode)` prop'u ile |
+| React / Next.js / Vite projesi (JSX veya TypeScript TSX) | `export_react([...], css="css" | "tailwind", typescript=true)`: `<Ad>.tsx`, `data` prop'u, `onNavigate`, `onSfx` ve gamepad odağı dahil |
 | Çalışan web sitesi / prototip | `export_web([...], layout="fit" | "responsive")`: linkler (`set_link`, `mode: "overlay"`), hover CSS, CSS animasyon, sayfa geçişi |
 | Görsel düzenleyicide devam | `export_psd` |
 | Geliştiriciye ölçü ve token | `export_spec`, `export_theme` (css, dtcg, design.md...) |
-| Video (fragman, mağaza, sosyal) | `export_animation(format="mp4" | "webm")` |
-| Animasyon | "Animasyon çıktısı" maddeleri |
+| Video / dotLottie / Animasyon | `export_animation(format="dotlottie" | "lottie" | "mp4" | "webm" | "spritesheet" | "json")` (`animation="all"` ile çoklu `.lottie`) |
 
 **Motor ayrıntıları:**
 - **Roblox:** `export_asset(engine="roblox", scales=[2])` → kullanıcı PNG'leri Studio'da yükler → `write_engine_helpers("roblox", out_dir, roblox_ids={...})` → `GameUi.apply(label, "ad")`. Boyutta `Scale` + `UIAspectRatioConstraint`, yazı `TextLabel`, hover / press `TweenService`. Arka plan bulanıklığı yoktur; camı daha opak yap.

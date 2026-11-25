@@ -4,21 +4,24 @@
 
 # game-ui-mcp
 
-### One MCP for designing, animating and shipping game and app UI.
+### Open-source local design, material, animation & engine-export MCP server for AI agents.
 
-**Describe a screen. Get engine-ready art, animation and code.**
+**Describe a game HUD, menu, or app screen. Watch it build live. Ship engine-ready art, interactive code, and video — with zero subscriptions, zero call limits, and zero image models.**
 
 [![tests](https://img.shields.io/github/actions/workflow/status/TENETTE/game-ui-mcp/tests.yml?branch=main&style=flat-square&label=tests)](https://github.com/TENETTE/game-ui-mcp/actions/workflows/tests.yml)
-[![MCP tools](https://img.shields.io/badge/MCP-85_tools-7c5cff?style=flat-square)](#tools)
-[![Python 3.10+](https://img.shields.io/badge/Python-3.10+-3776AB?style=flat-square&logo=python&logoColor=white)](#quick-start)
-[![GPU optional](https://img.shields.io/badge/GPU-optional_CUDA-76b900?style=flat-square&logo=nvidia&logoColor=white)](#quick-start)
-[![MIT license](https://img.shields.io/badge/license-MIT-f4c430?style=flat-square)](LICENSE)
+[![MCP tools](https://img.shields.io/badge/MCP-92_tools_+_Resources_+_Prompts-7c5cff?style=flat-square)](#tools)
+[![Materials](https://img.shields.io/badge/Materials-39_Cook--Torrance_PBR-f59e0b?style=flat-square)](#materials)
+[![PBR Maps](https://img.shields.io/badge/Export-Game_Engines_%7C_.NET_WPF_%7C_C++_Qt_ImGui_%7C_TSX-ec4899?style=flat-square)](#what-you-can-ship)
+[![GPU optional](https://img.shields.io/badge/GPU-CUDA_12_%2B_WebGPU_(wgpu)-76b900?style=flat-square)](#performance)
+[![MIT license](https://img.shields.io/badge/license-MIT-22c55e?style=flat-square)](LICENSE)
 
-[Quick start](#quick-start) · [How it works](#how-it-works) · [What you can ship](#what-you-can-ship) · [Showcases](#showcases) · [Features](#features) · [FAQ](#faq) · [Documentation](#documentation)
+[Why game-ui-mcp](#why-game-ui-mcp) · [Quick start](#quick-start) · [What you can ship](#what-you-can-ship) · [Showcases](#showcases) · [Performance](#performance) · [Features](#features) · [Tools](#tools) · [FAQ](#faq)
 
-<code>claude mcp add game-ui -s user -- uvx --from git+https://github.com/TENETTE/game-ui-mcp game-ui-mcp</code>
+```bash
+claude mcp add game-ui -s user -- uvx --from git+https://github.com/TENETTE/game-ui-mcp game-ui-mcp
+```
 
-<br /><br />
+<br />
 
 <img src="docs/banner.png" alt="game-ui-mcp banner, drawn with game-ui-mcp itself" width="1200" />
 
@@ -26,25 +29,87 @@
 
 ---
 
-Need a menu, a HUD, a health bar or a whole settings screen? Ask your AI agent. game-ui-mcp gives it the drawing tools of a design app: shapes, text, layers, lighting, materials, auto layout, components and keyframe animation. The agent draws, looks at the result, finds its own mistakes and fixes them.
+## Why game-ui-mcp?
 
-When the design is right, the same canvas goes out as whatever you need: 9-slice sprites and scenes for Unity, Unreal, Godot and Roblox, editable SVG and PSD, PDF, Lottie, MP4, a working website or React components with their interactions.
+Paid design platforms increasingly gate AI design workflows behind seat licenses, monthly MCP call limits, splash screens, or cloud lock-in. **game-ui-mcp** is a **100% local, MIT-licensed** alternative built from the ground up for AI coding & design agents:
 
-Everything runs locally. There is no image model and no internet access: every pixel comes from the tools the agent calls, so results are clean, repeatable and editable.
+- **Deterministic vector & Cook-Torrance PBR engine:** No diffusion hallucinations, no broken text, no upload to external APIs. Every pixel comes from editable vector shapes, HarfBuzz-shaped typography, physically-based Cook-Torrance GGX materials with HDR studio IBL + ACES filmic tone mapping, and keyframe tracks.
+- **Closed visual feedback loop:** The agent draws, inspects the rendered PNG with `preview`, audits layout/contrast/alignment with `review_canvas`, fixes issues automatically, and lets **you** watch edits in real time via `live_preview` in your browser.
+- **One canvas → every target:** Export the exact same design as Unity (UI Toolkit & uGUI), Unreal, Godot 4, or Roblox scenes and 9-slice sprites — plus editable SVG, RLE-compressed layered PSD, vector PDF, Lottie, MP4/WebM, websites, and React (CSS or Tailwind) with live data binding and gamepad navigation.
+
+### Compared to paid tools
+
+| Capability | **game-ui-mcp** | Figma + MCP | Pencil (`pen.dev`) | Rive | Envy UI |
+| --- | :---: | :---: | :---: | :---: | :---: |
+| **Price & license** | **\$0 · MIT Open Source** | \$16–\$90/seat/mo | \$16–\$48/mo | \$9–\$120/mo (splash on free) | Paid desktop app |
+| **MCP tool calls** | **Unlimited · Local** | Metered (20/mo free, 200/day Pro) | 5 agent-days/mo free | CLI publish caps | — |
+| **Runs 100% offline** | ✅ | ❌ Cloud | ✅ | ❌ Cloud editor | ✅ |
+| **Git-local project files** | ✅ Auto `.gameui/` | ❌ | ✅ `.pen` | ❌ Binary `.riv` | ✅ |
+| **Live browser preview** | ✅ `live_preview` (SSE) | ✅ | ✅ | ✅ | ✅ |
+| **Unity / Unreal / Godot / Roblox export** | ✅ All 4 + controllers + native widgets | ❌ Manual rebuild | ❌ Web/HTML | Partial (runtime plugin) | Godot / Unity / Web |
+| **C# .NET (WPF/Avalonia/WinUI) & C++ (Qt/ImGui)** | ✅ Native XAML / QML / ImGui + ViewModel | ❌ | ❌ | ❌ | ❌ |
+| **Cook-Torrance GGX PBR + Custom HDRI** | ✅ 39 built-in + `.hdr` / `.exr` IBL | ❌ | Limited | ❌ | ❌ |
+| **Engine PBR Maps (Normal/ORM/CanvasTexture)** | ✅ `export_pbr_maps` | ❌ | ❌ | ❌ | ❌ |
+| **Parametric AAA Frames (`add_frame`)** | ✅ 9 editable presets (filigree/rivets) | ❌ | ❌ | ❌ | ❌ |
+| **Screenshot → Editable Canvas** | ✅ `import_screenshot` (OpenCV + optional OCR) | ❌ | ❌ | ❌ | ❌ |
+| **Data binding & dotLottie v2 state machine** | ✅ `set_binding` + `set_interaction` + `.lottie` v2 | Variables only | Variables only | ✅ | ✅ |
+| **Native Scroll & Input widgets** | ✅ Canvas + Web/React + Engines + Desktop | Design only | Partial | ❌ | Partial |
+| **Web & React (TSX / Tailwind) + Gamepad** | ✅ | Via Code Connect | HTML/code | Web runtime | Web runtime |
+| **SVG / PSD / PDF / dotLottie v2 / MP4 / Atlases** | ✅ All built-in | SVG / PDF | Partial | `.riv` | — |
+
+---
 
 ## Quick start
 
-### Set up your agent
+Install [uv](https://docs.astral.sh/uv/) (`winget install astral-sh.uv`, `brew install uv`, or `pip install uv`). First launch downloads dependencies in ~30 seconds.
 
-You need [uv](https://docs.astral.sh/uv/) (`winget install astral-sh.uv`, `brew install uv` or `pip install uv`). The first start downloads everything (about 30 seconds).
+### Multi-IDE One-Command Setup (OpenCode, Claude Code, VS Code, Visual Studio, Antigravity, Cursor, Windsurf, ChatGPT)
 
-**Claude Code**
+Auto-detect your GPU architecture (`nvidia` / `amd` / `intel` / `apple` / `cpu`) and configure any MCP client automatically:
+
+```bash
+# Inspect your GPU, active backend, and installed tools
+uvx --from git+https://github.com/TENETTE/game-ui-mcp game-ui-mcp doctor
+
+# Auto-configure your IDE (merges safely without overwriting existing servers)
+uvx --from git+https://github.com/TENETTE/game-ui-mcp game-ui-mcp setup opencode --write
+uvx --from git+https://github.com/TENETTE/game-ui-mcp game-ui-mcp setup claude --write
+uvx --from git+https://github.com/TENETTE/game-ui-mcp game-ui-mcp setup visualstudio --write
+uvx --from git+https://github.com/TENETTE/game-ui-mcp game-ui-mcp setup vscode --scope project --write
+uvx --from git+https://github.com/TENETTE/game-ui-mcp game-ui-mcp setup antigravity --write
+uvx --from git+https://github.com/TENETTE/game-ui-mcp game-ui-mcp setup cursor --write
+
+# ChatGPT Apps / Connectors (Streamable HTTP MCP server)
+uvx --from git+https://github.com/TENETTE/game-ui-mcp game-ui-mcp serve --transport http --port 8765
+```
+
+See [`configs/README.md`](configs/README.md) for manual JSON snippets and [`docs/COMPATIBILITY.md`](docs/COMPATIBILITY.md) for the full 2026 engine/API compatibility matrix.
+
+### GPU Architecture Extras (No Unnecessary Bloat)
+
+| GPU Vendor / Architecture | Install Extra | Runtime Used |
+| --- | --- | --- |
+| **NVIDIA (CUDA 12 + WebGPU)** | `game-ui-mcp[nvidia]` (or `[gpu]`) | Fused CuPy CUDA 12 + `wgpu` fallback |
+| **AMD (Vulkan / DirectX 12)** | `game-ui-mcp[amd]` | Shared portable `wgpu` WGSL compute |
+| **Intel Arc / Xe (Vulkan / D3D12)** | `game-ui-mcp[intel]` | Shared portable `wgpu` WGSL compute |
+| **Apple Silicon (Metal)** | `game-ui-mcp[apple]` | Shared portable `wgpu` WGSL compute |
+| **CPU-Only (Universal)** | `game-ui-mcp` (default / `[cpu]`) | OpenCV C++ SIMD + NumPy (0 GPU deps) |
+
+### Configurable Quality Tiers & Visual Style Presets
+
+Not every project should look dark, gritty or AAA. Choose the exact visual style and rendering complexity per workspace (`set_theme`) or per canvas (`update_canvas`):
+- **4 Quality Tiers (`quality`):** `"simple"` (clean flat/soft shading, 0 grain, minimal frame geometry, 2× SS), `"standard"` (balanced bevels/detail, 3× SS), `"advanced"` (full Cook-Torrance PBR + rich ornaments, 4× SS), `"aaa"` (deepened micro-bevels, heightened edge wear & full ornate details, 4× SS).
+- **9 Style Presets (`style_preset`):** `"kids"`, `"cartoon"`, `"stylized"`, `"minimal"`, `"web_saas"`, `"scifi"`, `"dark_fantasy"`, `"realistic"`, `"photorealistic"` — automatically seeds matching palette tokens, spacing/radius scales, named styles, lighting studio, and default frame style (`add_frame(preset="auto")`).
+
+### Claude Code
 
 ```bash
 claude mcp add game-ui -s user -- uvx --from git+https://github.com/TENETTE/game-ui-mcp game-ui-mcp
 ```
 
-**Claude Desktop, Cursor, Windsurf and other MCP clients** (in VS Code, `.vscode/mcp.json` uses `servers` instead of `mcpServers`):
+### Cursor, Windsurf, Claude Desktop, Antigravity & other MCP clients
+
+Add to your MCP config (`~/.cursor/mcp.json`, Claude Desktop config, or `.vscode/mcp.json` using `"servers"` instead of `"mcpServers"`):
 
 ```json
 {
@@ -57,113 +122,127 @@ claude mcp add game-ui -s user -- uvx --from git+https://github.com/TENETTE/game
 }
 ```
 
-Restart the client afterwards.
+Restart your client afterwards.
 
 <details>
-<summary>GPU build, video export and the skill</summary>
+<summary><strong>Optional extras: NVIDIA GPU (CUDA), Video (ffmpeg), Git-local mode & Agent Skill</strong></summary>
 
-**GPU.** With an NVIDIA card, the `[gpu]` build computes shader fills, materials and large blurs on the GPU (CuPy + CUDA 12, about 1 GB to download; 9-11x faster on an RTX 4060 Ti). Without a working CUDA device it falls back to the CPU with identical results. `GAME_UI_MCP_GPU=0` turns it off.
-
-```bash
-claude mcp add game-ui -s user -- uvx --from "game-ui-mcp[gpu] @ git+https://github.com/TENETTE/game-ui-mcp" game-ui-mcp
-```
-
-**Video.** MP4 / WebM export uses `ffmpeg` from your PATH (`winget install ffmpeg`, `brew install ffmpeg`), or the `[video]` extra installs one.
-
-**Skill.** [`skill/game-ui-mcp/SKILL.md`](skill/game-ui-mcp/SKILL.md) teaches the agent the craft: themes, layer order, lighting, 9-slice rules, animation timing, interactions, a review pass and engine hand-off. In Claude Code, copy the folder to `~/.claude/skills/`. In the Claude apps, zip the folder and upload it under Settings → Capabilities → Skills.
+- **Cross-GPU WebGPU acceleration (`[wgpu]`):** Compiles shaders & Cook-Torrance PBR to standard WGSL `@compute` via `wgpu-py` (Vulkan / DirectX 12 / Metal; **32× faster** shaders & **7.1× faster** PBR vs CPU on RTX 4060 Ti Vulkan). Select via `GAME_UI_MCP_GPU=wgpu|cuda|cpu|auto`. *(Honesty note: physically verified on NVIDIA RTX 4060 Ti Vulkan/D3D12; AMD, Intel and Apple Silicon Metal are architecturally targeted via standard WGSL but not physically tested.)*
+  ```bash
+  uvx --from "game-ui-mcp[wgpu] @ git+https://github.com/TENETTE/game-ui-mcp" game-ui-mcp
+  ```
+- **NVIDIA GPU acceleration (`[gpu]`):** Compiles shader fills & materials into fused CUDA C++ kernels via CuPy + CUDA 12 (~1 GB download; **130× faster** GPU shaders on RTX 4060 Ti). Falls back transparently to WebGPU or CPU with identical output. Disable anytime with `GAME_UI_MCP_GPU=0`.
+  ```bash
+  claude mcp add game-ui -s user -- uvx --from "game-ui-mcp[gpu] @ git+https://github.com/TENETTE/game-ui-mcp" game-ui-mcp
+  ```
+- **MP4 / WebM video (`[video]`):** Uses `ffmpeg` from PATH (`winget install ffmpeg`, `brew install ffmpeg`), or install the `[video]` extra to bundle one.
+- **Git-local project workspace:** Create a `.gameui/` folder in your project root and the server automatically stores sorted, diff-friendly project JSONs right alongside your code (otherwise defaults to `~/GameUI`, or set `GAME_UI_MCP_DIR`).
+- **Agent Skill:** [`skill/game-ui-mcp/SKILL.md`](skill/game-ui-mcp/SKILL.md) teaches your agent UI craft (layer order, 2.5D lighting, 9-slice rules, timing curves, review pass, and engine hand-off). Copy `skill/game-ui-mcp/` to `~/.claude/skills/` (or upload as zip in Claude Settings → Capabilities → Skills).
 
 </details>
 
-### Ask your agent
+### First prompts to try
 
 ```text
-Design a main menu for a sci-fi game: title, four buttons with hover and press
-states, a settings dialog. Check it, then export it as a website I can click
-through and as 9-slice sprites for Unity.
+Start live_preview so I can watch. Design a sci-fi main menu with liquid_glass panels,
+four buttons with hover/press states and click SFX, bind a player level variable,
+review it, then export as Tailwind React and a Unity UI Toolkit scene with controller.
 ```
 
 More ideas:
-
-- "Make a rev gauge for a racing game with a needle animation, and give me the parts as separate layers in `D:\Game\UI`."
-- "Show me three different directions for this victory screen, then keep the second one."
-- "Build a gold-trimmed inventory panel with stone and leather materials."
-- "Translate this menu to Arabic and Japanese and check for overflowing text."
-- "Turn this card animation into an MP4 for the store page."
-- "Export the theme as a DESIGN.md for my coding agent."
+- *"Build a racing rev gauge using `radial_metal` and `carbon_twill`, animate the needle, and export separated layers for Unity."*
+- *"Create an RPG health bar bound to `hp / max_hp` that turns crimson under 25%, preview it at 80% and 15%, then export for Godot 4 with controller."*
+- *"Show me 3 visual directions for this victory modal with `make_variations`, then polish the second one."*
+- *"Build a medieval inventory frame with `hammered_gold`, `leather` stitching, and `aged_parchment`."*
+- *"Translate this HUD into Arabic and Japanese and run `review_canvas` to catch clipping."*
 
 ### Update
-
-`uvx` keeps a cached copy. To get the latest version, clear it and restart your client:
 
 ```bash
 uv cache clean game-ui-mcp
 ```
 
-## How it works
+---
 
-Your agent calls the tools over MCP. The server keeps the canvases, renders them and answers with a picture, so the agent can look at what it drew. `review_canvas` adds a written check (clipped shadows, low contrast, overflowing text, missing glyphs, half-pixel blur, inconsistent radii). The agent fixes what it finds, then exports.
+## How it works
 
 ```mermaid
 flowchart LR
-    A["Your request"] --> B["Agent"]
-    B -->|"draws with tools"| C["game-ui-mcp"]
-    C -->|"picture + review"| D{"Looks right?"}
-    D -->|"no, fix it"| B
-    D -->|"yes"| E["Export"]
-    E --> F["Engine sprites<br/>and scenes"]
-    E --> G["SVG · PSD<br/>PDF · PNG"]
-    E --> H["Web · React<br/>Lottie · MP4"]
+    U["Your Prompt"] --> A["AI Agent"]
+    A -->|"92 MCP tools"| S["game-ui-mcp<br/>(Local · Deterministic)"]
+    S -->|"Live SSE"| L["Browser Studio<br/>live_preview"]
+    S -->|"PNG + review_canvas"| C{"Looks right?"}
+    C -->|"Fix issues"| A
+    C -->|"Ship"| E["One-Command Export"]
+    E --> G1["Unity · Unreal<br/>Godot 4 · Roblox"]
+    E --> G2["Web · React / Tailwind<br/>Gamepad + Data Binding"]
+    E --> G3["SVG · PSD · PDF<br/>Lottie · MP4 / WebM"]
 ```
+
+---
 
 ## What you can ship
 
 | Target | What you get | Tools |
 | --- | --- | --- |
-| Unity | 9-slice sprites with an import helper, UI Toolkit screens (UXML + USS), C# tokens | `export_asset`, `export_screen`, `write_engine_helpers` |
-| Unreal | Box brushes with margins, an editor import script | `export_asset`, `write_engine_helpers` |
-| Godot 4 | `.tscn` scenes, `StyleBoxTexture` resources, GDScript tokens | `export_screen`, `export_asset` |
-| Roblox | A LocalScript screen, slice centers, Luau tokens | `export_screen`, `export_asset` |
-| Animated parts | Separate layers with pivots, sprite sheets, tween JSON with Roblox and DOTween ease names | `export_layers`, `export_animation` |
-| Websites | HTML / CSS pages with real text, links, overlays, hover states, animations and interactions | `export_web` |
-| React | One JSX + CSS component per screen, images imported, interactions included | `export_react` |
-| Mobile and desktop apps | iOS / Android / web density sets, app icons, ICO | `export_png` |
-| Design apps | Editable vector SVG, layered PSD | `export_svg`, `export_psd` |
-| Print and review | Multi-page vector PDF | `export_pdf` |
-| Apps and players | Lottie with vector shape layers | `export_animation` |
-| Video | MP4 (H.264) or transparent WebM | `export_animation` |
-| Developers and agents | Specs, tokens (CSS, USS, DTCG, C#, GDScript, Luau), DESIGN.md | `export_spec`, `export_theme` |
+| **Unity** | 9-slice sprites + `GameUiImporter.cs`, UI Toolkit (`.uxml` + `.uss` + `Controller.cs`), **uGUI Canvas/RectTransform builder** (`unity-ugui`), C# tokens | `export_asset`, `export_screen`, `write_engine_helpers` |
+| **Godot 4** | `.tscn` scenes + `_controller.gd` (data binding, SFX signals, gamepad `focus_neighbor_*`), `StyleBoxTexture .tres`, GDScript tokens | `export_screen`, `export_asset`, `write_engine_helpers` |
+| **Unreal Engine** | Box brushes with normalized margins, automated Python editor import script | `export_asset`, `write_engine_helpers` |
+| **Roblox** | `LocalScript` ScreenGui builder, `SliceCenter` / `SliceScale` metadata, `GameUiAssets.luau`, Luau tokens | `export_screen`, `export_asset`, `write_engine_helpers` |
+| **C# / .NET Desktop** | **WPF** (`.xaml` + `.xaml.cs` + `INotifyPropertyChanged` ViewModel for .NET Framework 4.8 & .NET 8/9), **Avalonia** (`.axaml`), **WinUI 3** (`.xaml`) with native `TextBox`/`PasswordBox`/`ScrollViewer` | `export_screen` |
+| **C++ Desktop & Tools** | **Qt 6 Quick** (`.qml` with `TextField`, `ScrollView`, properties & signals), **Dear ImGui** (self-contained C++17 `_ui.hpp` with `State`, `InputTextWithHint`, `BeginChild`) | `export_screen` |
+| **Engine PBR Maps** | **Albedo, Tangent Normal (OpenGL & DirectX), Roughness, Metallic, AO, Height, ORM packed + Godot 4 `CanvasTexture .tres`** for live dynamic engine lighting | `export_pbr_maps` |
+| **React & TypeScript** | `<Screen>.jsx` or typed **`<Screen>.tsx`**, CSS or **Tailwind utilities**, live `<input>` / scrollable views, `data` prop bindings, `onNavigate` / `onSfx`, keyboard & **Gamepad API** navigation | `export_react` |
+| **Websites & Prototypes** | Responsive HTML/CSS with real selectable text, live inputs & scroll containers, links, overlays, View Transitions, `window.gameuiSetData()`, gamepad focus | `export_web`, `export_prototype` |
+| **Motion & Video** | **dotLottie v2 (`.lottie` multi-animation + interactive State Machine ZIP)**, vector Lottie JSON, H.264 MP4 / transparent VP9 WebM (streamed), sprite sheets, GIF / APNG / WebP, DOTween & Roblox ease JSON | `export_animation`, `export_layers` |
+| **Atlases, Design & Print** | **TexturePacker / Godot `AtlasTexture` / Unity / CSS sprite atlases**, editable SVG, PackBits RLE PSD, vector PDF, iOS/Android/Web sets, ICO, BMFont | `export_atlas`, `export_svg`, `export_psd`, `export_pdf`, `export_png`, `export_bitmap_font` |
+| **Design Systems** | Developer spec, W3C DTCG JSON, CSS/USS/C#/GDScript/Luau tokens, **`DESIGN.md`** | `export_spec`, `export_theme` |
+
+---
 
 ## Showcases
 
-Every picture here is drawn by the server itself; the scripts in [`examples/`](examples) rebuild them.
+Every single image and animation below was rendered directly by `game-ui-mcp` (reproducible via `python examples/run_all.py`).
+
+### Materials
+
+**39 built-in photorealistic Cook-Torrance GGX PBR materials** rendered in linear HDR with dual-lobe GGX specular, curvature edge wear, 5 studio HDRI light tents (`bright`, `warm`, `dark`, `sunset`, `cyberpunk`) plus optional custom `.hdr`/`.png` equirectangular IBL (`env_map`), OpenCV SIMD SDF bevels, clearcoat lacquer, linear & radial anisotropic brushed metal, subsurface scattering wrap, crevice AO, HDR emission, and ACES filmic tone mapping.
+
+![39 Cook-Torrance PBR Materials](examples/materials.png)
+
+### Real-time Engine PBR Texture Maps (`export_pbr_maps`)
+
+**Unique to game-ui-mcp:** Bake any 2D UI badge, medallion, button, or frame directly into **Albedo, Tangent Normal (OpenGL `+Y` / DirectX `-Y`), Roughness, Metallic, Ambient Occlusion, Height, ORM packed, and Godot 4 `CanvasTexture .tres`** so your game engine dynamically lights your UI with real lights.
+
+![PBR Texture Maps Breakdown](examples/pbr_maps.png)
+
+### Parametric AAA Frames (`add_frame`)
+
+One tool call builds editable, layered vector + PBR frames across **9 presets** (`rpg_gold`, `royal_ornate`, `fantasy_parchment`, `scifi_hud`, `cyber_tech`, `glass_card`, `medieval_iron`, `luxury_minimal`, `cartoon_thick`) with cubic-Bézier corner filigree, winged gem crests, forged iron clasps, perimeter rivets, and telemetry ticks — returning the exact `inner_box` safe area.
+
+![Parametric AAA Frames](examples/frames.png)
 
 ### A full UI kit
 
-Buttons, panels, bars, slots and badges from one theme, checked side by side with `contact_sheet`.
+Buttons, panels, bars, slots and badges from one token theme, audited side by side with `contact_sheet`.
 
 ![UI kit](examples/kit_sheet.png)
 
 ### A realistic racing HUD
 
-Dark glass panels, carbon and brushed metal, a rev gauge with ticks, a needle and LED segments, telemetry in fixed-width digits.
+Dark glass panels, carbon and brushed metal, a rev gauge with ticks, a needle and LED segments, telemetry in tabular figures.
 
 ![Racing HUD](examples/racing_hud.png)
 
-### Materials
-
-23 procedural materials, each tintable, seedable and animatable. Define your own in the theme, from a built-in one or from scratch with a shader formula.
-
-![Materials](examples/materials.png)
-
 ### Design variations
 
-`make_variations` explores palette, shape and type directions in one call and lays them out next to the original.
+`make_variations` explores alternative palette, shape, and typography directions in one call.
 
 ![Variations](examples/variations.png)
 
 ### Design tools in one screen
 
-Boolean shapes, smoothed corners, fill stacks, wrapping layout, frosted glass, single-side strokes, truncated text and light / dark modes, also exported as an [editable SVG](examples/design_tools.svg).
+Exact booleans, squircle smoothing, fill stacks, wrapping auto layout, frosted glass, individual side strokes, truncated text, and light/dark modes — also exported as an [editable SVG](examples/design_tools.svg).
 
 ![Design tools](examples/design_tools.png)
 
@@ -174,137 +253,133 @@ Boolean shapes, smoothed corners, fill stacks, wrapping layout, frosted glass, s
 | ![Button animation](examples/anim_button.gif) | ![Gauge animation](examples/anim_gauge.gif) | ![Menu animation](examples/anim_menu.gif) |
 
 <details>
-<summary>More examples</summary>
+<summary><strong>More showcases (lighting, layers, realistic kit, workflow, multi-resolution)</strong></summary>
 
-**Lighting and shading.** Flat shapes turned into glass, metal and plastic with layers, clipping and directional light.
-
+**Lighting and shading**
 ![Shading kit](examples/shading_kit.png)
 
-**Painting in layers.** Ground shadow, body, shade (multiply), light (screen) and a rim, each on its own layer.
-
+**Layered painting**
 ![Orb layers](examples/orb_layers.png)
 
-**Realistic kit.** Carbon, glass, turned metal and a boost gauge.
-
+**Realistic kit**
 ![Realistic kit](examples/realistic_kit.png)
 
-**Components, states and data.** One button with four states, item cards generated from data rows, pixel-art mode.
-
+**Components, states, data templates & pixel art**
 ![Workflow](examples/workflow.png)
 
-**Multi-resolution.** One HUD pinned to screen edges, checked at 16:9, 21:9 and phone sizes.
-
+**Multi-resolution pin checks (16:9, 21:9, mobile)**
 ![Resolutions](examples/resolutions.png)
 
 </details>
 
+---
+
+## Performance
+
+Built for fast agent iteration loops with **OpenCV C++ SIMD** on CPU, **WebGPU WGSL (`wgpu-py`)** across GPU vendors, and **Fused CUDA 12** on NVIDIA GPUs (measured on Windows, Python 3.12, NVIDIA GeForce RTX 4060 Ti):
+
+| Workload | CPU (OpenCV SIMD) | WebGPU (`wgpu` Vulkan) | CUDA 12 (`cupy`) | Highlights |
+| --- | ---: | ---: | ---: | --- |
+| `512×512` exact Euclidean SDF (`distance_field`) | **2.84 ms** | — | — | `cv2.distanceTransform` C++ SIMD (~9× faster than NumPy JFA) |
+| `512×512` shader (`fbm` + `ridged` + `voronoi`) | 150.2 ms | **4.64 ms** (32×) | **1.12 ms** (134×) | Bit-exact `u32` hash (`max_diff < 1e-4` across CPU / WebGPU / CUDA) |
+| `512×512` Cook-Torrance GGX PBR + Studio IBL | 289.5 ms | **40.53 ms** (7.1×) | — | WGSL `@compute` BRDF + ACES Filmic shader |
+| 18 Cook-Torrance PBR cards (`1200×800`, cached) | 593 ms cold / **37.2 ms cached** | — | — | 128 MB LRU element render cache + bbox crop |
+| 21-frame `1280×720` HUD sprite sheet | **873 ms** | — | — | Static-layer pre-baking + parallel worker threads (4.7× faster) |
+
+> **Platform honesty note:** Hardware GPU benchmarks above were measured on an **NVIDIA GeForce RTX 4060 Ti** (CUDA 12 + Vulkan/D3D12 WebGPU). AMD, Intel, and Apple Silicon (Metal) GPUs are targeted through portable standard WGSL via `wgpu-py`, but have **not** been physically benchmarked on those machines yet.
+
+Key engine optimizations:
+- **OpenCV C++ SIMD Primitives:** Exact L2 `distanceTransform`, Scharr normal gradients, `GaussianBlur`, morphological disc dilation/erosion, and `remap` optical liquid-glass warping run in native AVX2/NEON C++.
+- **Fused CUDA AST Compiler:** Sandboxed shader ASTs compile directly into a single register-only CUDA C++ kernel on GPU with bit-exact `uint32` noise hashing across CPU and GPU.
+- **Smart Bbox Cropping & Caching:** PBR & shaders evaluate strictly inside element bounds (skipping empty shadow padding), styled layers crop to element bounds, and static animation layers bake once.
+- **Low-Memory I/O:** MP4/WebM frames stream directly into `ffmpeg` stdin; PSD layers write with PackBits RLE compression.
+
+---
+
 ## Features
 
-- **Shapes:** rects with round, cut or smoothed corners, ellipses, polygons and stars, lines with arrow heads and tapering, arcs, gauge ticks, SVG paths and import, exact booleans, offset / outline / flatten, components, linear and circular arrays, image vectorising.
-- **Style:** solid, linear / radial / conic / diamond gradients (OKLab), patterns, fill stacks, your own per-pixel shader formulas, 23 ready materials plus your own, multiple strokes, shadows, glows, inner effects, bevel, directional 3D lighting, frosted and refracting glass, progressive blur, feathered edges, grain, edge texture, masks, 13 blend modes, layers with clipping.
-- **Images:** crop, background cut-out, pan and zoom inside any shape, animated GIF / APNG / WebP and sprite sheets, sub-pixel smooth motion.
-- **Text:** 10 bundled fonts plus system fonts, Arabic, Hebrew, Indic, Thai and CJK shaped with HarfBuzz, colour emoji, OpenType features, variable axes, lists, text on arcs and paths, truncation, text to outlines, missing-glyph checks.
-- **Design system:** colour and number tokens, light / dark / team modes, named styles, generated palettes with contrast checks, W3C DTCG and DESIGN.md import / export, kit-wide restyling, version history.
-- **Layout:** live auto layout (row / column / grid, wrap, hug, fill, min / max, spans), pins to screen edges, device presets with safe areas, multi-resolution preview, colour-blindness simulation.
-- **Components and data:** instances, variants, slots, optional parts, interaction states, templates from data rows, string tables with pseudo-localisation.
-- **Animation:** keyframes on any property with 30+ eases (spring included), motion paths, staggering, motion blur, filmstrip preview.
-- **Interaction:** a state machine (hover, press, click, keys, animation chains, states, navigation) that runs in web and React output and is listed for engine code.
-- **Review:** `preview` with zoom and regions, `review_canvas` lint, pixel inspection, contact sheets, design variations.
+- **Cook-Torrance GGX PBR Materials & Shaders:** 39 built-in photorealistic materials (`chrome`, `gold`, `silver`, `bronze`, `copper`, `steel`, `iron`, `radial_metal`, `hammered_gold`, `rust`, `wood`, `stone`, `runic_stone`, `marble`, `obsidian`, `jade`, `gem`, `ruby`, `emerald`, `lava`, `ice`, `leather`, `paper`, `aged_parchment`, `fabric`, `carbon_twill`, `wax_seal`, `enamel`, `glass`, `liquid_glass`, `hologram`, `energy_shield`, `foil_holographic`, `neon`, `plastic`, `candy_gloss`, `clay_3d`, `rubber`, `jelly`), `style.pbr` physical overrides (metallic, roughness, clearcoat, IOR, anisotropy, SSS, studio IBL, ACES tone mapping), custom theme materials, and sandboxed shader DSL with `d`/`edge` SDF inputs, `height` bump output, `ridged`/`turbulence`/`fbm`/`voronoi` noise, and animated `shine` sweeps.
+- **Vector Geometry:** Exact scanline winding-number rasterizer (4× supersampled), squircle corner smoothing, cut corners, ellipses, stars/polygons, tapered/wiggled/arrowed lines, arcs, gauge ticks, SVG import, exact `pyclipper` booleans, offset/outline/flatten/simplify, arrays, scatter, and `vectorize_image`.
+- **Reactive Data Binding & State Machine:** `set_binding` variables & sandboxed expressions for live bars, colors, visibility, and `{placeholders}`; `set_interaction` triggers (`load`, `hover`, `press`, `click`, `key:*`, `end:*`) with `sfx` audio event hooks; arrow-key + Web Gamepad API navigation in Web/React and controller scripts in Unity/Godot/Roblox.
+- **Live Preview Studio:** `live_preview("start")` serves a zero-dependency `127.0.0.1` SSE browser studio that auto-reloads on every agent call with ID overlays, safe-area guides, backdrops, and coordinate inspection.
+- **Typography & Global Localization:** 10 bundled OFL fonts + system/user fonts, HarfBuzz + BiDi shaping for Arabic, Hebrew, Indic, Thai, and CJK with automatic Noto fallback, color emoji, OpenType features, variable axes, text on arcs/paths, text-to-outlines, string tables, and pseudo-localization (`pseudo`, `pseudo-long`, `pseudo-rtl`).
+- **Layout, Design Systems & Self-Review:** Live Flex/Grid auto layout (`row`, `column`, `grid`, `wrap`, `hug`, `fill`, `span`), edge pins, device safe areas, OKLCH WCAG palettes (`make_palette`), light/dark/team modes, W3C DTCG & `DESIGN.md`, `review_canvas` lint, color-blindness simulation, and named version history.
 
-The full reference with style keys, layers, animation and engine tables is in **[docs/GUIDE.md](docs/GUIDE.md)** (Turkish).
+---
 
 ## Tools
 
 <details>
-<summary><strong>All 85 tools</strong></summary>
+<summary><strong>All 92 MCP tools (+ 3 Resources & 3 Workflow Prompts)</strong></summary>
 
 | Group | Tools |
 | --- | --- |
-| Canvas | `create_canvas`, `list_canvases`, `get_canvas`, `update_canvas`, `duplicate_canvas`, `delete_canvas`, `fit_canvas`, `resize_canvas`, `canvas_version` |
-| Layers | `create_layer`, `update_layer`, `delete_layer`, `set_layer` |
-| Drawing | `add_rect`, `add_ellipse`, `add_line`, `add_polygon`, `add_path`, `add_arc`, `add_ticks`, `add_text`, `add_image`, `add_instance`, `add_svg` |
-| Editing | `update_element`, `delete_elements`, `duplicate_element`, `boolean_elements`, `path_ops`, `restyle`, `find_elements`, `vectorize_image`, `move_elements`, `reorder_element`, `align_elements`, `arrange_elements`, `scatter`, `copy_elements`, `set_pin`, `batch`, `undo`, `redo` |
-| States, data, language | `set_state`, `delete_state`, `generate_from_template`, `set_strings`, `get_strings` |
-| Checks | `review_canvas`, `inspect_pixels`, `view_image`, `preview_nine_slice` |
-| Animation | `create_animation`, `set_keyframes`, `delete_keyframes`, `get_animations`, `delete_animation`, `preview_animation`, `export_animation` |
-| Theme and info | `set_theme`, `get_theme`, `make_palette`, `list_fonts`, `measure_text`, `guide` |
-| Preview and explore | `preview`, `preview_resolutions`, `contact_sheet`, `make_variations` |
-| Export | `export_png`, `export_svg`, `export_pdf`, `export_web`, `export_react`, `export_asset`, `export_layers`, `export_psd`, `export_atlas`, `export_bitmap_font`, `write_engine_helpers` |
-| Hand-off | `export_spec`, `export_theme`, `set_link`, `set_interaction`, `export_prototype`, `export_screen` |
+| **Canvas** | `create_canvas`, `list_canvases`, `get_canvas`, `update_canvas`, `duplicate_canvas`, `delete_canvas`, `fit_canvas`, `resize_canvas`, `canvas_version` |
+| **Layers** | `create_layer`, `update_layer`, `delete_layer`, `set_layer` |
+| **Drawing, Frames & Widgets** | `add_rect`, `add_ellipse`, `add_line`, `add_polygon`, `add_path`, `add_arc`, `add_ticks`, `add_text`, `add_image`, `add_instance`, `add_svg`, **`add_frame`**, **`add_input`**, **`add_scroll`**, **`import_screenshot`** |
+| **Editing** | `update_element`, `delete_elements`, `duplicate_element`, `boolean_elements`, `path_ops`, `restyle`, `find_elements`, `vectorize_image`, `move_elements`, `reorder_element`, `align_elements`, `arrange_elements`, `scatter`, `copy_elements`, `set_pin`, `batch`, `undo`, `redo` |
+| **Data, states & i18n** | `set_binding`, `set_state`, `delete_state`, `generate_from_template`, `set_strings`, `get_strings` |
+| **Checks & Live Studio** | `live_preview`, `review_canvas`, `inspect_pixels`, `view_image`, `preview_nine_slice` |
+| **Animation** | `create_animation`, `set_keyframes`, `delete_keyframes`, `get_animations`, `delete_animation`, `preview_animation`, `export_animation` |
+| **Theme & Info** | `set_theme`, `get_theme`, `make_palette`, `list_fonts`, `measure_text`, `guide` |
+| **Preview & Explore** | `preview`, `preview_resolutions`, `contact_sheet`, `make_variations` |
+| **Export** | `export_png`, `export_svg`, `export_pdf`, `export_web`, `export_react`, `export_asset`, **`export_pbr_maps`**, `export_layers`, `export_psd`, `export_atlas`, `export_bitmap_font`, `write_engine_helpers` |
+| **Hand-off & Engines** | `export_spec`, `export_theme`, `set_link`, `set_interaction`, `export_prototype`, `export_screen` |
 
-Look-only tools (`preview`, `get_*`, `review_canvas`...) are marked read-only and `delete_*` destructive, so clients can skip or ask for approval. Every error tells the agent what was wrong and how to fix it.
+Read-only tools carry `readOnlyHint=True` and destructive tools carry `destructiveHint=True` via MCP `ToolAnnotations`. Native MCP Resources (`gameui://materials`, `gameui://workspace`, `gameui://guide/{topic}`) and Prompts (`design_game_hud`, `design_rpg_panel`, `audit_and_polish`) aid agent discovery while keeping server instructions under 2k chars. See [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) for full dependency & OFL font attribution.
 
 </details>
+
+---
+
+## Security
+
+- **Offline by design:** Zero outbound network calls. `live_preview` binds strictly to `127.0.0.1`.
+- **Sandboxed formulas:** Both `shader.py` and `binding.py` validate ASTs against strict whitelists (no imports, attributes, subscripts, or loops) and enforce pixel/work budgets before execution.
+- **Injection-safe engine export:** Engine paths and asset IDs are allow-listed; generated engine scripts are written to disk, never executed; SVG `DOCTYPE` / `ENTITY` declarations are refused.
+
+Report security issues privately via [SECURITY.md](SECURITY.md).
+
+---
 
 ## FAQ
 
 <details>
-<summary><strong>Which agents can use it?</strong></summary>
+<summary><strong>Which AI clients are supported?</strong></summary>
 
-Any client that supports local MCP servers: Claude Code, Claude Desktop, Cursor, Windsurf, VS Code and others. See [Quick start](#quick-start).
-
-</details>
-
-<details>
-<summary><strong>Does it use an image model or the internet?</strong></summary>
-
-No. The agent builds everything from shapes, text and effects, and the server renders them locally. Nothing is uploaded; your agent's model provider sees the tool results under its own data policy.
+Any MCP-compatible client: Claude Code, Claude Desktop, Cursor, Windsurf, VS Code, Antigravity, Goose, Codex, and custom agents.
 
 </details>
 
 <details>
-<summary><strong>Can it draw characters, illustrations or photos?</strong></summary>
+<summary><strong>Does it use an image generation model?</strong></summary>
 
-No, that is not what it is for. It draws interface art. Place existing art with `add_image`, which can crop it, cut out a flat background, pan and zoom it, or play it as an animation.
-
-</details>
-
-<details>
-<summary><strong>Where are my files?</strong></summary>
-
-Canvases, the theme and exports live in `~/GameUI` and survive restarts. Set `"env": {"GAME_UI_MCP_DIR": "D:\\UI"}` in the client config for another folder. Fonts dropped into `~/GameUI/fonts/` become available.
+No. Every element is built from deterministic vector primitives, shaders, lighting, and typography rendered locally. Need character art or portraits? Place them with `add_image` (with crop, background cutout, pan/zoom, or sprite-sheet playback).
 
 </details>
 
 <details>
-<summary><strong>Are the engine files tested inside the engines?</strong></summary>
+<summary><strong>Where are my project files saved?</strong></summary>
 
-Yes. They are generated, format-tested and tested in Unity, Unreal, Godot and Roblox. If an import fails, the error message usually tells the agent what to change; please also [open an issue](https://github.com/TENETTE/game-ui-mcp/issues).
-
-</details>
-
-<details>
-<summary><strong>How much context do the tools take?</strong></summary>
-
-The 85 tool definitions take about 30k tokens. Clients that load tools on demand (Claude Code) pay much less. Long references live behind the `guide` tool instead of the server instructions.
+If your working directory contains a `.gameui/` folder, it uses that automatically (ideal for Git). Otherwise it uses `~/GameUI` (or `GAME_UI_MCP_DIR`). Custom `.ttf`/`.otf` fonts dropped into `<workspace>/fonts/` are picked up automatically.
 
 </details>
 
 <details>
-<summary><strong>What should I do if I hit a bug?</strong></summary>
+<summary><strong>How much context window do 92 tools consume?</strong></summary>
 
-[Update](#update) first. If it persists, [open an issue](https://github.com/TENETTE/game-ui-mcp/issues) with what you asked, the tool call and the error message.
+Tool schemas are concise and long references live behind `guide(topic)` and MCP Resources instead of server instructions (~2.0k chars). Clients with on-demand tool loading (Claude Code, Antigravity) pay minimal context overhead.
 
 </details>
 
-## Documentation
+---
 
-- [Guide](docs/GUIDE.md) (Turkish): every feature, style key, layer rule, animation and engine table, and the limits.
-- [Skill](skill/game-ui-mcp/SKILL.md) (Turkish): the workflow and craft rules the agent follows.
-- [Changelog](CHANGELOG.md): what changed in each version.
-- In the agent, `guide(topic)` returns the full reference for fills, shaders, style, design, layers, geometry, text, reuse, review, animation and export.
+## Documentation & Contributing
 
-## Security
-
-- No network access. Generated engine scripts are written, never run. Shader formulas are a whitelisted maths language that cannot touch files or the system.
-- Values written into engine scripts are allow-listed, SVG DOCTYPE / ENTITY declarations are refused, and oversized renders and heavy formulas are refused before they start.
-- Export tools write to the folder you give them and overwrite files with the same name.
-
-Report vulnerabilities privately as described in [SECURITY.md](SECURITY.md).
-
-## Contributing
-
-Bug reports, ideas and pull requests are welcome: [open an issue](https://github.com/TENETTE/game-ui-mcp/issues) or [send a pull request](https://github.com/TENETTE/game-ui-mcp/pulls).
+- **[docs/GUIDE.md](docs/GUIDE.md)** — Full feature, style, animation, and engine reference (Turkish)
+- **[skill/game-ui-mcp/SKILL.md](skill/game-ui-mcp/SKILL.md)** — Agent UI craft skill (Turkish)
+- **[THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md)** — Dependency & bundled SIL OFL-1.1 font audit
+- **[CHANGELOG.md](CHANGELOG.md)** — Release history
 
 ```bash
 git clone https://github.com/TENETTE/game-ui-mcp
@@ -313,10 +388,10 @@ uv venv && uv pip install -e ".[dev]"
 uv run pytest
 ```
 
-`python examples/run_all.py` rebuilds every picture in this README. See [CONTRIBUTING.md](CONTRIBUTING.md).
+`python examples/run_all.py` rebuilds every showcase image. PRs and issues welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-[MIT](LICENSE): free for any use, including commercial. Bundled fonts are under the SIL Open Font License (`OFL.txt` in each font folder). What you draw with it is yours.
+[MIT](LICENSE) — free for personal and commercial use. Bundled fonts are SIL OFL-1.1 (`OFL.txt` in each font directory); see [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) for the complete license audit. Everything you create with it is yours.
 
-Figma, Penpot, Unity, Unreal Engine, Godot, Roblox, Photoshop, Illustrator, Inkscape, React and other product names are trademarks of their owners. This project is not affiliated with or endorsed by them; the names only describe compatibility.
+Figma, Penpot, Pencil, Rive, Envy, Unity, Unreal Engine, Godot, Roblox, Photoshop, Illustrator, Inkscape, React, Tailwind CSS, and other product names are trademarks of their respective owners. This project is independent and not affiliated with or endorsed by them.
