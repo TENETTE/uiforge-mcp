@@ -76,6 +76,31 @@ class ActivityLog:
 activity_log = ActivityLog()
 
 
+def canvas_element_rows(st, canvas: dict[str, Any], language: str | None = None) -> list[dict[str, Any]]:
+    """Compute element metadata & bounding boxes without rasterising any pixels (used by /api/canvas & render_view)."""
+    r1 = st.renderer(canvas, 1.0, language=language)
+    el_rows: list[dict[str, Any]] = []
+    for el in canvas.get("elements", []):
+        if not el.get("visible", True):
+            continue
+        try:
+            x0, y0, x1, y1 = r1.element_box(el)
+            box = [round(x0, 1), round(y0, 1), round(x1 - x0, 1), round(y1 - y0, 1)]
+        except ValueError:
+            box = [0.0, 0.0, 0.0, 0.0]
+        row: dict[str, Any] = {"id": el["id"], "type": el["type"], "bbox_xywh": box}
+        for key in ("layer", "group", "note", "text", "label", "bind"):
+            if el.get(key) is not None:
+                row[key] = el[key]
+        if isinstance(el.get("style"), dict):
+            if "material" in el["style"]:
+                row["material"] = el["style"]["material"]
+            if "fill" in el["style"] and isinstance(el["style"]["fill"], str):
+                row["fill"] = el["style"]["fill"]
+        el_rows.append(row)
+    return el_rows
+
+
 def render_view(st, canvas_id: str, *, background: str = "checker",
                 show_ids: bool = False, show_guides: bool = False, state: str | None = None,
                 data: dict[str, Any] | None = None, hide_layers: list[str] | None = None,
@@ -107,26 +132,7 @@ def render_view(st, canvas_id: str, *, background: str = "checker",
             for ly in (c.get("layers") or [])
         ])
 
-    r1 = st.renderer(c, 1.0, language=language)
-    el_rows: list[dict[str, Any]] = []
-    for el in c.get("elements", []):
-        if not el.get("visible", True):
-            continue
-        try:
-            x0, y0, x1, y1 = r1.element_box(el)
-            box = [round(x0, 1), round(y0, 1), round(x1 - x0, 1), round(y1 - y0, 1)]
-        except ValueError:
-            box = [0.0, 0.0, 0.0, 0.0]
-        row: dict[str, Any] = {"id": el["id"], "type": el["type"], "bbox_xywh": box}
-        for key in ("layer", "group", "note", "text", "label", "bind"):
-            if el.get(key) is not None:
-                row[key] = el[key]
-        if isinstance(el.get("style"), dict):
-            if "material" in el["style"]:
-                row["material"] = el["style"]["material"]
-            if "fill" in el["style"] and isinstance(el["style"]["fill"], str):
-                row["fill"] = el["style"]["fill"]
-        el_rows.append(row)
+    el_rows = canvas_element_rows(st, c, language=language)
 
     scale = min(1.0, float(max_dim) / max(1, c["width"], c["height"]))
     r = st.renderer(c, scale, language=language)

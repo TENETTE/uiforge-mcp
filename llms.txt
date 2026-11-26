@@ -21,8 +21,9 @@
 
 ## Documentation Map
 
-- [README.md](README.md): English overview, 3 modes, real Studio UI screenshots, quick start, showcases, benchmarks.
-- [README.tr.md](README.tr.md): Turkish overview and guide.
+- [README.md](README.md): Concise English overview, quick start, 3 modes, export targets, and measured benchmarks.
+- [README.tr.md](README.tr.md): Concise Turkish overview and quick start.
+- [docs/SHOWCASES.md](docs/SHOWCASES.md): Full Studio UI, Cook-Torrance PBR, HUD, animation showcase gallery & 97-operation index.
 - [configs/README.md](configs/README.md): Multi-mode launch & provider-neutral MCP setup templates (OpenCode, Codex, Claude Code, VS Code, Visual Studio, Antigravity, Cursor, Windsurf, ChatGPT HTTP).
 - [docs/GUIDE.md](docs/GUIDE.md): Complete technical reference (Turkish).
 - [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md): Verified 2026 runtime, engine, GPU, and client matrix.

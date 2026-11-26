@@ -279,7 +279,7 @@ class StudioServer:
                     s.sync_from_disk()
                     try:
                         c = s.get(cid)
-                        _, _, el_rows = core.render_view(s, cid, max_dim=480.0)
+                        el_rows = core.canvas_element_rows(s, c)
                         self._send_json(200, {
                             "id": c["id"],
                             "name": c.get("name", c["id"]),
@@ -463,7 +463,7 @@ class StudioServer:
                         return
                     os.environ["UIFORGE_MCP_GPU"] = pref
                     from . import gpu
-                    gpu._cupy.cache_clear()
+                    gpu.select_backend(pref)
                     core.activity_log.record("set_gpu_backend", source="ui", detail=pref)
                     self._send_json(200, {"ok": True, "doctor": cli.doctor_report()})
                     return

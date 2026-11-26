@@ -30,11 +30,12 @@ _CJK = {
 }
 _SYSTEM = ["Segoe UI", "Nirmala UI", "Leelawadee UI", "Kohinoor Devanagari", "Thonburi", "Noto Sans",
            "DejaVu Sans", "Segoe UI Symbol", "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji"]
-COLOR_FONTS = ("seguiemj.ttf", "applecoloremoji.ttc", "notocoloremoji.ttf")
+COLOR_FONTS = ("seguiemj.ttf", "applecoloremoji.ttc", "notocoloremoji.ttf", "twemojimozilla.ttf")
 
 
 def is_color_font(path: str) -> bool:
-    return Path(path).name.lower() in COLOR_FONTS
+    norm = Path(path).name.lower().replace(" ", "").replace("-", "").replace("_", "")
+    return norm in COLOR_FONTS
 
 
 def _is_emoji(text: str, i: int) -> bool:
@@ -530,9 +531,31 @@ class ShapedText:
         """Paint colour emoji of ``text`` into the RGBA ``img`` (already offset)."""
         from PIL import ImageDraw
         self.shape(text)
+        req_sz = max(1, int(round(size_px)))
         for gx, part, fi in self.color_runs.get(text, []):
-            font = _pil_font(self.chain[fi].path, max(1, int(round(size_px))))
-            ImageDraw.Draw(img).text((x + gx, baseline), part, font=font, anchor="ls", embedded_color=True)
+            font, actual_sz = _pil_font_with_strike(self.chain[fi].path, req_sz)
+            if actual_sz == req_sz:
+                ImageDraw.Draw(img).text((x + gx, baseline), part, font=font, anchor="ls", embedded_color=True)
+            else:
+                # Bitmap colour emoji fonts (NotoColorEmoji 109px, Apple Color Emoji SBIX strikes)
+                # only rasterise at fixed strike sizes; render at the strike size and LANCZOS-scale cleanly.
+                pad = max(16, actual_sz // 2)
+                tmp_w = max(actual_sz * (len(part) + 2), actual_sz * 2) + pad * 2
+                tmp_h = actual_sz * 2 + pad * 2
+                base_y = actual_sz + pad
+                patch = Image.new("RGBA", (tmp_w, tmp_h), (0, 0, 0, 0))
+                ImageDraw.Draw(patch).text((pad, base_y), part, font=font, anchor="ls", embedded_color=True)
+                bbox = patch.getbbox()
+                if not bbox:
+                    continue
+                ratio = req_sz / float(actual_sz)
+                crop = patch.crop(bbox)
+                nw = max(1, int(round(crop.width * ratio)))
+                nh = max(1, int(round(crop.height * ratio)))
+                scaled = crop.resize((nw, nh), Image.LANCZOS)
+                dx = int(round(x + gx + (bbox[0] - pad) * ratio))
+                dy = int(round(baseline + (bbox[1] - base_y) * ratio))
+                img.alpha_composite(scaled, (dx, dy))
 
     def outline_polys(self, text: str, x: float, baseline: float) -> list:
         """Glyph outlines of ``text`` as polygons in pixels (text to vector paths)."""
@@ -571,6 +594,21 @@ def unsupported_features(path: str, features: dict) -> list[str]:
 def _pil_font(path: str, size: int):
     from PIL import ImageFont
     return ImageFont.truetype(path, size)
+
+
+@lru_cache(maxsize=32)
+def _pil_font_with_strike(path: str, size: int):
+    from PIL import ImageFont
+    try:
+        return ImageFont.truetype(path, size), size
+    except OSError:
+        strikes = sorted((20, 32, 40, 48, 64, 96, 109, 128, 160), key=lambda s: (s < size, abs(s - size)))
+        for st in strikes:
+            try:
+                return ImageFont.truetype(path, st), st
+            except OSError:
+                continue
+        raise
 
 
 

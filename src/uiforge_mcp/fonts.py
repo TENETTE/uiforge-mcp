@@ -76,10 +76,15 @@ class FontLibrary:
         for path in sorted(root.rglob("*")):
             if path.suffix.lower() not in FONT_EXTS:
                 continue
-            try:
-                font = ImageFont.truetype(str(path), 16)
-                family, style = font.getname()
-            except Exception:
+            font = None
+            for probe_sz in (16, 109, 64, 48, 40, 32, 20, 128):
+                try:
+                    font = ImageFont.truetype(str(path), probe_sz)
+                    family, style = font.getname()
+                    break
+                except Exception:
+                    font = None
+            if font is None:
                 continue
             if not family:
                 continue

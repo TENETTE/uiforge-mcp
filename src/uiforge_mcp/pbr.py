@@ -555,9 +555,10 @@ def shade_pbr(fill_img: Image.Image, shape_mask: Image.Image, spec: dict[str, An
     key_ang = math.radians(float(spec.get("angle", 225.0)))
     key_alt = math.radians(max(10.0, min(80.0, float(spec.get("altitude", 46.0)))))
 
+    _pbr_backend = gpu.backend_name(w * h)
     if (not env_map and aniso <= 0.01 and str(brush_mode).lower() != "radial"
             and profile not in ("facet", "dome") and spec.get("shine") is None
-            and gpu.backend_name(w * h) == "wgpu"):
+            and (_pbr_backend == "wgpu" or (_pbr_backend == "cuda" and gpu.wgpu_available()))):
         from . import gpu_wgpu
         wgpu_img = gpu_wgpu.shade_pbr_wgpu(f, spec)
         if wgpu_img is not None:

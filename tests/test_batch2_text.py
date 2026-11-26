@@ -43,6 +43,9 @@ def test_colour_emoji_render_in_colour(ws):
     s.create_canvas("c", 120, 50)
     s.add_text("c", "A \U0001F525", x=5, y=5, size=32, color="#ffffff")
     st = s.store()
+    lay = TextLayout(st.get("c")["elements"][0], {}, st.fonts, 1.0)
+    if not lay.shaper or not any(f.color and 0x1F525 in f.cmap for f in lay.shaper.chain):
+        pytest.skip("no system colour emoji font installed (e.g. Segoe UI Emoji, Apple Color Emoji, Noto Color Emoji)")
     px = np.asarray(st.renderer(st.get("c")).render(include_background=False))
     vis = px[..., 3] > 200
     assert (vis & (px[..., 0].astype(int) - px[..., 2].astype(int) > 80)).any()
