@@ -1,16 +1,16 @@
 name: Feature request
-description: A tool, style or export the model needs to draw something it cannot today
+description: Propose a Studio UI capability, MCP tool, material, style preset, or engine export
 labels: [enhancement]
 body:
   - type: textarea
     id: goal
     attributes:
-      label: What do you want to make?
-      description: The UI piece, look or engine hand-off you are after (a reference image helps).
+      label: What do you want to build or ship?
+      description: The UI piece, workflow, visual look, or engine/framework hand-off you are after (a reference image helps).
     validations:
       required: true
   - type: textarea
     id: gap
     attributes:
       label: What is missing today?
-      description: What you tried with the existing tools and where it falls short.
+      description: What you tried in Studio UI or MCP tools and where it falls short.

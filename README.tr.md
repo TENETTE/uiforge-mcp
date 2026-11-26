@@ -2,23 +2,38 @@
 
 [English](README.md) · **Türkçe**
 
-# UIForge (`uiforge-mcp`)
+<a href="#studio-ui-turu">
+  <img src="docs/banner.png" alt="UIForge (uiforge-mcp) — Deterministik UI Tasarım Stüdyosu ve MCP Sunucusu" width="100%" />
+</a>
 
-### İnsanlar, yapay zekâ ajanları veya ikisinin canlı ortak çalışması için açık kaynaklı, %100 yerel UI tasarım stüdyosu ve MCP sunucusu.
+<br />
+
+### İnsanlar, yapay zekâ ajanları veya ikisinin canlı ortak çalışması için %100 yerel, deterministik UI tasarım stüdyosu ve MCP sunucusu.
 
 **Oyun HUD'ları, menüler, masaüstü uygulamalar ve web arayüzlerini doğrudan Studio UI'da tasarla, dilediğin MCP uyumlu yapay zekâ istemcisiyle yönet veya Combined Mode'da aynı projede eş zamanlı çalış — abonelik, çağrı limiti ve difüzyon halüsinasyonu olmadan.**
 
-[![tests](https://img.shields.io/github/actions/workflow/status/TENETTE/uiforge-mcp/tests.yml?branch=main&style=flat-square&label=tests)](https://github.com/TENETTE/uiforge-mcp/actions/workflows/tests.yml)
-[![3 Mod](https://img.shields.io/badge/Modlar-Human_UI_%7C_MCP_%7C_Combined-e89b3c?style=flat-square)](#üç-çalışma-modu)
-[![Motor](https://img.shields.io/badge/Motor-97_Araç_+_142_İkon_+_39_PBR-7c5cff?style=flat-square)](#araçlar-ve-yetenekler)
-[![Hedefler](https://img.shields.io/badge/Çıktı-UE_UMG_%7C_Unity_%7C_Godot_%7C_Roblox_%7C_.NET_%7C_C++_%7C_React-ec4899?style=flat-square)](#neye-çıktı-verir)
-[![GPU isteğe bağlı](https://img.shields.io/badge/GPU-CUDA_12_%2B_WebGPU_(wgpu)_%2B_CPU_SIMD-76b900?style=flat-square)](#performans-ve-gpu-arka-uçları)
-[![MIT lisansı](https://img.shields.io/badge/lisans-MIT-22c55e?style=flat-square)](LICENSE)
+<p>
+  <a href="https://github.com/TENETTE/uiforge-mcp/actions/workflows/tests.yml"><img src="https://img.shields.io/github/actions/workflow/status/TENETTE/uiforge-mcp/tests.yml?branch=main&style=flat-square&label=tests" alt="CI Testleri" /></a>
+  <a href="pyproject.toml"><img src="https://img.shields.io/badge/python-3.10%2B-3776ab?style=flat-square&logo=python&logoColor=white" alt="Python 3.10+" /></a>
+  <a href="#üç-çalışma-modu"><img src="https://img.shields.io/badge/modlar-Human_UI_%7C_MCP_%7C_Combined-e89b3c?style=flat-square" alt="3 Çalışma Modu" /></a>
+  <a href="#araçlar-ve-yetenekler"><img src="https://img.shields.io/badge/motor-97_Ara%C3%A7_%C2%B7_142_%C4%B0kon_%C2%B7_39_PBR-38bdf8?style=flat-square" alt="Motor Yetenekleri" /></a>
+  <a href="#performans-ve-gpu-arka-uçları"><img src="https://img.shields.io/badge/GPU-CUDA_12_%7C_WebGPU_%7C_CPU_SIMD-76b900?style=flat-square" alt="GPU Arka Uçları" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/lisans-MIT-22c55e?style=flat-square" alt="MIT Lisansı" /></a>
+</p>
 
-[Neden UIForge](#neden-uiforge) · [Üç Çalışma Modu](#üç-çalışma-modu) · [Studio UI Turu](#studio-ui-turu) · [Hızlı Başlangıç](#hızlı-başlangıç) · [Neye Çıktı Verir](#neye-çıktı-verir) · [Örnekler](#örnekler) · [Performans](#performans-ve-gpu-arka-uçları) · [SSS](#sss)
+<p>
+  <a href="#neden-uiforge">Neden UIForge</a> ·
+  <a href="#üç-çalışma-modu">Üç Çalışma Modu</a> ·
+  <a href="#studio-ui-turu">Studio UI</a> ·
+  <a href="#hızlı-başlangıç">Hızlı Başlangıç</a> ·
+  <a href="#neye-çıktı-verir">Çıktı Hedefleri</a> ·
+  <a href="#örnekler">Örnekler</a> ·
+  <a href="#performans-ve-gpu-arka-uçları">Performans</a> ·
+  <a href="#sss">SSS</a>
+</p>
 
 ```bash
-# Human Mode — bağımsız Studio UI'ı aç (MCP istemcisi veya AI IDE gerekmez)
+# Human Mode — bağımsız görsel Studio UI (MCP istemcisi veya AI IDE gerekmez)
 uvx --from git+https://github.com/TENETTE/uiforge-mcp uiforge
 
 # Combined Mode — Studio UI + MCP sunucusu aynı çalışma alanında canlı senkron
@@ -27,7 +42,9 @@ uvx --from git+https://github.com/TENETTE/uiforge-mcp uiforge combined
 
 <br />
 
-<img src="docs/ui_studio.png" alt="UIForge Studio UI — Combined MCP + UI modu, PBR kalkan barı, yerel bileşenler ve canlı Activity Log" width="1200" />
+<img src="docs/ui_studio.png" alt="UIForge Studio UI — Combined MCP + UI modu, PBR kalkan barı, yerel bileşenler ve canlı Activity Log" width="100%" />
+
+<sub><em>UIForge Studio yerel Combined Mode çalışırken — Cook-Torrance PBR sahnesi, 8 noktalı boyutlandırma tutamakları, canlı işlem günlüğü ve eş zamanlı MCP + UI senkronizasyonu.</em></sub>
 
 </div>
 
@@ -50,7 +67,7 @@ uvx --from git+https://github.com/TENETTE/uiforge-mcp uiforge combined
 
 | Mod | Komut | Kullanım Amacı | MCP / AI IDE Gerekli mi? |
 | --- | --- | --- | :---: |
-| **Human Mode (UI Mode)** | `uiforge` veya `uiforge ui` (çerçevesiz pencere için `--app`) | Tarayıcıda veya masaüstü penceresinde doğrudan tasarım, 39 PBR materyal ve 142 ikon kataloğu, canlı veri testi, WCAG denetimi ve tek tıkla çıktı | **Hayır** |
+| **Human Mode (UI Mode)** | `uiforge` veya `uiforge ui` (çerçevesiz pencere için `--app`) | Doğrudan görsel tasarım, 39 PBR materyal ve 142 ikon, canlı PBR ayarı, WCAG/CVD denetimi ve tek tıkla motor çıktısı | **Hayır** |
 | **MCP Mode** | `uiforge-mcp` veya `uiforge mcp` (`--transport stdio\|http`) | OpenCode, Claude Code, OpenAI Codex, VS Code, Visual Studio, Antigravity, Cursor, Windsurf ve ChatGPT gibi MCP istemcileriyle arayüzsüz çalışma | Evet |
 | **Combined Mode (MCP + UI)** | `uiforge combined` veya `uiforge serve --mode combined` | İnsan ve yapay zekânın **aynı projede eş zamanlı çalışması**; canlı SSE güncellemesi, atomik disk eşitleme ve ortak `[MCP]` + `[UI]` işlem günlüğü | İsteğe bağlı (ayrı süreçler arasında da senkron) |
 
@@ -68,35 +85,70 @@ flowchart LR
     C --> E3["Web ve Varlıklar<br/>React TSX / Tailwind · HTML · SVG · PSD · PDF · dotLottie · MP4"]
 ```
 
+<details>
+<summary><strong>Depo yapısı ve temel modüller</strong></summary>
+
+```text
+uiforge-mcp/
+├── src/uiforge_mcp/            # Ana Python paketi (src-layout + py.typed)
+│   ├── core.py                 # MCP'den bağımsız işlem dağıtıcı, render_view ve ActivityLog
+│   ├── store.py                # RLock + atomik JSON depo ve süreçler arası disk eşitleme
+│   ├── server.py               # MCP adaptörü (97 araç, 4 kaynak, 3 prompt; MCP olmadan temiz düşüş)
+│   ├── cli.py                  # Birleşik CLI (`uiforge`, `uiforge-mcp`, `doctor`, `setup`)
+│   ├── studio_ui.py            # Bağımsız çevrimdışı Studio HTTP + SSE sunucusu (127.0.0.1)
+│   ├── ui_assets/              # Studio HTML/CSS/JS + UIForge ile üretilmiş PBR amblem ve şablonlar
+│   ├── render.py / pbr.py      # Deterministik vektör motoru, Cook-Torrance GGX PBR ve HDR IBL
+│   ├── gpu.py / gpu_wgpu.py    # Tak-çıkar CUDA 12, WebGPU WGSL ve OpenCV SIMD arka uçları
+│   ├── icons.py / frames.py    # 142 saf MIT vektör ikon ve 9 parametrik AAA çerçeve
+│   ├── widgets.py / tokens.py  # Yerel UI bileşenleri ve CSS/Tailwind/shadcn/DTCG token içe aktarıcı
+│   ├── tools_delivery.py       # Unreal UMG, Unity, Godot, Roblox, PBR doku haritaları ve atlaslar
+│   ├── desktop_export.py       # WPF, Avalonia, WinUI 3, Qt 6 QML ve Dear ImGui dışa aktarıcıları
+│   ├── webexport.py / lottie.py# React TSX/Tailwind, HTML prototip ve dotLottie v2 durum makineleri
+│   └── assets/fonts/           # 11 gömülü SIL OFL-1.1 font ailesi (Noto BiDi/Hintçe dahil)
+├── tests/                      # 275+ birim, eşzamanlılık, güvenlik, render ve 3-mod entegrasyon testi
+├── configs/                    # 9+ AI istemcisi için hazır MCP yapılandırma şablonları
+├── docs/                       # Studio UI ekran görüntüleri, tam kılavuz ve uyumluluk matrisi
+├── examples/                   # Yeniden üretilebilir örnek betikler (`python examples/run_all.py`)
+├── skill/uiforge-mcp/          # Sağlayıcıdan bağımsız AI ajan tasarım kılavuzu (`SKILL.md`)
+├── .github/                    # Çoklu platform CI, PyPI yayın akışı, Dependabot ve YAML issue formları
+├── llms.txt                    # AI kodlama araçları için makine okunabilir özet dizin
+└── pyproject.toml              # Hatchling paketleme, ekler, pytest ve ruff yapılandırması
+```
+
+</details>
+
 ---
 
 ## Studio UI Turu
 
-Aşağıdaki tüm ekran görüntüleri doğrudan çalışan UIForge Studio uygulamasından alınmıştır (sahte mockup değildir). Stüdyonun kendi Cook-Torrance PBR marka amblemi ve 3 başlangıç şablonu bizzat UIForge motoruyla üretildi; **Koyu Atölye & Açık Stüdyo temaları**, **`Ctrl+K` Komut Paleti**, **8 noktalı canlı boyutlandırma tutamakları**, **manyetik akıllı hizalama çizgileri**, **`Shift+Tık` çoklu seçim + eşit dağıtma**, **çift tıkla satır içi metin düzenleme**, **canlı Cook-Torrance PBR ayar paneli ve özel materyal kaydetme**, **Renk Körlüğü (`Deuteranopia`/`Protanopia`/`Tritanopia`/`Grayscale`) & `Pseudo-Long`/`Pseudo-RTL` simülatörü**, **Çoklu Cihaz Matrisi** (`1080p`/`21:9`/`Steam Deck`/`Mobil`), **Görsel Varyasyon Gezgini**, **CSS `:root` / Tailwind v4 `@theme` / shadcn token içe aktarıcı** ve **Hızlı Hareket + `dotLottie v2`/GIF dışa aktarma** yerleşiktir.
+Aşağıdaki tüm ekran görüntüleri doğrudan çalışan UIForge Studio uygulamasından alınmıştır (sahte mockup değildir). Stüdyoda **Koyu Atölye & Açık Stüdyo temaları**, **`Ctrl+K` Komut Paleti** (97 işlem, 39 PBR materyal, 142 ikon, 9 çerçeve ve tüm tuvallerde hızlı arama), **8 noktalı canlı boyutlandırma tutamakları**, **manyetik akıllı hizalama çizgileri**, **`Shift+Tık` çoklu seçim + eşit dağıtma**, **çift tıkla satır içi metin düzenleme**, **canlı Cook-Torrance PBR ayar paneli ve özel materyal kaydetme**, **Renk Körlüğü (`Deuteranopia`/`Protanopia`/`Tritanopia`/`Grayscale`) & `Pseudo-Long`/`Pseudo-RTL` simülatörü**, **Çoklu Cihaz Matrisi** (`1080p`/`21:9`/`Steam Deck`/`Mobil`), **Görsel Varyasyon Gezgini**, **CSS `:root` / Tailwind v4 `@theme` / shadcn token içe aktarıcı** ve **Hızlı Hareket + `dotLottie v2`/GIF dışa aktarma** yerleşiktir.
 
-### 1. 3 Gerçek Başlangıç Şablonlu Stüdyo Karşılama Ekranı (MCP Gerekmez)
-
-`uiforge` komutunu çalıştır ve hiçbir AI IDE ya da bulut hesabı olmadan doğrudan **Tactical Sci-Fi HUD**, **Fantasy RPG Forge**, **Desktop & SaaS App**, boş tuval veya ekran görüntüsü içe aktarma ile başla.
-
-<img src="docs/ui_launcher.png" alt="UIForge Studio 3 şablonlu başlangıç ekranı — PBR amblem, Tactical HUD, RPG Forge ve Desktop SaaS şablonları" width="1200" />
-
-### 2. Cook-Torrance PBR Materyal Atölyesi ve 142 Gömülü Vektör İkon
-
-**39 canlı render edilmiş Cook-Torrance GGX PBR materyalini** (`gold`, `hammered_gold`, `chrome`, `obsidian`, `jade`, `gem`, `liquid_glass`, `energy_shield`, `carbon_twill` ve daha fazlası) önizleyip tek tıkla uygula, hizalama/katman çubuğu veya ok tuşlarıyla hassas yerleştir, **9 parametrik AAA çerçeve** kur ve **142 saf MIT vektör ikonu** sahneye ekle.
-
-<img src="docs/ui_materials.png" alt="UIForge Studio PBR Materyal Atölyesi — 39 canlı Cook-Torrance örneği ve RPG demirci paneli" width="1200" />
-
-### 3. Tek Tıkla Motor, Masaüstü ve Web Çıktısı + Dahili Kod İnceleyici
-
-Aktif tasarımı tek tıkla **Unreal Engine 5 UMG**, **Unity (UI Toolkit & uGUI)**, **Godot 4**, **Roblox**, **C# .NET (WPF / Avalonia / WinUI 3)**, **C++ (Qt 6 QML / Dear ImGui)**, **React TSX / Tailwind**, **Etkileşimli HTML/CSS** veya **PNG / SVG / PSD / PBR Harita** olarak üret; çıkan kodu stüdyo içinde inceleyip tek tıkla kopyala.
-
-<img src="docs/ui_export.png" alt="UIForge Dışa Aktarma ve Motor Teslim penceresi — üretilmiş Unreal Engine 5 UMG Python WidgetBlueprint kodu" width="1200" />
-
-### 4. Duyarlı (Responsive) Düzen ve Canlı Veri Bağlama
-
-Hem geniş ekranlarda hem de dar bölünmüş pencerelerde (`900px` çekmece düzeni) sorunsuz çalışır. `set_binding` değişkenlerini, etkileşim durumlarını, WCAG kontrast denetimini ve piksel fark ısı haritalarını (`Önce | Sonra | Fark`) anlık dene.
-
-<img src="docs/ui_responsive.png" alt="UIForge Studio dar ekran duyarlı görünümü ve açık Canlı Veri Bağlama sürgüleri" width="900" />
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/ui_launcher.png" alt="UIForge Studio 3 şablonlu başlangıç ekranı" width="100%" /><br />
+      <strong>1. MCP Gerektirmeyen 3 Şablonlu Başlangıç</strong><br />
+      Hiçbir AI IDE veya bulut hesabı olmadan <em>Tactical Sci-Fi HUD</em>, <em>Fantasy RPG Forge</em>, <em>Desktop &amp; SaaS App</em>, boş tuval veya ekran görüntüsü içe aktarma ile başla.
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/ui_materials.png" alt="UIForge Studio PBR Materyal Atölyesi" width="100%" /><br />
+      <strong>2. Cook-Torrance PBR Atölyesi &amp; 142 Vektör İkon</strong><br />
+      <strong>39 canlı Cook-Torrance GGX örneğini</strong> önizle, pürüzlülük/metalik/aşınma ayarlarını canlı değiştir, özel materyal kaydet, 9 AAA çerçeve kur ve 142 saf MIT vektör ikonu ekle.
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/ui_export.png" alt="UIForge Dışa Aktarma ve Motor Teslim penceresi" width="100%" /><br />
+      <strong>3. Tek Tıkla Motor, Masaüstü &amp; Web Teslimi</strong><br />
+      <strong>Unreal Engine 5 UMG</strong>, Unity, Godot 4, Roblox, WPF / Avalonia / WinUI 3, Qt QML, Dear ImGui, React TSX / Tailwind, SVG, PSD veya PBR haritaları üretip kodu stüdyo içinde incele.
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/ui_responsive.png" alt="UIForge Studio dar ekran duyarlı görünümü ve Canlı Veri Bağlama" width="100%" /><br />
+      <strong>4. Duyarlı Düzen &amp; Canlı Veri Bağlama</strong><br />
+      Dar bölünmüş ekranlara (<code>900px</code> çekmece) otomatik uyum sağlar. <code>set_binding</code> sürgülerini, durumları, WCAG denetimini, görme simülasyonunu ve piksel fark ısı haritasını canlı test et.
+    </td>
+  </tr>
+</table>
 
 ---
 
@@ -110,7 +162,7 @@ Hem geniş ekranlarda hem de dar bölünmüş pencerelerde (`900px` çekmece dü
 # Studio UI'ı doğrudan tarayıcıda başlat (http://127.0.0.1:8766)
 uvx --from git+https://github.com/TENETTE/uiforge-mcp uiforge
 
-# Veya çerçevesiz yerel masaüstü penceresinde aç (pywebview veya Edge/Chrome --app)
+# Çerçevesiz yerel masaüstü penceresinde aç (pywebview veya Edge/Chrome --app)
 uvx --from git+https://github.com/TENETTE/uiforge-mcp uiforge ui --app
 
 # Belirli bir proje çalışma alanıyla başlat
@@ -150,7 +202,7 @@ uvx --from git+https://github.com/TENETTE/uiforge-mcp uiforge-mcp setup windsurf
 uvx --from git+https://github.com/TENETTE/uiforge-mcp uiforge-mcp serve --transport http --port 8765 --auth-token GIZLI_ANAHTAR
 ```
 
-Elle JSON / TOML yapılandırma örnekleri (OpenCode, OpenAI Codex, Claude Code, VS Code, Visual Studio, Antigravity, Cursor, Windsurf, ChatGPT) için [`configs/README.md`](configs/README.md) dosyasına bak.
+Elle JSON / TOML yapılandırma örnekleri için [`configs/README.md`](configs/README.md) dosyasına bak.
 
 ### Seçenek C — Combined Mode (Human Studio UI + MCP Eş Zamanlı)
 
@@ -213,7 +265,7 @@ uiforge-mcp mcp --toolset web --compact       # Web siteleri, React TSX/Tailwind
 | **Motor PBR Doku Haritaları** | **Albedo, Tangent Normal (OpenGL `+Y` & DirectX `-Y`), Roughness, Metallic, AO, Height, ORM paketli + Godot 4 `CanvasTexture .tres`** | `export_pbr_maps` |
 | **Hareket ve Video** | **dotLottie v2 (`.lottie` çoklu animasyon + etkileşimli Durum Makinesi ZIP)**, vektör Lottie JSON, H.264 MP4 / saydam VP9 WebM (akışlı), sprite sheet, GIF / APNG / WebP, DOTween & Roblox ease JSON | `export_animation`, `export_layers` |
 | **Atlas, Vektör ve Baskı** | **TexturePacker / Godot / Unity / CSS sprite atlasları**, düzenlenebilir SVG, PackBits RLE PSD, çok sayfalı vektör PDF, iOS/Android/Web PNG setleri, ICO, BMFont | `export_atlas`, `export_svg`, `export_psd`, `export_pdf`, `export_png`, `export_bitmap_font` |
-| **Tasarım Sistemi** | Geliştirici ölçü dökümü, W3C DTCG JSON, CSS/USS/C#/GDScript/Luau token'ları, **`DESIGN.md`** | `export_spec`, `export_theme` |
+| **Tasarım Sistemi** | Geliştirici ölçü dökümü, W3C DTCG JSON, CSS/USS/C#/GDScript/Luau token'ları, **`DESIGN.md`** + CSS `:root` / Tailwind v4 `@theme` / shadcn içe aktarma (`set_theme(tokens=...)`) | `export_spec`, `export_theme`, `set_theme` |
 
 ---
 
@@ -227,52 +279,72 @@ Lineer-HDR çift loblu GGX specular, kenar aşınması (`wear`), 5 HDR stüdyo �
 
 ![39 Cook-Torrance PBR Materyal](examples/materials.png)
 
-### Gerçek Zamanlı Motor PBR Doku Haritaları (`export_pbr_maps`)
+### Motor PBR Doku Haritaları (`export_pbr_maps`) ve 9 Parametrik AAA Çerçeve (`add_frame`)
 
-Herhangi bir 2B UI rozetini, madalyonu veya çerçeveyi tek seferde **Albedo, Tangent Normal (OpenGL / DirectX), Roughness, Metallic, AO, Height, ORM paketli ve Godot 4 `CanvasTexture .tres`** olarak pişir; motor ışıkları 2B arayüzünü canlı aydınlatsın.
+Herhangi bir 2B UI rozetini, madalyonu veya çerçeveyi tek seferde **Albedo, Tangent Normal (OpenGL / DirectX), Roughness, Metallic, AO, Height, ORM paketli ve Godot 4 `CanvasTexture .tres`** olarak pişir ya da tek çağrıda 9 stilde (`rpg_gold`, `royal_ornate`, `fantasy_parchment`, `scifi_hud`, `cyber_tech`, `glass_card`, `medieval_iron`, `luxury_minimal`, `cartoon_thick`) %100 düzenlenebilir çerçeve kur.
 
 ![PBR Doku Haritaları](examples/pbr_maps.png)
 
-### 9 Parametrik AAA Çerçeve (`add_frame`)
-
-Tek çağrıda 9 stilde (`rpg_gold`, `royal_ornate`, `fantasy_parchment`, `scifi_hud`, `cyber_tech`, `glass_card`, `medieval_iron`, `luxury_minimal`, `cartoon_thick`) %100 düzenlenebilir vektör + PBR çerçeve kurar ve içerik için `inner_box` güvenli alanını döner.
-
 ![Parametrik AAA Çerçeveler](examples/frames.png)
 
-### Gerçekçi Yarış HUD'u ve Bütün Bir UI Kiti
+### HUD'lar, UI Kitleri, Varyasyonlar ve Düzenlenebilir Vektör SVG
 
-![Yarış HUD'u](examples/racing_hud.png)
-
-![UI kiti](examples/kit_sheet.png)
-
-### Tasarım Varyasyonları ve Düzenlenebilir Vektör Çıktı
-
-`make_variations` tek çağrıda alternatif palet, şekil ve tipografi yönleri üretir; `export_svg` vektör yollarını, desenleri ve filtreleri düzenlenebilir korur ([design_tools.svg](examples/design_tools.svg)).
-
-![Varyasyonlar](examples/variations.png)
-
-![Tasarım araçları](examples/design_tools.png)
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="examples/racing_hud.png" alt="Gerçekçi Yarış HUD'u" width="100%" /><br />
+      <strong>Gerçekçi Yarış HUD'u</strong> — Konik devir kadranı, metalik göstergeler ve keskin telemetri.
+    </td>
+    <td width="50%" valign="top">
+      <img src="examples/kit_sheet.png" alt="UI Kiti Sayfası" width="100%" /><br />
+      <strong>Bütün Bir UI Kiti</strong> — Butonlar, kartlar, ilerleme çubukları, rozetler ve durum varyantları.
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="examples/variations.png" alt="Tasarım Varyasyonları" width="100%" /><br />
+      <strong>Tek Çağrıda Varyasyon Keşfi</strong> — <code>make_variations</code> alternatif palet, şekil ve tipografi yönleri üretir.
+    </td>
+    <td width="50%" valign="top">
+      <img src="examples/design_tools.png" alt="Tasarım Araçları ve Düzenlenebilir SVG" width="100%" /><br />
+      <strong>Düzenlenebilir Vektör Çıktı</strong> — Yollar, boolean işlemler, desenler ve filtreler korunur (<a href="examples/design_tools.svg">design_tools.svg</a>).
+    </td>
+  </tr>
+</table>
 
 ### Keyframe Animasyonlar
 
 | Buton girişi + parlama | Devir saati | Menü girişi ve seçim |
-| --- | --- | --- |
+| :---: | :---: | :---: |
 | ![Buton animasyonu](examples/anim_button.gif) | ![Gösterge animasyonu](examples/anim_gauge.gif) | ![Menü animasyonu](examples/anim_menu.gif) |
 
 <details>
 <summary><strong>Daha fazla örnek (ışık, katmanlar, gerçekçi kit, iş akışı, çoklu çözünürlük)</strong></summary>
 
-**Işık ve gölgeleme**
-![Gölgeleme kiti](examples/shading_kit.png)
+<br />
 
-**Kat kat boyama**
-![Küre katmanları](examples/orb_layers.png)
-
-**Gerçekçi kit**
-![Gerçekçi kit](examples/realistic_kit.png)
-
-**Bileşen, durum, veri şablonları ve piksel sanat**
-![İş akışı](examples/workflow.png)
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="examples/shading_kit.png" alt="Işık ve gölgeleme kiti" width="100%" /><br />
+      <strong>Işık ve Gölgeleme Kiti</strong>
+    </td>
+    <td width="50%" valign="top">
+      <img src="examples/realistic_kit.png" alt="Gerçekçi materyal kiti" width="100%" /><br />
+      <strong>Gerçekçi Materyal Kiti</strong>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="examples/orb_layers.png" alt="Kat kat boyama dökümü" width="100%" /><br />
+      <strong>Kat Kat Boyama Dökümü</strong>
+    </td>
+    <td width="50%" valign="top">
+      <img src="examples/workflow.png" alt="Bileşen, durum, şablon ve piksel sanat" width="100%" /><br />
+      <strong>Bileşen, Durum, Şablon ve Piksel Sanat</strong>
+    </td>
+  </tr>
+</table>
 
 **Çoklu çözünürlük pin testi (16:9, 21:9, mobil)**
 ![Çözünürlükler](examples/resolutions.png)
@@ -395,19 +467,21 @@ Hayır. Her eleman yerel vektör geometrisi, PBR shader'lar, ışıklandırma ve
 
 ## Belgeler ve Katkı
 
-- **[`configs/README.md`](configs/README.md)** — Çoklu mod başlatma ve IDE MCP yapılandırma şablonları
-- **[`docs/GUIDE.md`](docs/GUIDE.md)** — Tüm özellik, materyal, animasyon, masaüstü ve oyun motoru referansı
-- **[`docs/COMPATIBILITY.md`](docs/COMPATIBILITY.md)** — 2026 motor, çerçeve, GPU ve istemci doğrulama matrisi
-- **[`skill/uiforge-mcp/SKILL.md`](skill/uiforge-mcp/SKILL.md)** — Sağlayıcıdan bağımsız AI ajan tasarım kılavuzu (Skill)
-- **[`llms.txt`](llms.txt)** — AI kodlama araçları için makine okunabilir özet dizin
-- **[`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md)** — Bağımlılık ve gömülü SIL OFL-1.1 font lisans dökümü
-- **[`CHANGELOG.md`](CHANGELOG.md)** — Sürüm geçmişi
+| Belge | Açıklama |
+| --- | --- |
+| [`configs/README.md`](configs/README.md) | Çoklu mod başlatma ve IDE MCP yapılandırma şablonları |
+| [`docs/GUIDE.md`](docs/GUIDE.md) | Tüm özellik, materyal, animasyon, masaüstü ve oyun motoru referansı |
+| [`docs/COMPATIBILITY.md`](docs/COMPATIBILITY.md) | 2026 motor, çerçeve, GPU ve istemci doğrulama matrisi |
+| [`skill/uiforge-mcp/SKILL.md`](skill/uiforge-mcp/SKILL.md) | Sağlayıcıdan bağımsız AI ajan tasarım kılavuzu (Skill) |
+| [`llms.txt`](llms.txt) | AI kodlama araçları için makine okunabilir özet dizin |
+| [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md) | Bağımlılık ve gömülü SIL OFL-1.1 font lisans dökümü |
+| [`CHANGELOG.md`](CHANGELOG.md) | Sürüm geçmişi |
 
 ```bash
 git clone https://github.com/TENETTE/uiforge-mcp
 cd uiforge-mcp
 uv venv && uv pip install -e ".[dev]"
-uv run pytest
+uv run pytest -q && uv run ruff check src tests
 ```
 
 Issue ve PR'lara açığız — bkz. [`CONTRIBUTING.md`](CONTRIBUTING.md) ve [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md).
@@ -416,4 +490,4 @@ Issue ve PR'lara açığız — bkz. [`CONTRIBUTING.md`](CONTRIBUTING.md) ve [`C
 
 [MIT](LICENSE) — ticari kullanım dahil tamamen serbesttir. Gömülü 11 font ailesi SIL OFL-1.1 lisanslıdır (her font klasöründe `OFL.txt`); tam lisans dökümü için [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md). UIForge ile ürettiğin her şey senindir.
 
-Figma, Penpot, Pencil, Rive, Unity, Unreal Engine, Godot, Roblox, Photoshop, Illustrator, React, Tailwind CSS, Qt ve adı geçen diğer ürünler sahiplerinin markalarıdır. Bu proje bağımsızdır ve onlarla bağlantılı değildir.
+<sub>Figma, Penpot, Pencil, Rive, Unity, Unreal Engine, Godot, Roblox, Photoshop, Illustrator, React, Tailwind CSS, Qt ve adı geçen diğer ürünler sahiplerinin markalarıdır. Bu proje bağımsızdır ve onlarla bağlantılı değildir.</sub>

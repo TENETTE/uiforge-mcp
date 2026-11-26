@@ -1,15 +1,68 @@
+# Python bytecode & caches
 __pycache__/
-*.pyc
-.pytest_cache/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Packaging & distribution
+build/
+dist/
+*.egg-info/
+*.egg
+*.whl
+MANIFEST
+.sdist_check/
+
+# Virtual environments
 .venv/
 venv/
-dist/
-build/
-*.egg-info/
+env/
+ENV/
 
-# local tool state
+# Testing, linting, typing & coverage
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.tox/
+.nox/
+.hypothesis/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+# Secrets & local environment variables
+.env
+.env.*
+!.env.example
+credentials.json
+*.pem
+*.key
+
+# Local AI tools, IDEs & editors
 .claude/
+.cursor/
+.codex/
+.opencode/
+.gemini/
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Local UIForge workspace & regenerated demo artifacts
+.uiforge/
+examples/out/
+examples/_*/
+examples/*.psd
+examples/*_strip.png
+examples/components.png
+examples/hud_mockup.png
+
+# Logs & OS junk
 *.log
 .DS_Store
+._*
 Thumbs.db
-docs/DEVELOPMENT.md
+desktop.ini

@@ -1,0 +1,20 @@
+# Binary assets (prevent diff corruption / text conversion)
+*.png binary
+*.gif binary
+*.webp binary
+*.jpg binary
+*.jpeg binary
+*.ico binary
+*.ttf binary
+*.otf binary
+*.psd binary
+*.pdf binary
+*.mp4 binary
+*.webm binary
+*.lottie binary
+
+# GitHub Linguist hints (keep repo language stats focused on source code)
+docs/** linguist-documentation
+examples/** linguist-documentation
+configs/** linguist-documentation
+skill/** linguist-documentation

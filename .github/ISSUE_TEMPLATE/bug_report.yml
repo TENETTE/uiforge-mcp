@@ -1,19 +1,29 @@
 name: Bug report
-description: Something renders wrong, a tool fails, or an export does not work in an engine
+description: Something renders wrong, a Studio UI action or MCP tool fails, or an engine export breaks
 labels: [bug]
 body:
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Runtime mode
+      options:
+        - "Human Mode (uiforge / uiforge ui)"
+        - "MCP Mode (uiforge-mcp / uiforge mcp)"
+        - "Combined Mode (uiforge combined)"
+    validations:
+      required: true
   - type: textarea
     id: what
     attributes:
       label: What happened
-      description: What you expected and what you got. Screenshots of the preview / export help a lot.
+      description: What you expected and what you got. Screenshots of the Studio UI, preview, or export help a lot.
     validations:
       required: true
   - type: textarea
     id: repro
     attributes:
       label: How to reproduce
-      description: The tool calls (or the canvas JSON from get_canvas) that show the problem.
+      description: Steps in Studio UI, or the tool calls / canvas JSON from get_canvas that reproduce the issue.
       render: json
     validations:
       required: true
@@ -21,14 +31,17 @@ body:
     id: version
     attributes:
       label: Version
-      description: From pyproject.toml, or the commit you installed.
+      description: Output of `uiforge-mcp doctor` or the commit/version installed.
   - type: dropdown
     id: build
     attributes:
-      label: Build
-      options: ["cpu (default)", "gpu"]
+      label: Compute backend
+      options:
+        - "cpu (default — OpenCV SIMD + NumPy)"
+        - "nvidia (CUDA 12 + WebGPU)"
+        - "amd / intel / apple (WebGPU wgpu)"
   - type: input
     id: env
     attributes:
-      label: OS, Python and MCP client
-      placeholder: Windows 11, Python 3.12, Claude Desktop
+      label: OS, Python, and client (if using MCP)
+      placeholder: "Windows 11, Python 3.12, Standalone UI / OpenCode / Claude Code / Codex / VS Code"

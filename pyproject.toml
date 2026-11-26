@@ -5,18 +5,39 @@ build-backend = "hatchling.build"
 [project]
 name = "uiforge-mcp"
 version = "0.15.0"
-description = "Local deterministic UI design studio & MCP server (MCP Mode, Human UI Mode, Combined Mode). PBR materials, animations, game engines, .NET/C++ desktop & web/React."
+description = "Local deterministic UI design studio & MCP server (Human UI Mode, MCP Mode, Combined Mode). PBR materials, animations, game engines, .NET/C++ desktop & web/React."
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
 requires-python = ">=3.10"
-keywords = ["mcp", "model-context-protocol", "uiforge", "ui-design", "ui-studio", "unity", "godot", "roblox", "unreal", "wpf", "qt", "svg"]
+keywords = [
+    "mcp",
+    "model-context-protocol",
+    "uiforge",
+    "ui-design",
+    "ui-studio",
+    "pbr",
+    "unreal",
+    "unity",
+    "godot",
+    "roblox",
+    "wpf",
+    "qt",
+    "svg",
+]
 classifiers = [
-    "Programming Language :: Python :: 3",
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Games/Entertainment",
     "Topic :: Multimedia :: Graphics :: Editors :: Vector-Based",
+    "Topic :: Software Development :: User Interfaces",
 ]
 dependencies = [
     "mcp>=1.2",
@@ -29,6 +50,9 @@ dependencies = [
 
 [project.urls]
 Homepage = "https://github.com/TENETTE/uiforge-mcp"
+Repository = "https://github.com/TENETTE/uiforge-mcp"
+Documentation = "https://github.com/TENETTE/uiforge-mcp#readme"
+Changelog = "https://github.com/TENETTE/uiforge-mcp/blob/main/CHANGELOG.md"
 Issues = "https://github.com/TENETTE/uiforge-mcp/issues"
 
 [project.optional-dependencies]
@@ -57,6 +81,24 @@ uiforge = "uiforge_mcp.cli:uiforge_main"
 [tool.hatch.build.targets.wheel]
 packages = ["src/uiforge_mcp"]
 
+[tool.hatch.build.targets.sdist]
+exclude = [
+    "/.github",
+    "/docs/*.png",
+    "/examples/*.png",
+    "/examples/*.gif",
+    "/examples/*.svg",
+    "/examples/*.psd",
+    "/examples/out",
+]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["F401", "F63", "F7", "F82"]
