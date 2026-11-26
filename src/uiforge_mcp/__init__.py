@@ -1,3 +1,5 @@
-"""uiforge-mcp: local MCP server for drawing game UI assets."""
+"""uiforge-mcp: local deterministic UI design, PBR & multi-engine studio + MCP server."""
 
-__version__ = "0.1.0"
+__version__ = "0.15.0"
+
+

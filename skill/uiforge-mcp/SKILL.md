@@ -1,6 +1,6 @@
 ---
 name: uiforge-mcp
-description: Oyun, C#/.NET (WPF, Avalonia, WinUI), C++ (Qt QML, Dear ImGui), mobil ve web/React arayüzleri (menü, HUD, buton, panel, bar, gösterge, ikon, form, kaydırılabilir liste, ekran görüntüsünden düzenleme) tasarlarken, canlandırırken ve teslim ederken uiforge-mcp server'ını kullanır. Seçilebilir kalite seviyeleri (simple/standard/advanced/aaa) ve 9 stil profili (kids, cartoon, stylized, minimal, web_saas, scifi, dark_fantasy, realistic, photorealistic), Cook-Torrance PBR + HDR/EXR IBL, 9 prosedürel çerçeve, yerel Input/Scroll bileşenleri, dotLottie v2 durum makinesi, Unity/Unreal/Godot/Roblox + WPF/Avalonia/WinUI/Qt/ImGui + React TSX/Tailwind çıktıları.
+description: Oyun, C#/.NET (WPF, Avalonia, WinUI), C++ (Qt QML, Dear ImGui), mobil ve web/React arayüzleri (menü, HUD, buton, panel, bar, gösterge, 100+ gömülü vektör ikon, form, slider/toggle/dropdown, kaydırılabilir liste, 3D kavisli HUD, ekran görüntüsünden düzenleme) tasarlarken, canlandırırken ve teslim ederken uiforge-mcp server'ını kullanır. Seçilebilir kalite seviyeleri (simple/standard/advanced/aaa) ve 9 stil profili, Cook-Torrance PBR + HDR/EXR IBL, 9 prosedürel çerçeve, yerel Input/Scroll/Slider/Toggle/Dropdown bileşenleri, SEP-1865 MCP App Studio (`open_studio`), dotLottie v2 durum makinesi, Unreal UMG/Unity/Godot/Roblox + WPF/Avalonia/WinUI/Qt/ImGui + React TSX/Tailwind çıktıları.
 ---
 
 # uiforge-mcp ile arayüz tasarlamak
@@ -33,9 +33,11 @@ Her tasarım AAA veya aşırı süslü **olmamalıdır**! Kullanıcının hedefi
 2. **Tema:** Tek çağrıda `set_theme(style_preset=..., quality=...)` ile palet, sayı token'ları ve isimlendirilmiş stilleri başlat (kullanıcının `DESIGN.md` veya DTCG JSON'u varsa `tokens=...`, ekran görüntüsü varsa `import_screenshot(path=...)` kullan!).
 3. **Canvas & Toplu Çizim:** Tek tek `add_*` yerine mutlaka `batch` kullan ve elemanlara anlamlı `id` ver.
    - Çerçeve/panel gerekiyorsa `add_frame(preset="auto", title=...)` kullan — aktif stile uygun çerçeveyi kurar ve `inner_box` güvenli alanını döner.
-   - Metin girişi veya kaydırılabilir liste gerekiyorsa düz `rect` çizme; doğrudan `add_input` ve `add_scroll` kullan ki tüm motorlarda ve WPF/Qt/React'ta gerçek yerel bileşene dönüşsün!
-4. **Canlı Önizleme (isteğe bağlı):** Kullanıcı izlemek isterse `live_preview("start", canvas=...)` başlat.
-5. **Bak, Denetle, Düzelt:** `preview` resmine bak + `review_canvas` çalıştır. Her `warn` maddesini tek bir `batch` / `update_element` turunda düzelt. Hata alırsan hata mesajındaki çözüm önerisini oku, aynı hatalı çağrıyı asla tekrarlama!
+   - İkon gerekiyorsa ham SVG uydurmak yerine önce gömülü 100+ saf MIT vektör kütüphanesinden `add_icon(name=...)` kullan (`uiforge://icons` kaynağında tüm liste var: `heart`, `shield`, `sword`, `crown`, `gem`, `coin`, `potion`, `settings`, `search`, `play`, `volume`, `crosshair`, `gauge`...).
+   - Metin girişi, kaydırılabilir liste, sürgü, anahtar/onay kutusu veya açılır menü gerekiyorsa düz `rect` çizme; doğrudan `add_input`, `add_scroll`, `add_slider`, `add_toggle` ve `add_dropdown` kullan ki Unreal UMG, Unity, Godot, Roblox, WPF/Avalonia/WinUI, Qt QML, Dear ImGui ve Web/React'ta gerçek yerel bileşene dönüşsün!
+   - FPS/yarış/VR diegetic kavisli HUD gerekiyorsa katmana `style={"perspective": {"rotate_y": 20, "rotate_x": -6, "visor_curve": 0.16}}` ver.
+4. **Canlı Önizleme, MCP App & Combined Mode (isteğe bağlı):** Kullanıcı tarayıcıda canlı izlemek isterse `live_preview("start", canvas=...)`, doğrudan sohbet/yan panelde etkileşimli incelemek isterse `open_studio(canvas=...)` çağır. Kullanıcı kendi de aynı anda tam stüdyo editöründe düzenleme yapmak isterse `uiforge combined` (veya aynı çalışma alanında ayrı bir `uiforge ui`) ile çalışabilir; disk senkronizasyonu iki tarafı otomatik güncel tutar.
+5. **Bak, Denetle, Düzelt:** `preview` resmine bak + `review_canvas` çalıştır (metin + widget WCAG kontrast özetini de döner). Riskli revizyonlardan önce `canvas_version("save", "v1")` al ve sonra `canvas_version("visual_diff", "v1")` ile piksel fark ısı haritasını gör! Her `warn` maddesini tek bir `batch` / `update_element` turunda düzelt. Hata alırsan hata mesajındaki çözüm önerisini oku, aynı hatalı çağrıyı asla tekrarlama!
 6. **Durumlar, Veri Bağlama & Hareket:** Hover/press/disabled için `set_state`, dinamik bar/metinler için `set_binding`, animasyon için `create_animation` + `set_keyframes`, tetikleyiciler için `set_interaction`.
 7. **Doğru Çıktı ile Teslim:** Aşağıdaki "Çıktı seçimi" tablosundan hedefe en uygun tek aracı çağır.
 
@@ -299,7 +301,8 @@ Hazır dolgular yetmiyorsa formülü kendin yaz: `{"type":"shader","code":"...",
 
 ## İkonlar
 
-- Hazır ikon seti yoktur. İkonu 24 × 24 ızgarada `add_path` ile çiz ve `scale` ile büyüt; basit geometrik formlar kullan, çizdikten sonra `preview(region=..., zoom=4)` ile yakından bak.
+- **142 gömülü saf MIT vektör ikonu (`add_icon`, `uiforge://icons`):** Standart UI, navigasyon, medya, RPG, FPS, yarış, bilim kurgu ve mağaza ikonları için ham SVG uydurmak yerine önce `add_icon(name=...)` kullan — standart düzenlenebilir `path` olarak eklenir ve PBR materyal, kontur, glow ve animasyon destekler.
+- Özel bir sembol gerekiyorsa 24 × 24 ızgarada `add_path` ile çiz ve `scale` ile büyüt; çizdikten sonra `preview(region=..., zoom=4)` ile yakından bak.
 - Kullanıcının ikon SVG'si varsa `add_svg`; elinde yalnızca PNG varsa `vectorize_image`.
 - Motor içinde renklendirilecek ikonları beyaz çiz (Unity `Image.color`, Roblox `ImageColor3`, Unreal `Tint`); setin tamamını tek dosyada vermek için `export_atlas`.
 
@@ -308,11 +311,11 @@ Hazır dolgular yetmiyorsa formülü kendin yaz: `{"type":"shader","code":"...",
 | Hedef | Çıktı |
 | --- | --- |
 | Unity / Unreal / Roblox / Godot sprite | `export_asset(engine=..., nine_slice="auto")` + bir kez `write_engine_helpers` |
-| Gerçek zamanlı motor ışığıyla canlı 2B/3B UI (Normal/ORM/CanvasTexture) | `export_pbr_maps(engine="godot" | "unity" | "unreal" | "generic")` |
-| Hızlı AAA çerçeve / panel kurulumu | `add_frame(preset="rpg_gold" | "royal_ornate" | "fantasy_parchment" | "scifi_hud" | "cyber_tech" | "glass_card" | "medieval_iron" | "luxury_minimal" | "cartoon_thick")` (`inner_box` döner) |
-| Yerel metin girişi & kaydırılabilir liste | `add_input(...)`, `add_scroll(...)` — Web/React, Godot, Unity, Roblox, WPF, Avalonia, WinUI, Qt QML ve ImGui'de yerel bileşen olur |
-| Ekran görüntüsünden düzenlenebilir canvas | `import_screenshot(path=...)` — OpenCV kontur/palet + isteğe bağlı OCR ile vektörleştirir |
-| Bütün bir ekran motor veya masaüstü sahnesi olarak | `export_screen(engine="godot" | "roblox" | "unity" | "unity-ugui" | "wpf" | "avalonia" | "winui" | "qt-qml" | "imgui")`: yazılar, input ve scroll yerel bileşendir; C# ViewModel / GDScript / C++ kodu üretir |
+| Gerçek zamanlı motor ışığıyla canlı 2B/3B UI (Normal/ORM/CanvasTexture) | `export_pbr_maps(engine="godot" \| "unity" \| "unreal" \| "generic")` |
+| Hızlı AAA çerçeve / panel kurulumu | `add_frame(preset="auto" \| "rpg_gold" \| "royal_ornate" \| "fantasy_parchment" \| "scifi_hud" \| "cyber_tech" \| "glass_card" \| "medieval_iron" \| "luxury_minimal" \| "cartoon_thick")` (`inner_box` döner) |
+| Yerel etkileşimli bileşenler | `add_input`, `add_scroll`, `add_slider`, `add_toggle`, `add_dropdown` — Web/React, Unreal UMG, Unity, Godot, Roblox, WPF, Avalonia, WinUI, Qt QML ve ImGui'de yerel bileşen olur |
+| Ekran görüntüsünden düzenlenebilir canvas | `import_screenshot(path=...)` — OpenCV kontur/palet, satır/sütun grubu + `$ss_*` token + isteğe bağlı yerel OCR |
+| Bütün bir ekran motor veya masaüstü sahnesi olarak | `export_screen(engine="unreal" \| "godot" \| "roblox" \| "unity" \| "unity-ugui" \| "wpf" \| "avalonia" \| "winui" \| "qt-qml" \| "imgui")`: yazılar ve widget'lar yerel bileşendir; Unreal UMG Python / C# ViewModel / GDScript / C++ kodu üretir |
 | Sprite atlası (Phaser/Pixi/Godot/Unity/CSS) | `export_atlas(format="texturepacker" | "godot" | "unity" | "css" | "json")` |
 | Motorda ayrı oynayacak parçalar (ibre, dolgu) | `export_layers` (her parça + pivot'lu `layout.json`) |
 | Mobil uygulama / web görseli | `export_png(preset="ios" | "android" | "web")`, ikon için `format="ico"` ya da `sizes` |

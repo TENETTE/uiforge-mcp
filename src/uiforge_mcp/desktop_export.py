@@ -72,11 +72,19 @@ def _xaml_align(align: str) -> str:
 def _collect_bindings(c: dict, nodes: list[dict]) -> dict[str, Any]:
     props: dict[str, Any] = dict(c.get("data") or {})
     for n in nodes:
+        el = n.get("el") or {}
+        bkey = el.get("bind") or _ident(n["id"])
         if n["kind"] == "input":
-            el = n["el"]
-            bkey = el.get("bind") or _ident(n["id"])
-            if bkey not in props:
-                props[bkey] = str(el.get("value") or "")
+            props.setdefault(bkey, str(el.get("value") or ""))
+        elif n["kind"] == "slider":
+            props.setdefault(bkey, float(el.get("value", 50.0)))
+        elif n["kind"] == "toggle":
+            props.setdefault(bkey, bool(el.get("checked", False)))
+        elif n["kind"] == "dropdown":
+            sel = el.get("selected", 0)
+            opts = [str(o) for o in (el.get("options") or [])]
+            idx = opts.index(sel) if (isinstance(sel, str) and sel in opts) else int(sel or 0)
+            props.setdefault(bkey, idx)
     return props
 
 
@@ -307,6 +315,58 @@ def _write_xaml(c: dict, nodes: list[dict], folder: Path, base: str, colors: dic
                 '                </ScrollViewer>',
                 '            </Border>',
             ]
+        elif node["kind"] == "slider":
+            el = node["el"]
+            bkey = _pascal(el.get("bind") or xname)
+            ey, ew, eh = float(el.get("y", y0)), float(el.get("width", nw)), float(el.get("height", nh))
+            lo, hi, stp = float(el.get("min", 0.0)), float(el.get("max", 100.0)), float(el.get("step", 1.0))
+            if el.get("label"):
+                lines.append(
+                    f'            <TextBlock Canvas.Left="{x0 + 2:.1f}" Canvas.Top="{y0:.1f}" '
+                    f'Text="{html.escape(str(el["label"]), quote=True)}" Foreground="#FFCBD5E1" '
+                    f'FontSize="{float(el.get("size", 13)):g}" FontWeight="SemiBold" />'
+                )
+            vbind = f'{{Binding {bkey}, Mode=TwoWay}}' if dialect != "winui" else f'{{x:Bind ViewModel.{bkey}, Mode=TwoWay}}'
+            step_attr = f' StepFrequency="{stp:g}"' if dialect == "winui" else f' TickFrequency="{stp:g}"'
+            lines.append(
+                f'            <Slider x:Name="{xname}" Canvas.Left="{x0:.1f}" Canvas.Top="{ey:.1f}" '
+                f'Width="{ew:.1f}" Height="{eh:.1f}" Minimum="{lo:g}" Maximum="{hi:g}"{step_attr} Value="{vbind}" />'
+            )
+        elif node["kind"] == "toggle":
+            el = node["el"]
+            bkey = _pascal(el.get("bind") or xname)
+            lbl = html.escape(str(el.get("label") or ""), quote=True)
+            if dialect == "winui" and str(el.get("variant", "switch")).lower() == "switch":
+                lines.append(
+                    f'            <ToggleSwitch x:Name="{xname}" {pos} Header="{lbl}" '
+                    f'IsOn="{{x:Bind ViewModel.{bkey}, Mode=TwoWay}}" />'
+                )
+            else:
+                cbind = f'{{Binding {bkey}, Mode=TwoWay}}' if dialect != "winui" else f'{{x:Bind ViewModel.{bkey}, Mode=TwoWay}}'
+                lines.append(
+                    f'            <CheckBox x:Name="{xname}" {pos} Content="{lbl}" '
+                    f'Foreground="#FFF8FAFC" IsChecked="{cbind}" />'
+                )
+        elif node["kind"] == "dropdown":
+            el = node["el"]
+            wc = widget_colors_summary(el, colors)
+            bkey = _pascal(el.get("bind") or xname)
+            ey, ew, eh = float(el.get("y", y0)), float(el.get("width", nw)), float(el.get("height", nh))
+            if el.get("label"):
+                lines.append(
+                    f'            <TextBlock Canvas.Left="{x0 + 2:.1f}" Canvas.Top="{y0:.1f}" '
+                    f'Text="{html.escape(str(el["label"]), quote=True)}" Foreground="#FFCBD5E1" '
+                    f'FontSize="{max(11.0, float(el.get("size", 14)) * 0.85):g}" FontWeight="SemiBold" />'
+                )
+            sbind = f'{{Binding {bkey}, Mode=TwoWay}}' if dialect != "winui" else f'{{x:Bind ViewModel.{bkey}, Mode=TwoWay}}'
+            lines.append(
+                f'            <ComboBox x:Name="{xname}" Canvas.Left="{x0:.1f}" Canvas.Top="{ey:.1f}" '
+                f'Width="{ew:.1f}" Height="{eh:.1f}" Background="{_hex_argb(wc["bg"])}" '
+                f'Foreground="{_hex_argb(wc["text"])}" SelectedIndex="{sbind}">'
+            )
+            for opt in (el.get("options") or []):
+                lines.append(f'                <ComboBoxItem Content="{html.escape(str(opt), quote=True)}" />')
+            lines.append('            </ComboBox>')
 
     lines += [
         '        </Canvas>',
@@ -502,6 +562,47 @@ def _write_qt_qml(c: dict, nodes: list[dict], folder: Path, base: str, colors: d
                 "        }",
                 "    }",
             ]
+        elif node["kind"] == "slider":
+            el = node["el"]
+            bkey = _ident(el.get("bind") or qid)
+            ey, ew, eh = float(el.get("y", y0)), float(el.get("width", nw)), float(el.get("height", nh))
+            lines += [
+                "    Slider {",
+                f"        id: {qid}",
+                f"        x: {x0:.1f}; y: {ey:.1f}; width: {ew:.1f}; height: {eh:.1f}",
+                f"        from: {float(el.get('min', 0.0)):g}; to: {float(el.get('max', 100.0)):g}; stepSize: {float(el.get('step', 1.0)):g}",
+                f"        value: root.{bkey}",
+                f"        onMoved: root.{bkey} = value",
+                "    }",
+            ]
+        elif node["kind"] == "toggle":
+            el = node["el"]
+            bkey = _ident(el.get("bind") or qid)
+            qcls = "CheckBox" if str(el.get("variant", "switch")).lower() == "checkbox" else "Switch"
+            lbl = str(el.get("label") or "").replace("\\", "\\\\").replace('"', '\\"')
+            lines += [
+                f"    {qcls} {{",
+                f"        id: {qid}",
+                f"        x: {x0:.1f}; y: {y0:.1f}",
+                f'        text: "{lbl}"',
+                f"        checked: root.{bkey}",
+                f"        onToggled: root.{bkey} = checked",
+                "    }",
+            ]
+        elif node["kind"] == "dropdown":
+            el = node["el"]
+            bkey = _ident(el.get("bind") or qid)
+            ey, ew, eh = float(el.get("y", y0)), float(el.get("width", nw)), float(el.get("height", nh))
+            opts_qml = "[" + ", ".join('"' + str(o).replace("\\", "\\\\").replace('"', '\\"') + '"' for o in (el.get("options") or [])) + "]"
+            lines += [
+                "    ComboBox {",
+                f"        id: {qid}",
+                f"        x: {x0:.1f}; y: {ey:.1f}; width: {ew:.1f}; height: {eh:.1f}",
+                f"        model: {opts_qml}",
+                f"        currentIndex: root.{bkey}",
+                f"        onActivated: root.{bkey} = currentIndex",
+                "    }",
+            ]
 
     lines.append("}")
     out = folder / f"{cls}.qml"
@@ -617,6 +718,40 @@ def _write_imgui(c: dict, nodes: list[dict], folder: Path, base: str, colors: di
                 "        ImGui::EndChild();",
                 "        ImGui::PopStyleColor();",
                 "        ImGui::PopStyleVar();",
+            ]
+        elif node["kind"] == "slider":
+            el = node["el"]
+            ey, ew = float(el.get("y", y0)), float(el.get("width", nw))
+            bkey = _ident(el.get("bind") or nid)
+            lbl = str(el.get("label") or nid).replace("\\", "\\\\").replace('"', '\\"')
+            lines += [
+                f"        ImGui::SetCursorPos(ImVec2({x0:.1f}f, {ey:.1f}f));",
+                f"        ImGui::PushItemWidth({ew:.1f}f);",
+                f'        ImGui::SliderFloat("{lbl}##{nid}", &state.{bkey}, {float(el.get("min", 0.0)):g}f, {float(el.get("max", 100.0)):g}f);',
+                "        ImGui::PopItemWidth();",
+            ]
+        elif node["kind"] == "toggle":
+            el = node["el"]
+            bkey = _ident(el.get("bind") or nid)
+            lbl = str(el.get("label") or nid).replace("\\", "\\\\").replace('"', '\\"')
+            lines += [
+                f"        ImGui::SetCursorPos(ImVec2({x0:.1f}f, {y0:.1f}f));",
+                f'        ImGui::Checkbox("{lbl}##{nid}", &state.{bkey});',
+            ]
+        elif node["kind"] == "dropdown":
+            el = node["el"]
+            ey, ew = float(el.get("y", y0)), float(el.get("width", nw))
+            bkey = _ident(el.get("bind") or nid)
+            lbl = str(el.get("label") or nid).replace("\\", "\\\\").replace('"', '\\"')
+            opts = [str(o).replace("\\", "\\\\").replace('"', '\\"') for o in (el.get("options") or ["Option 1"])]
+            items_lit = ", ".join(f'"{o}"' for o in opts)
+            lines += [
+                f"        ImGui::SetCursorPos(ImVec2({x0:.1f}f, {ey:.1f}f));",
+                f"        ImGui::PushItemWidth({ew:.1f}f);",
+                f"        static const char* {nid}_items[] = {{ {items_lit} }};",
+                f"        int {nid}_idx = static_cast<int>(state.{bkey});",
+                f'        if (ImGui::Combo("{lbl}##{nid}", &{nid}_idx, {nid}_items, {len(opts)})) state.{bkey} = static_cast<float>({nid}_idx);',
+                "        ImGui::PopItemWidth();",
             ]
 
     lines += [

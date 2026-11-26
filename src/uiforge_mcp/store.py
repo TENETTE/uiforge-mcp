@@ -4,17 +4,23 @@ from __future__ import annotations
 
 import copy
 import json
+import logging
 import math
 import os
 import re
+import tempfile
+import threading
+import time
 from pathlib import Path
 from typing import Any
 
 from .fonts import FontLibrary
 from .render import Renderer, shift_element
 
+_log = logging.getLogger("uiforge_mcp.store")
+
 ELEMENT_TYPES = ("rect", "ellipse", "polygon", "line", "path", "text", "image", "arc", "ticks", "instance",
-                 "boolean", "input", "scroll")
+                 "boolean", "input", "scroll", "slider", "toggle", "dropdown")
 MAX_CANVAS = 8192
 MAX_UNDO = 40
 MAX_VERSIONS = 30
@@ -52,6 +58,8 @@ class Store:
         self._undo: dict[str, list[dict]] = {}
         self._redo: dict[str, list[dict]] = {}
         self._version_mem: dict[str, dict] = {}
+        self._lock = threading.RLock()
+        self._disk_stamps: dict[str, tuple[int, int]] = {}
         self.rev: int = 0
         self._listeners: list = []
         if persist:
@@ -59,64 +67,168 @@ class Store:
 
     def on_change(self, fn) -> None:
         """Register a callback invoked as fn(canvas_id | None) whenever the store changes."""
-        if fn not in self._listeners:
-            self._listeners.append(fn)
+        with self._lock:
+            if fn not in self._listeners:
+                self._listeners.append(fn)
 
     def _notify(self, canvas_id: str | None = None) -> None:
-        self.rev += 1
-        for fn in list(self._listeners):
+        with self._lock:
+            self.rev += 1
+            listeners = list(self._listeners)
+        for fn in listeners:
             try:
                 fn(canvas_id)
-            except Exception:
-                pass
+            except Exception as exc:
+                _log.debug("Store change listener failed: %s", exc)
 
+    @staticmethod
+    def _stamp(path: Path) -> tuple[int, int] | None:
+        try:
+            st = path.stat()
+            return (st.st_mtime_ns, st.st_size)
+        except OSError:
+            return None
+
+    def _record_stamp(self, path: Path) -> None:
+        s = self._stamp(path)
+        if s is not None:
+            self._disk_stamps[str(path)] = s
+
+    def sync_from_disk(self) -> bool:
+        """Reload canvases/theme/strings modified externally by another process (Combined Mode safety)."""
+        if not self.persist:
+            return False
+        changed = False
+        with self._lock:
+            strings_file = self.workspace / "strings.json"
+            sf = self._stamp(strings_file)
+            if sf and self._disk_stamps.get(str(strings_file)) != sf:
+                try:
+                    data = json.loads(strings_file.read_text(encoding="utf-8"))
+                    self.strings = {"default": data.get("default"), "tables": dict(data.get("tables", {}))}
+                    self._disk_stamps[str(strings_file)] = sf
+                    changed = True
+                except (OSError, json.JSONDecodeError, ValueError) as exc:
+                    _log.warning("Could not reload %s: %s", strings_file, exc)
+
+            theme_file = self.workspace / "theme.json"
+            tf = self._stamp(theme_file)
+            if tf and self._disk_stamps.get(str(theme_file)) != tf:
+                try:
+                    data = json.loads(theme_file.read_text(encoding="utf-8"))
+                    self.theme = {"colors": dict(data.get("colors", {})), "styles": dict(data.get("styles", {})),
+                                  "modes": dict(data.get("modes", {})), "mode": data.get("mode"),
+                                  "numbers": dict(data.get("numbers", {})), "materials": dict(data.get("materials", {})),
+                                  "environment": dict(data.get("environment", {})) if isinstance(data.get("environment"), dict) else {},
+                                  "profile": dict(data.get("profile", {})) if isinstance(data.get("profile"), dict) else {}}
+                    self._disk_stamps[str(theme_file)] = tf
+                    changed = True
+                except (OSError, json.JSONDecodeError, ValueError) as exc:
+                    _log.warning("Could not reload %s: %s", theme_file, exc)
+
+            if self.projects_dir.is_dir():
+                seen_ids: set[str] = set()
+                for path in sorted(self.projects_dir.glob("*.json")):
+                    pf = self._stamp(path)
+                    if pf is None:
+                        continue
+                    cid_guess = path.stem
+                    seen_ids.add(cid_guess)
+                    if self._disk_stamps.get(str(path)) != pf:
+                        try:
+                            canvas = json.loads(path.read_text(encoding="utf-8"))
+                            if {"id", "width", "height", "elements"} <= set(canvas):
+                                self.canvases[canvas["id"]] = canvas
+                                seen_ids.add(canvas["id"])
+                                self._disk_stamps[str(path)] = pf
+                                changed = True
+                        except (OSError, json.JSONDecodeError, ValueError) as exc:
+                            _log.warning("Could not reload %s: %s", path, exc)
+                # Remove canvases deleted on disk by another process
+                for existing_id in list(self.canvases):
+                    p = self.projects_dir / f"{existing_id}.json"
+                    if str(p) in self._disk_stamps and existing_id not in seen_ids and not p.is_file():
+                        self.canvases.pop(existing_id, None)
+                        self._disk_stamps.pop(str(p), None)
+                        changed = True
+        if changed:
+            self._notify(None)
+        return changed
 
     def _load(self) -> None:
-        strings_file = self.workspace / "strings.json"
-        if strings_file.is_file():
-            try:
-                data = json.loads(strings_file.read_text(encoding="utf-8"))
-                self.strings = {"default": data.get("default"), "tables": dict(data.get("tables", {}))}
-            except Exception:
-                pass
-        theme_file = self.workspace / "theme.json"
-        if theme_file.is_file():
-            try:
-                data = json.loads(theme_file.read_text(encoding="utf-8"))
-                self.theme = {"colors": dict(data.get("colors", {})), "styles": dict(data.get("styles", {})),
-                              "modes": dict(data.get("modes", {})), "mode": data.get("mode"),
-                              "numbers": dict(data.get("numbers", {})), "materials": dict(data.get("materials", {})),
-                              "environment": dict(data.get("environment", {})) if isinstance(data.get("environment"), dict) else {},
-                              "profile": dict(data.get("profile", {})) if isinstance(data.get("profile"), dict) else {}}
-            except Exception:
-                pass
-        for path in sorted(self.projects_dir.glob("*.json")):
-            try:
-                canvas = json.loads(path.read_text(encoding="utf-8"))
-                if {"id", "width", "height", "elements"} <= set(canvas):
-                    self.canvases[canvas["id"]] = canvas
-            except Exception:
-                continue
+        with self._lock:
+            strings_file = self.workspace / "strings.json"
+            if strings_file.is_file():
+                try:
+                    data = json.loads(strings_file.read_text(encoding="utf-8"))
+                    self.strings = {"default": data.get("default"), "tables": dict(data.get("tables", {}))}
+                    self._record_stamp(strings_file)
+                except (OSError, json.JSONDecodeError, ValueError) as exc:
+                    _log.warning("Failed to load %s: %s", strings_file, exc)
+            theme_file = self.workspace / "theme.json"
+            if theme_file.is_file():
+                try:
+                    data = json.loads(theme_file.read_text(encoding="utf-8"))
+                    self.theme = {"colors": dict(data.get("colors", {})), "styles": dict(data.get("styles", {})),
+                                  "modes": dict(data.get("modes", {})), "mode": data.get("mode"),
+                                  "numbers": dict(data.get("numbers", {})), "materials": dict(data.get("materials", {})),
+                                  "environment": dict(data.get("environment", {})) if isinstance(data.get("environment"), dict) else {},
+                                  "profile": dict(data.get("profile", {})) if isinstance(data.get("profile"), dict) else {}}
+                    self._record_stamp(theme_file)
+                except (OSError, json.JSONDecodeError, ValueError) as exc:
+                    _log.warning("Failed to load %s: %s", theme_file, exc)
+            for path in sorted(self.projects_dir.glob("*.json")):
+                try:
+                    canvas = json.loads(path.read_text(encoding="utf-8"))
+                    if {"id", "width", "height", "elements"} <= set(canvas):
+                        self.canvases[canvas["id"]] = canvas
+                        self._record_stamp(path)
+                except (OSError, json.JSONDecodeError, ValueError) as exc:
+                    _log.warning("Failed to load canvas %s: %s", path, exc)
 
     @staticmethod
     def _atomic_write(path: Path, text: str) -> None:
-        tmp = path.with_suffix(path.suffix + ".tmp")
-        tmp.write_text(text, encoding="utf-8")
-        os.replace(tmp, path)
+        """Write via a unique per-call temp file + retry replace so concurrent threads/processes never collide."""
+        path.parent.mkdir(parents=True, exist_ok=True)
+        fd, tmp_name = tempfile.mkstemp(prefix=path.stem + ".", suffix=".tmp", dir=str(path.parent))
+        tmp_path = Path(tmp_name)
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                handle.write(text)
+                handle.flush()
+                os.fsync(handle.fileno())
+            for attempt in range(5):
+                try:
+                    os.replace(tmp_path, path)
+                    return
+                except PermissionError:
+                    if attempt == 4:
+                        raise
+                    time.sleep(0.015 * (attempt + 1))
+        finally:
+            if tmp_path.exists():
+                try:
+                    tmp_path.unlink()
+                except OSError:
+                    pass
 
     def save_canvas(self, canvas: dict) -> None:
-        if any(isinstance(e.get("layout"), dict) for e in canvas.get("elements", [])):
-            from .autolayout import reflow
-            reflow(self, canvas)
-        if self.persist:
-            path = self.projects_dir / f"{canvas['id']}.json"
-            self._atomic_write(path, json.dumps(canvas, ensure_ascii=False, indent=1, sort_keys=True))
+        with self._lock:
+            if any(isinstance(e.get("layout"), dict) for e in canvas.get("elements", [])):
+                from .autolayout import reflow
+                reflow(self, canvas)
+            if self.persist:
+                path = self.projects_dir / f"{canvas['id']}.json"
+                self._atomic_write(path, json.dumps(canvas, ensure_ascii=False, indent=1, sort_keys=True))
+                self._record_stamp(path)
         self._notify(canvas["id"])
 
     def save_theme(self) -> None:
-        if self.persist:
-            self._atomic_write(self.workspace / "theme.json",
-                               json.dumps(self.theme, ensure_ascii=False, indent=1, sort_keys=True))
+        with self._lock:
+            if self.persist:
+                path = self.workspace / "theme.json"
+                self._atomic_write(path, json.dumps(self.theme, ensure_ascii=False, indent=1, sort_keys=True))
+                self._record_stamp(path)
         self._notify(None)
 
 
@@ -130,18 +242,19 @@ class Store:
         raise ValueError(f"Canvas '{canvas_id}' not found. Existing canvases: {known}")
 
     def create_canvas(self, name: str, width: int, height: int, background: Any = None) -> dict:
-        width, height = int(width), int(height)
-        if not (1 <= width <= MAX_CANVAS and 1 <= height <= MAX_CANVAS):
-            raise ValueError(f"Canvas size must be between 1 and {MAX_CANVAS} px per side")
-        cid = slugify(name)
-        if cid in self.canvases:
-            raise ValueError(f"Canvas '{cid}' already exists. Pick another name, or delete_canvas / duplicate_canvas.")
-        canvas = {"id": cid, "name": str(name), "width": width, "height": height, "background": background,
-                  "elements": [], "counters": {}}
-        self._validate_background(canvas)
-        self.canvases[cid] = canvas
-        self.save_canvas(canvas)
-        return canvas
+        with self._lock:
+            width, height = int(width), int(height)
+            if not (1 <= width <= MAX_CANVAS and 1 <= height <= MAX_CANVAS):
+                raise ValueError(f"Canvas size must be between 1 and {MAX_CANVAS} px per side")
+            cid = slugify(name)
+            if cid in self.canvases:
+                raise ValueError(f"Canvas '{cid}' already exists. Pick another name, or delete_canvas / duplicate_canvas.")
+            canvas = {"id": cid, "name": str(name), "width": width, "height": height, "background": background,
+                      "elements": [], "counters": {}}
+            self._validate_background(canvas)
+            self.canvases[cid] = canvas
+            self.save_canvas(canvas)
+            return canvas
 
     def _validate_background(self, canvas: dict) -> None:
         probe = dict(canvas, width=min(canvas["width"], 8), height=min(canvas["height"], 8), elements=[])
@@ -182,21 +295,20 @@ class Store:
         return mem[cid]
 
     def save_version(self, canvas: dict, name: str | None, note: str | None) -> dict:
-        import time
-        versions = self._versions(canvas["id"])
-        key = slugify(name or f"v{len(versions) + 1}", "version")
-        if key in versions:
-            raise ValueError(f"version '{key}' already exists - pick another name or delete it first")
-        if len(versions) >= MAX_VERSIONS:
-            raise ValueError(f"at most {MAX_VERSIONS} versions per canvas - delete old ones first")
-        entry = {"name": key, "note": note or "", "saved": time.strftime("%Y-%m-%d %H:%M:%S"),
-                 "canvas": copy.deepcopy(canvas)}
-        versions[key] = entry
-        if self.persist:
-            folder = self.projects_dir / "versions" / canvas["id"]
-            folder.mkdir(parents=True, exist_ok=True)
-            (folder / f"{key}.json").write_text(json.dumps(entry, ensure_ascii=False), encoding="utf-8")
-        return entry
+        with self._lock:
+            versions = self._versions(canvas["id"])
+            key = slugify(name or f"v{len(versions) + 1}", "version")
+            if key in versions:
+                raise ValueError(f"version '{key}' already exists - pick another name or delete it first")
+            if len(versions) >= MAX_VERSIONS:
+                raise ValueError(f"at most {MAX_VERSIONS} versions per canvas - delete old ones first")
+            entry = {"name": key, "note": note or "", "saved": time.strftime("%Y-%m-%d %H:%M:%S"),
+                     "canvas": copy.deepcopy(canvas)}
+            versions[key] = entry
+            if self.persist:
+                folder = self.projects_dir / "versions" / canvas["id"]
+                self._atomic_write(folder / f"{key}.json", json.dumps(entry, ensure_ascii=False))
+            return entry
 
     def list_versions(self, canvas: dict) -> list[dict]:
         return [{"name": v["name"], "note": v.get("note", ""), "saved": v.get("saved", ""),
@@ -224,53 +336,62 @@ class Store:
             path.unlink()
 
     def delete_canvas(self, canvas: dict) -> None:
-        self.canvases.pop(canvas["id"], None)
-        self._undo.pop(canvas["id"], None)
-        if self.persist:
-            path = self.projects_dir / f"{canvas['id']}.json"
-            if path.is_file():
-                path.unlink()
+        with self._lock:
+            cid = canvas["id"]
+            self.canvases.pop(cid, None)
+            self._undo.pop(cid, None)
+            self._redo.pop(cid, None)
+            if self.persist:
+                path = self.projects_dir / f"{cid}.json"
+                self._disk_stamps.pop(str(path), None)
+                if path.is_file():
+                    path.unlink()
+        self._notify(cid)
 
     def duplicate_canvas(self, canvas: dict, new_name: str) -> dict:
-        cid = slugify(new_name)
-        if cid in self.canvases:
-            raise ValueError(f"Canvas '{cid}' already exists")
-        clone = copy.deepcopy(canvas)
-        clone["id"], clone["name"] = cid, str(new_name)
-        self.canvases[cid] = clone
-        self.save_canvas(clone)
-        return clone
+        with self._lock:
+            cid = slugify(new_name)
+            if cid in self.canvases:
+                raise ValueError(f"Canvas '{cid}' already exists")
+            clone = copy.deepcopy(canvas)
+            clone["id"], clone["name"] = cid, str(new_name)
+            self.canvases[cid] = clone
+            self.save_canvas(clone)
+            return clone
 
 
     def checkpoint(self, canvas: dict) -> None:
-        stack = self._undo.setdefault(canvas["id"], [])
-        stack.append(copy.deepcopy(canvas))
-        del stack[:-MAX_UNDO]
-        self._redo.pop(canvas["id"], None)
+        with self._lock:
+            stack = self._undo.setdefault(canvas["id"], [])
+            stack.append(copy.deepcopy(canvas))
+            del stack[:-MAX_UNDO]
+            self._redo.pop(canvas["id"], None)
 
     def undo(self, canvas: dict) -> bool:
-        stack = self._undo.get(canvas["id"])
-        if not stack:
-            return False
-        previous = stack.pop()
-        redo = self._redo.setdefault(canvas["id"], [])
-        redo.append(copy.deepcopy(canvas))
-        del redo[:-MAX_UNDO]
-        canvas.clear()
-        canvas.update(previous)
-        self.save_canvas(canvas)
-        return True
+        with self._lock:
+            stack = self._undo.get(canvas["id"])
+            if not stack:
+                return False
+            previous = stack.pop()
+            redo = self._redo.setdefault(canvas["id"], [])
+            redo.append(copy.deepcopy(canvas))
+            del redo[:-MAX_UNDO]
+            canvas.clear()
+            canvas.update(previous)
+            self.save_canvas(canvas)
+            return True
 
     def redo(self, canvas: dict) -> bool:
-        stack = self._redo.get(canvas["id"])
-        if not stack:
-            return False
-        nxt = stack.pop()
-        self._undo.setdefault(canvas["id"], []).append(copy.deepcopy(canvas))
-        canvas.clear()
-        canvas.update(nxt)
-        self.save_canvas(canvas)
-        return True
+        with self._lock:
+            stack = self._redo.get(canvas["id"])
+            if not stack:
+                return False
+            nxt = stack.pop()
+            self._undo.setdefault(canvas["id"], []).append(copy.deepcopy(canvas))
+            canvas.clear()
+            canvas.update(nxt)
+            self.save_canvas(canvas)
+            return True
 
     def drop_checkpoint(self, canvas: dict) -> None:
         stack = self._undo.get(canvas["id"])
@@ -296,21 +417,24 @@ class Store:
 
 
     def set_strings(self, language: str, strings: dict, default: bool, replace: bool) -> dict:
-        lang = str(language).strip()
-        if not lang or lang.startswith("pseudo"):
-            raise ValueError("language must be a code like 'en', 'tr', 'de' ('pseudo', 'pseudo-long', 'pseudo-rtl' are built in)")
-        table = {} if replace else dict(self.strings["tables"].get(lang, {}))
-        for key, value in (strings or {}).items():
-            if value is None:
-                table.pop(key, None)
-            else:
-                table[str(key)] = str(value)
-        self.strings["tables"][lang] = table
-        if default or not self.strings.get("default"):
-            self.strings["default"] = lang
-        if self.persist:
-            (self.workspace / "strings.json").write_text(json.dumps(self.strings, ensure_ascii=False, indent=1),
-                                                         encoding="utf-8")
+        with self._lock:
+            lang = str(language).strip()
+            if not lang or lang.startswith("pseudo"):
+                raise ValueError("language must be a code like 'en', 'tr', 'de' ('pseudo', 'pseudo-long', 'pseudo-rtl' are built in)")
+            table = {} if replace else dict(self.strings["tables"].get(lang, {}))
+            for key, value in (strings or {}).items():
+                if value is None:
+                    table.pop(key, None)
+                else:
+                    table[str(key)] = str(value)
+            self.strings["tables"][lang] = table
+            if default or not self.strings.get("default"):
+                self.strings["default"] = lang
+            if self.persist:
+                path = self.workspace / "strings.json"
+                self._atomic_write(path, json.dumps(self.strings, ensure_ascii=False, indent=1))
+                self._record_stamp(path)
+        self._notify(None)
         return table
 
     def find(self, canvas: dict, element_id: str) -> dict:
@@ -353,121 +477,126 @@ class Store:
         return r.warnings
 
     def add_element(self, canvas: dict, etype: str, props: dict, checkpoint: bool = True) -> tuple[dict, list[str]]:
-        if etype not in ELEMENT_TYPES:
-            raise ValueError(f"Unknown element type '{etype}'. Types: {', '.join(ELEMENT_TYPES)}")
-        props = {k: v for k, v in props.items() if v is not None}
-        el = {"id": self._new_id(canvas, etype, props.pop("id", None)), "type": etype}
-        el.update(props)
-        if el.get("clip"):
-            self.find(canvas, el["clip"])
-        if el.get("layer"):
-            el["layer"] = self.get_layer(canvas, el["layer"])["name"]
-        elif canvas.get("active_layer") and any(l["name"] == canvas["active_layer"] for l in canvas.get("layers", [])):
-            el["layer"] = canvas["active_layer"]
-        if checkpoint:
-            self.checkpoint(canvas)
-        canvas["elements"].append(el)
-        try:
-            warnings = self._validate(canvas, el)
-        except Exception:
-            canvas["elements"].remove(el)
-            if checkpoint:
-                self._undo[canvas["id"]].pop()
-            raise
-        self.save_canvas(canvas)
-        return el, warnings
-
-    def update_element(self, canvas: dict, el: dict, props: dict, checkpoint: bool = True) -> list[str]:
-        if "id" in props or "type" in props:
-            raise ValueError("id and type cannot be changed; duplicate or re-add the element instead")
-        backup = copy.deepcopy(el)
-        if checkpoint:
-            self.checkpoint(canvas)
-        for key, value in props.items():
-            if key == "style" and isinstance(value, dict) and isinstance(el.get("style"), (dict, str)):
-                merged = dict(el["style"]) if isinstance(el["style"], dict) else {"use": el["style"]}
-                for sk, sv in value.items():
-                    if sv is None:
-                        merged.pop(sk, None)
-                    else:
-                        merged[sk] = sv
-                el["style"] = merged
-            elif value is None:
-                el.pop(key, None)
-            else:
-                el[key] = value
-        try:
+        with self._lock:
+            if etype not in ELEMENT_TYPES:
+                raise ValueError(f"Unknown element type '{etype}'. Types: {', '.join(ELEMENT_TYPES)}")
+            props = {k: v for k, v in props.items() if v is not None}
+            el = {"id": self._new_id(canvas, etype, props.pop("id", None)), "type": etype}
+            el.update(props)
             if el.get("clip"):
                 self.find(canvas, el["clip"])
             if el.get("layer"):
-                if str(el["layer"]).lower() == "base":
-                    el.pop("layer")
-                else:
-                    el["layer"] = self.get_layer(canvas, el["layer"])["name"]
-            warnings = self._validate(canvas, el)
-        except Exception:
-            el.clear()
-            el.update(backup)
+                el["layer"] = self.get_layer(canvas, el["layer"])["name"]
+            elif canvas.get("active_layer") and any(l["name"] == canvas["active_layer"] for l in canvas.get("layers", [])):
+                el["layer"] = canvas["active_layer"]
             if checkpoint:
-                self._undo[canvas["id"]].pop()
-            raise
-        self.save_canvas(canvas)
-        return warnings
+                self.checkpoint(canvas)
+            canvas["elements"].append(el)
+            try:
+                warnings = self._validate(canvas, el)
+            except Exception:
+                canvas["elements"].remove(el)
+                if checkpoint:
+                    self._undo[canvas["id"]].pop()
+                raise
+            self.save_canvas(canvas)
+            return el, warnings
+
+    def update_element(self, canvas: dict, el: dict, props: dict, checkpoint: bool = True) -> list[str]:
+        with self._lock:
+            if "id" in props or "type" in props:
+                raise ValueError("id and type cannot be changed; duplicate or re-add the element instead")
+            backup = copy.deepcopy(el)
+            if checkpoint:
+                self.checkpoint(canvas)
+            for key, value in props.items():
+                if key == "style" and isinstance(value, dict) and isinstance(el.get("style"), (dict, str)):
+                    merged = dict(el["style"]) if isinstance(el["style"], dict) else {"use": el["style"]}
+                    for sk, sv in value.items():
+                        if sv is None:
+                            merged.pop(sk, None)
+                        else:
+                            merged[sk] = sv
+                    el["style"] = merged
+                elif value is None:
+                    el.pop(key, None)
+                else:
+                    el[key] = value
+            try:
+                if el.get("clip"):
+                    self.find(canvas, el["clip"])
+                if el.get("layer"):
+                    if str(el["layer"]).lower() == "base":
+                        el.pop("layer")
+                    else:
+                        el["layer"] = self.get_layer(canvas, el["layer"])["name"]
+                warnings = self._validate(canvas, el)
+            except Exception:
+                el.clear()
+                el.update(backup)
+                if checkpoint:
+                    self._undo[canvas["id"]].pop()
+                raise
+            self.save_canvas(canvas)
+            return warnings
 
     def delete_elements(self, canvas: dict, elements: list[dict], checkpoint: bool = True) -> list[str]:
-        if checkpoint:
-            self.checkpoint(canvas)
-        ids = {e["id"] for e in elements}
-        canvas["elements"] = [e for e in canvas["elements"] if e["id"] not in ids]
-        for e in canvas["elements"]:
-            if e.get("clip") in ids:
-                e.pop("clip", None)
-        for anim in canvas.get("animations", {}).values():
-            anim["tracks"] = [t for t in anim["tracks"] if t["target"] not in ids]
-        self.save_canvas(canvas)
-        return sorted(ids)
+        with self._lock:
+            if checkpoint:
+                self.checkpoint(canvas)
+            ids = {e["id"] for e in elements}
+            canvas["elements"] = [e for e in canvas["elements"] if e["id"] not in ids]
+            for e in canvas["elements"]:
+                if e.get("clip") in ids:
+                    e.pop("clip", None)
+            for anim in canvas.get("animations", {}).values():
+                anim["tracks"] = [t for t in anim["tracks"] if t["target"] not in ids]
+            self.save_canvas(canvas)
+            return sorted(ids)
 
     @staticmethod
     def shift(el: dict, dx: float, dy: float) -> None:
         shift_element(el, dx, dy)
 
     def move_elements(self, canvas: dict, elements: list[dict], dx: float, dy: float, checkpoint: bool = True) -> None:
-        if checkpoint:
-            self.checkpoint(canvas)
-        for el in elements:
-            self.shift(el, float(dx), float(dy))
-        self.save_canvas(canvas)
+        with self._lock:
+            if checkpoint:
+                self.checkpoint(canvas)
+            for el in elements:
+                self.shift(el, float(dx), float(dy))
+            self.save_canvas(canvas)
 
     def reorder(self, canvas: dict, el: dict, position: Any, checkpoint: bool = True) -> int:
-        others = [e for e in canvas["elements"] if e is not el]
-        idx = canvas["elements"].index(el)
-        pos = str(position).lower().strip()
-        if pos == "front":
-            new = len(others)
-        elif pos == "back":
-            new = 0
-        elif pos == "forward":
-            new = min(len(others), idx + 1)
-        elif pos == "backward":
-            new = max(0, idx - 1)
-        elif pos.startswith(("above:", "below:")):
-            target = str(position).split(":", 1)[1].strip()
-            if target == el["id"]:
-                raise ValueError("cannot reorder an element relative to itself")
-            other = self.find(canvas, target)
-            new = others.index(other) + (1 if pos.startswith("above:") else 0)
-        else:
-            try:
-                new = max(0, min(len(others), int(position)))
-            except (TypeError, ValueError):
-                raise ValueError("position must be 'front', 'back', 'forward', 'backward', 'above:<id>', "
-                                 "'below:<id>' or an index") from None
-        if checkpoint:
-            self.checkpoint(canvas)
-        others.insert(new, el)
-        canvas["elements"] = others
-        self.save_canvas(canvas)
-        return new
+        with self._lock:
+            others = [e for e in canvas["elements"] if e is not el]
+            idx = canvas["elements"].index(el)
+            pos = str(position).lower().strip()
+            if pos == "front":
+                new = len(others)
+            elif pos == "back":
+                new = 0
+            elif pos == "forward":
+                new = min(len(others), idx + 1)
+            elif pos == "backward":
+                new = max(0, idx - 1)
+            elif pos.startswith(("above:", "below:")):
+                target = str(position).split(":", 1)[1].strip()
+                if target == el["id"]:
+                    raise ValueError("cannot reorder an element relative to itself")
+                other = self.find(canvas, target)
+                new = others.index(other) + (1 if pos.startswith("above:") else 0)
+            else:
+                try:
+                    new = max(0, min(len(others), int(position)))
+                except (TypeError, ValueError):
+                    raise ValueError("position must be 'front', 'back', 'forward', 'backward', 'above:<id>', "
+                                     "'below:<id>' or an index") from None
+            if checkpoint:
+                self.checkpoint(canvas)
+            others.insert(new, el)
+            canvas["elements"] = others
+            self.save_canvas(canvas)
+            return new
 
     def duplicate_element(self, canvas: dict, el: dict, dx: float, dy: float, new_id: str | None,
                           props: dict | None, count: int = 1, rotate: float = 0.0,
@@ -522,7 +651,6 @@ class Store:
     def fit_canvas(self, canvas: dict, padding: float = 0.0, include_animations: bool = True) -> dict:
         """Shrink or grow the canvas to what is actually painted (effects included) plus padding, and
         move every element (and position keyframes) so nothing changes visually."""
-        import numpy as np
         from .animation import apply_animation
         frames = [canvas]
         if include_animations:

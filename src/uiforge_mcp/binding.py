@@ -14,11 +14,59 @@ from functools import lru_cache
 from typing import Any
 
 MAX_EXPR = 400
+MAX_POW_EXP = 64.0
+MAX_STR_LEN = 4096
 _NODES = (
     ast.Expression, ast.Name, ast.Load, ast.Constant, ast.BinOp, ast.UnaryOp, ast.BoolOp, ast.Compare,
     ast.Call, ast.IfExp, ast.Add, ast.Sub, ast.Mult, ast.Div, ast.FloorDiv, ast.Mod, ast.Pow,
     ast.USub, ast.UAdd, ast.Not, ast.And, ast.Or, ast.Lt, ast.Gt, ast.LtE, ast.GtE, ast.Eq, ast.NotEq,
 )
+
+
+def _safe_pow(base: Any, exp: Any) -> float:
+    b = float(base)
+    e = float(exp)
+    if not (math.isfinite(b) and math.isfinite(e)):
+        raise ValueError("power arguments must be finite numbers")
+    if abs(e) > MAX_POW_EXP:
+        raise ValueError(f"exponent {e:g} exceeds safety limit ({MAX_POW_EXP:g})")
+    if abs(b) > 1e6 and abs(e) > 2.0:
+        raise ValueError("power base/exponent exceeds safety limit")
+    res = b ** e
+    if isinstance(res, complex) or not math.isfinite(float(res)):
+        raise ValueError("power result is not a finite real number")
+    return float(res)
+
+
+def _safe_mul(a: Any, b: Any) -> Any:
+    if isinstance(a, str) and isinstance(b, int):
+        if b < 0 or len(a) * b > MAX_STR_LEN:
+            raise ValueError(f"string repetition exceeds safety limit ({MAX_STR_LEN} chars)")
+        return a * b
+    if isinstance(b, str) and isinstance(a, int):
+        if a < 0 or len(b) * a > MAX_STR_LEN:
+            raise ValueError(f"string repetition exceeds safety limit ({MAX_STR_LEN} chars)")
+        return a * b
+    return a * b
+
+
+class _SafeOps(ast.NodeTransformer):
+    """Rewrite ** and * into DoS-bounded helpers so binding expressions cannot exhaust CPU/RAM."""
+
+    def visit_BinOp(self, node: ast.BinOp) -> ast.AST:
+        node = self.generic_visit(node)
+        if isinstance(node.op, ast.Pow):
+            return ast.copy_location(
+                ast.Call(func=ast.Name(id="_safe_pow", ctx=ast.Load()), args=[node.left, node.right], keywords=[]),
+                node,
+            )
+        if isinstance(node.op, ast.Mult):
+            return ast.copy_location(
+                ast.Call(func=ast.Name(id="_safe_mul", ctx=ast.Load()), args=[node.left, node.right], keywords=[]),
+                node,
+            )
+        return node
+
 
 FUNCS: dict[str, Any] = {
     "min": min,
@@ -62,13 +110,14 @@ def compile_expr(expr: str):
                 raise ValueError(f"binding expr: unknown function. Available: {', '.join(sorted(FUNCS))}")
         if isinstance(node, ast.Constant) and not isinstance(node.value, (int, float, str, bool)):
             raise ValueError("binding expr: only numbers, strings and booleans are allowed")
-    return compile(tree, "<binding>", "eval")
+    safe_tree = ast.fix_missing_locations(_SafeOps().visit(tree))
+    return compile(safe_tree, "<binding>", "eval")
 
 
 def eval_expr(expr: str, data: dict[str, Any]) -> Any:
     """Evaluate a validated binding expression against ``data``."""
     code = compile_expr(expr)
-    ns: dict[str, Any] = {"__builtins__": {}}
+    ns: dict[str, Any] = {"__builtins__": {}, "_safe_pow": _safe_pow, "_safe_mul": _safe_mul}
     ns.update(FUNCS)
     for k, v in (data or {}).items():
         if isinstance(k, str) and k.isidentifier() and not k.startswith("_") and k not in FUNCS:

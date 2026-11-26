@@ -6,9 +6,7 @@ from __future__ import annotations
 import base64
 import copy
 import html
-import io
 import json
-import math
 import re
 import shutil
 from pathlib import Path
@@ -20,7 +18,7 @@ from PIL import ImageDraw
 from . import export as ex
 from . import shaping
 from .colors import parse_color, to_hex
-from .render import TextLayout, _stroke_specs, parse_anchor, resolve_style
+from .render import TextLayout, _stroke_specs, resolve_style
 from .server import (Image, _gradient_blocks, _label_font, _maybe_json, _out_dir, _out_path, _png_bytes,
                      backdrop, store, tool)
 from .store import slugify
@@ -681,12 +679,7 @@ addEventListener('keydown',e=>{{if(e.key==='Escape'&&hist.length)show(hist.pop()
 addEventListener('resize',fit);show({json.dumps(first['id'])},false);
 </script></body></html>
 """
-    out = Path(path).expanduser() if path else st.exports_dir / f"{first['id']}_prototype.html"
-    if not out.is_absolute():
-        out = st.exports_dir / out
-    if out.suffix.lower() != ".html":
-        raise ValueError("path must end with .html")
-    out.parent.mkdir(parents=True, exist_ok=True)
+    out = _out_path(path, f"{first['id']}_prototype.html", suffixes=(".html",))
     out.write_text(doc, encoding="utf-8")
     unlinked = [cid for cid in seen if not st.get(cid).get("links")]
     result: dict = {"file": str(out), "screens": seen, "size_kb": round(out.stat().st_size / 1024)}
@@ -729,7 +722,7 @@ def _pieces(c: dict, scale: float, bake_text: bool, language: str | None):
             nodes.append({"kind": "text", "id": el["id"], "box": (x0, y0, x1, y1), "pin": el.get("pin") or {},
                           "el": el, "info": info})
             continue
-        if el["type"] in ("input", "scroll"):
+        if el["type"] in ("input", "scroll", "slider", "toggle", "dropdown"):
             x0, y0, x1, y1 = r1.element_box(el)
             nodes.append({"kind": el["type"], "id": el["id"], "box": (x0, y0, x1, y1), "pin": el.get("pin") or {},
                           "el": el})
@@ -739,7 +732,7 @@ def _pieces(c: dict, scale: float, bake_text: bool, language: str | None):
                 continue
             groups_done.add(el["group"])
             members = [e for e in c["elements"] if e.get("group") == el["group"] and e.get("visible", True)
-                       and e["type"] not in ("input", "scroll")
+                       and e["type"] not in ("input", "scroll", "slider", "toggle", "dropdown")
                        and (bake_text or e["type"] != "text" or e.get("arc"))]
             if not members:
                 continue
@@ -845,6 +838,29 @@ def _write_godot(c: dict, nodes: list, folder: Path, res: str, name: str, colors
                 body += [f'[node name="Item{i}" type="Label" parent="{nid}/Content"]',
                          f'text = {json.dumps(str(title), ensure_ascii=False)}',
                          f"theme_override_font_sizes/font_size = {int(round(float(el.get('size', 13))))}", ""]
+        elif node["kind"] == "slider":
+            el = node["el"]
+            body += [f'[node name="{_ident_node(node["id"])}" type="HSlider" parent="."]', "layout_mode = 1", *anchors,
+                     f"min_value = {float(el.get('min', 0.0)):g}",
+                     f"max_value = {float(el.get('max', 100.0)):g}",
+                     f"step = {float(el.get('step', 1.0)):g}",
+                     f"value = {float(el.get('value', 50.0)):g}", ""]
+        elif node["kind"] == "toggle":
+            el = node["el"]
+            gtype = "CheckBox" if str(el.get("variant", "switch")).lower() == "checkbox" else "CheckButton"
+            body += [f'[node name="{_ident_node(node["id"])}" type="{gtype}" parent="."]', "layout_mode = 1", *anchors,
+                     f'text = {json.dumps(str(el.get("label") or ""), ensure_ascii=False)}',
+                     f"button_pressed = {'true' if el.get('checked') else 'false'}", ""]
+        elif node["kind"] == "dropdown":
+            el = node["el"]
+            opts = [str(o) for o in (el.get("options") or [])]
+            sel = el.get("selected", 0)
+            idx = opts.index(sel) if (isinstance(sel, str) and sel in opts) else int(sel or 0)
+            props = [f'[node name="{_ident_node(node["id"])}" type="OptionButton" parent="."]', "layout_mode = 1", *anchors,
+                     f"selected = {idx}", f"item_count = {len(opts)}"]
+            for i, opt in enumerate(opts):
+                props.append(f'popup/item_{i}/text = {json.dumps(opt, ensure_ascii=False)}')
+            body += props + [""]
         else:
             t = node["info"]
             props = [f'[node name="{_ident_node(node["id"])}" type="Label" parent="."]', "layout_mode = 1", *anchors]
@@ -980,6 +996,43 @@ def _write_roblox(c: dict, nodes: list, folder: Path, name: str, colors: dict) -
                     f"{var}_i{i}.TextSize = {int(round(float(el.get('size', 13))))}",
                     f"{var}_i{i}.Parent = {var}",
                 ]
+        elif node["kind"] == "slider":
+            el = node["el"]
+            lo, hi = float(el.get("min", 0.0)), float(el.get("max", 100.0))
+            frac = max(0.0, min(1.0, (float(el.get("value", 50.0)) - lo) / max(1e-6, hi - lo)))
+            lines += [
+                f'local {var} = Instance.new("Frame")', f'{var}.Name = "{node["id"]}"',
+                f"{var}.BackgroundColor3 = Color3.fromRGB(30, 41, 59)",
+                f'local {var}c = Instance.new("UICorner")', f"{var}c.CornerRadius = UDim.new(1, 0)", f"{var}c.Parent = {var}",
+                f'local {var}_fill = Instance.new("Frame")', f'{var}_fill.Name = "Fill"',
+                f"{var}_fill.Size = UDim2.new({frac:.3f}, 0, 1, 0)",
+                f"{var}_fill.BackgroundColor3 = Color3.fromRGB(56, 189, 248)",
+                f"{var}_fill.Parent = {var}",
+            ]
+        elif node["kind"] == "toggle":
+            el = node["el"]
+            chk = bool(el.get("checked"))
+            lines += [
+                f'local {var} = Instance.new("TextButton")', f'{var}.Name = "{node["id"]}"',
+                f'{var}.Text = {json.dumps(str(el.get("label") or ("ON" if chk else "OFF")), ensure_ascii=False)}',
+                f"{var}.BackgroundColor3 = Color3.fromRGB({'34, 197, 94' if chk else '51, 65, 85'})",
+                f"{var}.TextColor3 = Color3.fromRGB(248, 250, 252)",
+                f'{var}:SetAttribute("Checked", {"true" if chk else "false"})',
+                f'local {var}c = Instance.new("UICorner")', f"{var}c.CornerRadius = UDim.new(1, 0)", f"{var}c.Parent = {var}",
+            ]
+        elif node["kind"] == "dropdown":
+            el = node["el"]
+            opts = [str(o) for o in (el.get("options") or ["Option 1"])]
+            sel = el.get("selected", 0)
+            shown = sel if (isinstance(sel, str) and sel in opts) else opts[min(len(opts) - 1, max(0, int(sel or 0)))]
+            lines += [
+                f'local {var} = Instance.new("TextButton")', f'{var}.Name = "{node["id"]}"',
+                f'{var}.Text = {json.dumps(shown + " v", ensure_ascii=False)}',
+                f"{var}.BackgroundColor3 = Color3.fromRGB(15, 23, 42)",
+                f"{var}.TextColor3 = Color3.fromRGB(248, 250, 252)",
+                f"{var}.TextXAlignment = Enum.TextXAlignment.Left",
+                f'local {var}c = Instance.new("UICorner")', f"{var}c.CornerRadius = UDim.new(0, 8)", f"{var}c.Parent = {var}",
+            ]
         else:
             t = node["info"]
             col = _first_color_hexlike(t["color"], colors)
@@ -1076,6 +1129,26 @@ def _write_unity(c: dict, nodes: list, folder: Path, name: str, colors: dict) ->
                 title = (raw_item.get("title") or raw_item.get("label") or f"Item {i + 1}") if isinstance(raw_item, dict) else str(raw_item)
                 uxml.append(f'            <ui:Label name="{node["id"]}_item_{i}" text="{html.escape(str(title), quote=True)}" />')
             uxml.append("        </ui:ScrollView>")
+        elif node["kind"] == "slider":
+            el = node["el"]
+            lbl = html.escape(str(el.get("label") or ""), quote=True)
+            uxml.append(
+                f'        <ui:Slider name="{node["id"]}" class="{cls}" label="{lbl}" '
+                f'low-value="{float(el.get("min", 0.0)):g}" high-value="{float(el.get("max", 100.0)):g}" '
+                f'value="{float(el.get("value", 50.0)):g}" />'
+            )
+        elif node["kind"] == "toggle":
+            el = node["el"]
+            lbl = html.escape(str(el.get("label") or ""), quote=True)
+            val = "true" if el.get("checked") else "false"
+            uxml.append(f'        <ui:Toggle name="{node["id"]}" class="{cls}" label="{lbl}" value="{val}" />')
+        elif node["kind"] == "dropdown":
+            el = node["el"]
+            opts = [str(o) for o in (el.get("options") or [])]
+            sel = el.get("selected", 0)
+            idx = opts.index(sel) if (isinstance(sel, str) and sel in opts) else int(sel or 0)
+            choices = html.escape(",".join(opts), quote=True)
+            uxml.append(f'        <ui:DropdownField name="{node["id"]}" class="{cls}" choices="{choices}" index="{idx}" />')
         else:
             t = node["info"]
             col = _first_color_hexlike(t["color"], colors)
@@ -1352,6 +1425,33 @@ def _write_unity_ugui(c: dict, nodes: list, folder: Path, name: str, colors: dic
                 f"        {var}Content.transform.SetParent({var}.transform, false);",
                 f"        {var}Sr.content = {var}Content.GetComponent<RectTransform>();",
             ]
+        elif node["kind"] == "slider":
+            el = node["el"]
+            lines += [
+                f'        var {var} = new GameObject("{node["id"]}", typeof(RectTransform), typeof(Slider));',
+                f"        {var}.transform.SetParent(root.transform, false);",
+                f"        var {var}Sl = {var}.GetComponent<Slider>(); {var}Sl.minValue = {float(el.get('min', 0.0)):g}f; {var}Sl.maxValue = {float(el.get('max', 100.0)):g}f; {var}Sl.value = {float(el.get('value', 50.0)):g}f;",
+            ]
+        elif node["kind"] == "toggle":
+            el = node["el"]
+            lines += [
+                f'        var {var} = new GameObject("{node["id"]}", typeof(RectTransform), typeof(Toggle));',
+                f"        {var}.transform.SetParent(root.transform, false);",
+                f"        {var}.GetComponent<Toggle>().isOn = {'true' if el.get('checked') else 'false'};",
+            ]
+        elif node["kind"] == "dropdown":
+            el = node["el"]
+            opts = [str(o).replace("\\", "\\\\").replace('"', '\\"') for o in (el.get("options") or ["Option 1"])]
+            sel = el.get("selected", 0)
+            idx = opts.index(sel) if (isinstance(sel, str) and sel in opts) else int(sel or 0)
+            opt_args = ", ".join(f'new Dropdown.OptionData("{o}")' for o in opts)
+            lines += [
+                f'        var {var} = new GameObject("{node["id"]}", typeof(RectTransform), typeof(Image), typeof(Dropdown));',
+                f"        {var}.transform.SetParent(root.transform, false);",
+                f"        var {var}Dd = {var}.GetComponent<Dropdown>();",
+                f"        {var}Dd.options = new System.Collections.Generic.List<Dropdown.OptionData> {{ {opt_args} }};",
+                f"        {var}Dd.value = {idx};",
+            ]
         else:
             t = node["info"]
             col = _first_color_hexlike(t["color"], colors)
@@ -1383,30 +1483,275 @@ def _write_unity_ugui(c: dict, nodes: list, folder: Path, name: str, colors: dic
     return out
 
 
+def _write_unreal_umg(c: dict, nodes: list, folder: Path, name: str, colors: dict,
+                      unreal_content_path: str = "/Game/UI/Generated") -> Path:
+    """Emit an Unreal Engine 5.5-5.8 Python Editor script that imports pieces & constructs a UMG WidgetBlueprint."""
+    if not re.fullmatch(r"/[A-Za-z0-9_/]+", unreal_content_path or ""):
+        raise ValueError("unreal_content_path must be a content path like /Game/UI/Generated (letters, digits, _ and / only)")
+    W, H = float(c["width"]), float(c["height"])
+    bp_name = "WBP_" + _pascal_id(name)
+    spec_nodes = []
+    for node in nodes:
+        x0, y0, x1, y1 = node["box"]
+        entry: dict[str, Any] = {
+            "kind": node["kind"],
+            "id": _ident_node(node["id"]),
+            "x": round(x0, 2), "y": round(y0, 2),
+            "w": round(max(1.0, x1 - x0), 2), "h": round(max(1.0, y1 - y0), 2),
+            "pin": node.get("pin") or {"x": "left", "y": "top"},
+        }
+        if node["kind"] == "image":
+            entry["file"] = node["file"]
+            if node.get("nine"):
+                iw, ih = node["img"].size
+                b = node["nine"]
+                entry["margin"] = [
+                    round(b["left"] / max(1, iw), 4),
+                    round(b["top"] / max(1, ih), 4),
+                    round(b["right"] / max(1, iw), 4),
+                    round(b["bottom"] / max(1, ih), 4),
+                ]
+        elif node["kind"] == "text":
+            t = node["info"]
+            col = _first_color_hexlike(t["color"], colors)
+            entry["text"] = str(t["text"])
+            entry["size"] = int(round(float(t["size"])))
+            entry["color"] = [round(c_ / 255.0, 4) for c_ in col]
+            entry["align"] = str(t.get("align", "left"))
+        elif node["kind"] in ("input", "scroll", "slider", "toggle", "dropdown"):
+            el = node["el"]
+            entry["props"] = {
+                "value": el.get("value"),
+                "placeholder": el.get("placeholder", ""),
+                "password": str(el.get("input_type", "")).lower() == "password",
+                "direction": str(el.get("direction", "vertical")).lower(),
+                "items": [(it.get("title") or it.get("label") or str(it)) if isinstance(it, dict) else str(it)
+                          for it in (el.get("items") or [])],
+                "min": float(el.get("min", 0.0)),
+                "max": float(el.get("max", 100.0)),
+                "step": float(el.get("step", 1.0)),
+                "checked": bool(el.get("checked", False)),
+                "options": [str(o) for o in (el.get("options") or [])],
+                "selected": el.get("selected", 0),
+                "label": str(el.get("label") or ""),
+            }
+        spec_nodes.append(entry)
+
+    script = f'''# {bp_name}_build_umg.py - generated by uiforge-mcp for Unreal Engine 5.5-5.8
+# Run in Unreal Editor (Python Editor Script Plugin + Editor Scripting Utilities enabled):
+#   Output Log -> Python -> py "<path>/{bp_name}_build_umg.py"
+import json
+import os
+import unreal
+
+SRC_DIR = os.path.dirname(os.path.abspath(__file__))
+DEST_PATH = {json.dumps(unreal_content_path)}
+BP_NAME = {json.dumps(bp_name)}
+CANVAS_W = {W:g}
+CANVAS_H = {H:g}
+NODES = json.loads({json.dumps(json.dumps(spec_nodes, ensure_ascii=False))})
+
+
+def _import_textures(src_dir, dest_path):
+    tasks = []
+    by_stem = {{}}
+    for n in NODES:
+        if n["kind"] != "image":
+            continue
+        fpath = os.path.join(src_dir, n["file"])
+        if not os.path.isfile(fpath):
+            continue
+        t = unreal.AssetImportTask()
+        t.set_editor_property("filename", fpath)
+        t.set_editor_property("destination_path", dest_path + "/Textures")
+        t.set_editor_property("automated", True)
+        t.set_editor_property("replace_existing", True)
+        t.set_editor_property("save", True)
+        tasks.append(t)
+        by_stem[os.path.splitext(n["file"])[0]] = n["id"]
+    textures = {{}}
+    if not tasks:
+        return textures
+    unreal.AssetToolsHelpers.get_asset_tools().import_asset_tasks(tasks)
+    for t in tasks:
+        for obj_path in t.get_editor_property("imported_object_paths"):
+            tex = unreal.load_asset(obj_path)
+            if not isinstance(tex, unreal.Texture2D):
+                continue
+            tex.set_editor_property("compression_settings", unreal.TextureCompressionSettings.TC_EDITOR_ICON)
+            tex.set_editor_property("lod_group", unreal.TextureGroup.TEXTUREGROUP_UI)
+            tex.set_editor_property("mip_gen_settings", unreal.TextureMipGenSettings.TMGS_NO_MIPMAPS)
+            tex.set_editor_property("srgb", True)
+            tex.set_editor_property("never_stream", True)
+            unreal.EditorAssetLibrary.save_loaded_asset(tex)
+            nid = by_stem.get(tex.get_name())
+            if nid:
+                textures[nid] = tex
+    return textures
+
+
+def _anchor_range(pin, a0, a1, span):
+    if pin in ("right", "bottom"):
+        return 1.0, 1.0, a0 - span, a1 - a0
+    if pin in ("center", "middle"):
+        return 0.5, 0.5, a0 - span * 0.5, a1 - a0
+    if pin == "stretch":
+        return 0.0, 1.0, a0, span - a1
+    if pin == "scale":
+        return a0 / span, a1 / span, 0.0, 0.0
+    return 0.0, 0.0, a0, a1 - a0
+
+
+def _apply_slot(slot, n):
+    if slot is None:
+        return
+    pin = n.get("pin") or {{}}
+    px, py = pin.get("x", "left"), pin.get("y", "top")
+    ax0, ax1, ox, sx = _anchor_range(px, n["x"], n["x"] + n["w"], CANVAS_W)
+    ay0, ay1, oy, sy = _anchor_range(py, n["y"], n["y"] + n["h"], CANVAS_H)
+    anchors = unreal.Anchors(minimum=unreal.Vector2D(ax0, ay0), maximum=unreal.Vector2D(ax1, ay1))
+    slot.set_anchors(anchors)
+    slot.set_offsets(unreal.Margin(left=ox, top=oy, right=sx, bottom=sy))
+
+
+def build_umg(src_dir=SRC_DIR, dest_path=DEST_PATH, bp_name=BP_NAME):
+    textures = _import_textures(src_dir, dest_path)
+    full_path = dest_path.rstrip("/") + "/" + bp_name
+    wbp = unreal.load_asset(full_path) if unreal.EditorAssetLibrary.does_asset_exist(full_path) else None
+    if wbp is None:
+        factory = unreal.WidgetBlueprintFactory()
+        wbp = unreal.AssetToolsHelpers.get_asset_tools().create_asset(
+            bp_name, dest_path, unreal.WidgetBlueprint, factory
+        )
+    if wbp is None:
+        raise RuntimeError("Could not create WidgetBlueprint at " + full_path)
+
+    subsys = unreal.get_editor_subsystem(unreal.WidgetEditorSubsystem) if hasattr(unreal, "WidgetEditorSubsystem") else None
+    tree = getattr(wbp, "widget_tree", None)
+    if tree is None:
+        tree = unreal.find_object(wbp, "WidgetTree")
+
+    def _make(cls, wname, parent_panel=None):
+        if hasattr(unreal, "WidgetBlueprintEditorUtils") and hasattr(unreal.WidgetBlueprintEditorUtils, "create_widget"):
+            w = unreal.WidgetBlueprintEditorUtils.create_widget(wbp, cls, wname)
+        elif tree is not None and hasattr(tree, "construct_widget"):
+            w = tree.construct_widget(cls, wname)
+        else:
+            w = unreal.new_object(cls, outer=tree or wbp, name=wname)
+        if parent_panel is not None and w is not None:
+            return w, parent_panel.add_child(w)
+        return w, None
+
+    root_panel, _ = _make(unreal.CanvasPanel, "RootCanvas")
+    if tree is not None:
+        if hasattr(tree, "set_root_widget"):
+            tree.set_root_widget(root_panel)
+        elif hasattr(tree, "root_widget"):
+            tree.root_widget = root_panel
+
+    for idx, n in enumerate(NODES):
+        kind = n["kind"]
+        wname = n["id"] + "_" + str(idx)
+        props = n.get("props") or {{}}
+        if kind == "image":
+            w, slot = _make(unreal.Image, wname, root_panel)
+            tex = textures.get(n["id"])
+            if tex is not None and hasattr(w, "set_brush_from_texture"):
+                w.set_brush_from_texture(tex, match_size=False)
+                if n.get("margin"):
+                    m = n["margin"]
+                    brush = w.get_editor_property("brush")
+                    brush.set_editor_property("draw_as", unreal.SlateBrushDrawType.BOX)
+                    brush.set_editor_property("margin", unreal.Margin(left=m[0], top=m[1], right=m[2], bottom=m[3]))
+                    w.set_editor_property("brush", brush)
+            _apply_slot(slot, n)
+        elif kind == "text":
+            w, slot = _make(unreal.TextBlock, wname, root_panel)
+            w.set_text(n.get("text", ""))
+            col = n.get("color", [1.0, 1.0, 1.0, 1.0])
+            w.set_color_and_opacity(unreal.SlateColor(unreal.LinearColor(col[0], col[1], col[2], col[3])))
+            _apply_slot(slot, n)
+        elif kind == "input":
+            w, slot = _make(unreal.EditableTextBox, wname, root_panel)
+            w.set_text(str(props.get("value") or ""))
+            if hasattr(w, "set_hint_text"):
+                w.set_hint_text(str(props.get("placeholder") or ""))
+            if props.get("password") and hasattr(w, "set_is_password"):
+                w.set_is_password(True)
+            _apply_slot(slot, n)
+        elif kind == "scroll":
+            w, slot = _make(unreal.ScrollBox, wname, root_panel)
+            if props.get("direction") == "horizontal" and hasattr(w, "set_orientation"):
+                w.set_orientation(unreal.Orientation.ORIENT_HORIZONTAL)
+            for i, it in enumerate(props.get("items") or []):
+                item_w, _ = _make(unreal.TextBlock, wname + "_Item_" + str(i), w)
+                item_w.set_text(str(it))
+            _apply_slot(slot, n)
+        elif kind == "slider":
+            w, slot = _make(unreal.Slider, wname, root_panel)
+            w.set_min_value(float(props.get("min", 0.0)))
+            w.set_max_value(float(props.get("max", 100.0)))
+            w.set_step_size(float(props.get("step", 1.0)))
+            w.set_value(float(props.get("value", 50.0)))
+            _apply_slot(slot, n)
+        elif kind == "toggle":
+            w, slot = _make(unreal.CheckBox, wname, root_panel)
+            w.set_is_checked(bool(props.get("checked", False)))
+            _apply_slot(slot, n)
+        elif kind == "dropdown":
+            w, slot = _make(unreal.ComboBoxString, wname, root_panel)
+            opts = props.get("options") or []
+            for o in opts:
+                w.add_option(str(o))
+            sel = props.get("selected", 0)
+            chosen = sel if (isinstance(sel, str) and sel in opts) else (opts[int(sel)] if (opts and 0 <= int(sel or 0) < len(opts)) else "")
+            if chosen:
+                w.set_selected_option(str(chosen))
+            _apply_slot(slot, n)
+
+    if hasattr(unreal, "BlueprintEditorLibrary"):
+        try:
+            unreal.BlueprintEditorLibrary.compile_blueprint(wbp)
+        except Exception:
+            pass
+    unreal.EditorAssetLibrary.save_loaded_asset(wbp)
+    unreal.log("uiforge-mcp: built Unreal UMG WidgetBlueprint " + full_path + " with " + str(len(NODES)) + " widgets")
+    return wbp
+
+
+if __name__ == "__main__":
+    build_umg()
+'''
+    out = folder / f"{bp_name}_build_umg.py"
+    out.write_text(script, encoding="utf-8")
+    return out
+
+
 @tool
 def export_screen(canvas: str, engine: str, out_dir: str | None = None, name: str | None = None,
                   scale: float = 1, bake_text: bool = False, language: str | None = None,
-                  godot_res_path: str | None = None):
+                  godot_res_path: str | None = None, unreal_content_path: str = "/Game/UI/Generated"):
     """Turn a screen mockup into a real engine or native desktop UI: image pieces + scene/view/script
-    rebuilding the layout with native text, Input fields, Scroll views and responsive pins.
+    rebuilding the layout with native text, Input, Scroll, Slider, Toggle, Dropdown widgets and responsive pins.
     When the canvas has interactions, data bindings or focus_order, also emits a ready controller/ViewModel.
 
     engine:
       Game engines:
-        - "godot"      (.tscn with LineEdit/ScrollContainer + optional _controller.gd)
-        - "roblox"     (LocalScript with ScreenGui + TextBox/ScrollingFrame)
-        - "unity"      (UI Toolkit .uxml + .uss with TextField/ScrollView + optional Controller.cs)
-        - "unity-ugui" (C# uGUI Canvas / RectTransform / InputField / ScrollRect editor builder)
+        - "godot"      (.tscn with LineEdit/ScrollContainer/HSlider/CheckButton/OptionButton + _controller.gd)
+        - "roblox"     (LocalScript with ScreenGui + TextBox/ScrollingFrame/controls)
+        - "unity"      (UI Toolkit .uxml + .uss with TextField/ScrollView/Slider/Toggle/DropdownField + Controller.cs)
+        - "unity-ugui" (C# uGUI Canvas / RectTransform / InputField / ScrollRect / Slider / Toggle / Dropdown builder)
+        - "unreal"     (UE 5.5-5.8 Python UMG WidgetBlueprint builder with CanvasPanel/Image 9-slice/TextBlock/EditableTextBox/ScrollBox/Slider/CheckBox/ComboBoxString)
       C# / .NET & C++ desktop UI frameworks:
         - "wpf"        (C# .NET Framework 4.8 & .NET 8/9 WPF .xaml + .xaml.cs + INotifyPropertyChanged ViewModel)
         - "avalonia"   (Cross-platform .NET 8/9 Avalonia .axaml + .axaml.cs + ViewModel)
         - "winui"      (Windows App SDK / WinUI 3 .xaml + .xaml.cs + ViewModel)
-        - "qt-qml"     (C++ Qt 6 Quick .qml with TextField, ScrollView, properties & signals)
-        - "imgui"      (C++17 Dear ImGui self-contained _ui.hpp header with State struct, InputText & BeginChild)
+        - "qt-qml"     (C++ Qt 6 Quick .qml with TextField, ScrollView, Slider, Switch, ComboBox)
+        - "imgui"      (C++17 Dear ImGui self-contained _ui.hpp header with State struct & all native widgets)
       Generic:
         - "json"       (pieces + layout JSON only)
     Pieces: every element group becomes one image (so group each widget), ungrouped elements one image
-    each. Text, input and scroll widgets stay native unless bake_text=true (text only). Pieces pinned
+    each. Text and interactive widgets stay native unless bake_text=true (text only). Pieces pinned
     "stretch" get 9-slice margins when their centre allows it. scale: export pieces at 2x for high-DPI.
     """
     from .desktop_export import DESKTOP_ENGINES, write_desktop
@@ -1414,7 +1759,7 @@ def export_screen(canvas: str, engine: str, out_dir: str | None = None, name: st
     c = st.get(canvas)
     st.require_glyphs(c, language)
     engine = engine.lower()
-    valid_engines = ("godot", "roblox", "unity", "unity-ugui", "json") + DESKTOP_ENGINES
+    valid_engines = ("godot", "roblox", "unity", "unity-ugui", "unreal", "json") + DESKTOP_ENGINES
     if engine not in valid_engines:
         raise ValueError(f"engine must be one of {', '.join(valid_engines)}")
     scale = max(0.5, min(4.0, float(scale)))
@@ -1454,7 +1799,7 @@ def export_screen(canvas: str, engine: str, out_dir: str | None = None, name: st
                   "members": n.get("members"),
                   "text": {k: v for k, v in n["info"].items() if not k.startswith("_")} if n["kind"] == "text" else None,
                   "widget": ({k: v for k, v in n["el"].items() if k not in ("type", "id", "x", "y", "width", "height")}
-                             if n["kind"] in ("input", "scroll") else None),
+                             if n["kind"] in ("input", "scroll", "slider", "toggle", "dropdown") else None),
               }.items() if v is not None} for n in nodes]}
     layout = {k: v for k, v in layout.items() if v is not None}
     (folder / f"{base}.screen.json").write_text(json.dumps(layout, ensure_ascii=False, indent=1), encoding="utf-8")
@@ -1467,12 +1812,12 @@ def export_screen(canvas: str, engine: str, out_dir: str | None = None, name: st
         if ctrl:
             files.append(ctrl.name)
         nxt = (f"Copy the folder to {godot_res_path or f'res://ui/{base}'} in your Godot 4 project and instance "
-               f"{out.name} under a CanvasLayer. Labels, LineEdit and ScrollContainer are native; anchors follow pins.")
+               f"{out.name} under a CanvasLayer. Labels, LineEdit, ScrollContainer, HSlider, CheckButton and OptionButton are native.")
     elif engine == "roblox":
         out = _write_roblox(c, nodes, folder, base, colors)
         files.append(out.name)
         nxt = ("Upload the PNGs in Studio, paste their ids into IMAGES at the top of the script, and put the "
-               "LocalScript in StarterPlayerScripts. TextBox and ScrollingFrame are native Roblox instances.")
+               "LocalScript in StarterPlayerScripts. TextBox, ScrollingFrame and interactive controls are native Roblox instances.")
     elif engine == "unity":
         outs = _write_unity(c, nodes, folder, base, colors)
         files += [o.name for o in outs]
@@ -1485,14 +1830,19 @@ def export_screen(canvas: str, engine: str, out_dir: str | None = None, name: st
         out = _write_unity_ugui(c, nodes, folder, base, colors)
         files.append(out.name)
         nxt = (f"Put {out.name} in Assets/Editor/ and run Tools -> UIForge -> Build {_pascal_id(base)}UGuiBuilder "
-               "to create a ready uGUI Canvas with RectTransform anchors, InputFields and ScrollRects.")
+               "to create a ready uGUI Canvas with RectTransform anchors and native UI widgets.")
+    elif engine == "unreal":
+        out = _write_unreal_umg(c, nodes, folder, base, colors, unreal_content_path)
+        files.append(out.name)
+        nxt = (f'In Unreal Engine 5.5-5.8: Output Log -> switch Cmd to Python -> py "{out.as_posix()}" '
+               f"to import PNGs and generate WBP_{_pascal_id(base)} in {unreal_content_path}.")
     elif engine in DESKTOP_ENGINES:
         outs, nxt = write_desktop(engine, c, nodes, folder, base, colors)
         files += [o.name for o in outs]
     result: dict = {"folder": str(folder), "engine": engine, "files": files,
                     "pieces": [n["id"] for n in nodes if n["kind"] == "image"],
                     "texts": [n["id"] for n in nodes if n["kind"] == "text"],
-                    "widgets": [n["id"] for n in nodes if n["kind"] in ("input", "scroll")], "next": nxt}
+                    "widgets": [n["id"] for n in nodes if n["kind"] in ("input", "scroll", "slider", "toggle", "dropdown")], "next": nxt}
     if fonts_copied:
         result["fonts_copied"] = fonts_copied
     notes = []

@@ -147,11 +147,10 @@ def test_missing_glyph_warning(ws):
     assert "warnings" in r
 
 
-def test_icon_elements_are_gone(ws):
+def test_builtin_icons_expand_to_editable_paths(ws):
     s.create_canvas("a", 48, 48)
-    assert not hasattr(s, "add_icon") and not hasattr(s, "list_icons")
-    with pytest.raises(ValueError):
-        s.batch("a", [{"op": "add_icon", "name": "star", "x": 0, "y": 0}])
+    r = s.batch("a", [{"op": "add_icon", "name": "star", "x": 8, "y": 8, "size": 32}])
+    assert r["results"][0]["type"] == "path" and r["results"][0]["icon"] == "star"
 
 
 def test_rotation_keeps_shape_area(ws):

@@ -6,9 +6,11 @@ text and effects the model asks for. Run with ``python -m uiforge_mcp``.
 
 from __future__ import annotations
 
+import asyncio
 import functools
 import io
 import json
+import os
 import re
 from pathlib import Path
 from typing import Any
@@ -16,15 +18,64 @@ from typing import Any
 from PIL import Image as PILImage
 from PIL import ImageDraw, ImageFont
 
+from . import __version__
+
+MCP_AVAILABLE = True
 try:
     from mcp.server.mcpserver import Image, MCPServer as _Server
     from mcp.server.mcpserver.exceptions import ToolError
 except ImportError:
-    from mcp.server.fastmcp import FastMCP as _Server, Image
     try:
-        from mcp.server.fastmcp.exceptions import ToolError
+        from mcp.server.fastmcp import FastMCP as _Server, Image
+        try:
+            from mcp.server.fastmcp.exceptions import ToolError
+        except ImportError:
+            ToolError = RuntimeError
     except ImportError:
-        ToolError = RuntimeError
+        MCP_AVAILABLE = False
+
+        class ToolError(RuntimeError):
+            """Fallback ToolError used in Human Mode when the optional `mcp` SDK is not installed."""
+
+        class Image:
+            """Lightweight MCP-compatible Image wrapper for Human Mode without the `mcp` SDK."""
+
+            def __init__(self, data: bytes, format: str = "png") -> None:
+                self.data = data
+                self.format = format
+
+        class _LocalToolManager:
+            def __init__(self) -> None:
+                self._tools: dict[str, Any] = {}
+
+            def remove_tool(self, name: str) -> None:
+                self._tools.pop(name, None)
+
+        class _Server:
+            """Zero-dependency local shim allowing Human Mode (UI) to run without the `mcp` package."""
+
+            def __init__(self, name: str, instructions: str = "") -> None:
+                self.name = name
+                self.instructions = instructions
+                self._tool_manager = _LocalToolManager()
+
+            def tool(self, **kwargs):
+                def _dec(fn):
+                    self._tool_manager._tools[fn.__name__] = type(
+                        "_LocalTool", (), {"name": fn.__name__, "description": kwargs.get("description") or fn.__doc__ or "", "parameters": {}}
+                    )()
+                    return fn
+                return _dec
+
+            def resource(self, *args, **kwargs):
+                return lambda fn: fn
+
+            def prompt(self, *args, **kwargs):
+                return lambda fn: fn
+
+            def run(self, *args, **kwargs):
+                raise RuntimeError("MCP Mode requires the 'mcp' package: pip install 'mcp>=1.2'")
+
 try:
     from mcp.types import ToolAnnotations
 except ImportError:
@@ -66,46 +117,287 @@ Topics: fills, shader, style, design, layers, geometry, text, reuse, review, ani
 
 mcp = _Server("uiforge-mcp", instructions=INSTRUCTIONS)
 
+_ALL_TOOLS: dict[str, dict[str, Any]] = {}
+_EXPORT_SANDBOX: bool | None = None
 
-def tool(fn):
-    """Register ``fn`` as an MCP tool.
+TOOLSETS: dict[str, set[str] | None] = {
+    "full": None,
+    "core": {
+        "set_theme", "get_theme", "create_canvas", "list_canvases", "get_canvas", "update_canvas",
+        "duplicate_canvas", "fit_canvas", "delete_canvas", "create_layer", "update_layer",
+        "delete_layer", "set_layer", "batch", "add_frame", "add_icon", "add_input", "add_scroll",
+        "add_slider", "add_toggle", "add_dropdown", "update_element", "delete_elements",
+        "move_elements", "reorder_element", "align_elements", "arrange_elements", "undo", "redo",
+        "canvas_version", "preview", "live_preview", "open_studio", "review_canvas", "export_png",
+        "export_svg", "guide", "make_palette", "import_screenshot", "list_fonts", "measure_text",
+        "set_pin", "set_state", "set_binding", "set_interaction", "find_elements", "restyle",
+    },
+    "game": {
+        "set_theme", "get_theme", "create_canvas", "list_canvases", "get_canvas", "update_canvas",
+        "duplicate_canvas", "fit_canvas", "delete_canvas", "create_layer", "update_layer",
+        "delete_layer", "set_layer", "batch", "add_frame", "add_icon", "add_input", "add_scroll",
+        "add_slider", "add_toggle", "add_dropdown", "add_instance", "add_arc", "add_ticks",
+        "add_path", "add_svg", "add_image", "boolean_elements", "path_ops", "scatter",
+        "update_element", "delete_elements", "move_elements", "reorder_element", "align_elements",
+        "arrange_elements", "undo", "redo", "canvas_version", "create_animation", "set_keyframes",
+        "delete_keyframes", "get_animations", "delete_animation", "preview_animation",
+        "export_animation", "preview", "contact_sheet", "live_preview", "open_studio",
+        "review_canvas", "preview_resolutions", "preview_nine_slice", "export_png", "export_svg",
+        "export_layers", "export_psd", "export_asset", "export_atlas", "export_pbr_maps",
+        "export_screen", "export_bitmap_font", "export_theme", "write_engine_helpers",
+        "set_pin", "set_state", "delete_state", "set_strings", "get_strings", "set_binding",
+        "set_interaction", "guide", "make_palette", "make_variations", "restyle", "find_elements",
+        "import_screenshot", "list_fonts", "measure_text",
+    },
+    "desktop": {
+        "set_theme", "get_theme", "create_canvas", "list_canvases", "get_canvas", "update_canvas",
+        "duplicate_canvas", "fit_canvas", "delete_canvas", "create_layer", "update_layer",
+        "delete_layer", "set_layer", "batch", "add_frame", "add_icon", "add_input", "add_scroll",
+        "add_slider", "add_toggle", "add_dropdown", "add_instance", "add_svg", "add_image",
+        "update_element", "delete_elements", "move_elements", "reorder_element", "align_elements",
+        "arrange_elements", "undo", "redo", "canvas_version", "preview", "live_preview",
+        "open_studio", "review_canvas", "preview_resolutions", "export_png", "export_svg",
+        "export_layers", "export_psd", "export_screen", "export_spec", "export_theme",
+        "set_pin", "set_state", "delete_state", "set_strings", "get_strings", "set_binding",
+        "set_interaction", "guide", "make_palette", "make_variations", "restyle", "find_elements",
+        "import_screenshot", "list_fonts", "measure_text",
+    },
+    "web": {
+        "set_theme", "get_theme", "create_canvas", "list_canvases", "get_canvas", "update_canvas",
+        "duplicate_canvas", "fit_canvas", "delete_canvas", "create_layer", "update_layer",
+        "delete_layer", "set_layer", "batch", "add_frame", "add_icon", "add_input", "add_scroll",
+        "add_slider", "add_toggle", "add_dropdown", "add_instance", "add_svg", "add_image",
+        "update_element", "delete_elements", "move_elements", "reorder_element", "align_elements",
+        "arrange_elements", "undo", "redo", "canvas_version", "create_animation", "set_keyframes",
+        "delete_keyframes", "get_animations", "delete_animation", "preview_animation",
+        "export_animation", "preview", "live_preview", "open_studio", "review_canvas",
+        "preview_resolutions", "export_png", "export_svg", "export_web", "export_react",
+        "export_pdf", "export_prototype", "export_spec", "export_theme", "set_link", "set_pin",
+        "set_state", "delete_state", "set_strings", "get_strings", "set_binding",
+        "set_interaction", "guide", "make_palette", "make_variations", "restyle", "find_elements",
+        "import_screenshot", "list_fonts", "measure_text",
+    },
+}
+
+
+def _compact_doc(doc: str | None) -> str:
+    """Condense a multi-paragraph tool docstring to its first concise sentence(s) + guide hint."""
+    if not doc:
+        return ""
+    text = doc.strip()
+    first_para = text.split("\n\n", 1)[0].replace("\n", " ")
+    first_para = re.sub(r"\s+", " ", first_para).strip()
+    if len(first_para) > 180:
+        cut = first_para.find(". ", 40)
+        if 0 < cut <= 180:
+            first_para = first_para[:cut + 1]
+        else:
+            first_para = first_para[:177].rstrip() + "..."
+    return f"{first_para} (Details: guide())"
+
+
+def set_export_sandbox(enabled: bool | None) -> None:
+    """Enable or disable export path sandboxing (restricts all writes to store().exports_dir)."""
+    global _EXPORT_SANDBOX
+    _EXPORT_SANDBOX = None if enabled is None else bool(enabled)
+
+
+def is_export_sandboxed() -> bool:
+    if _EXPORT_SANDBOX is not None:
+        return _EXPORT_SANDBOX
+    return os.environ.get("UIFORGE_MCP_SANDBOX_EXPORTS", "0").strip().lower() in ("1", "true", "yes", "on")
+
+
+def _enforce_export_sandbox(path: Path, st: Store) -> Path:
+    if not is_export_sandboxed():
+        return path
+    root = st.exports_dir.resolve()
+    resolved = path.resolve()
+    try:
+        resolved.relative_to(root)
+    except ValueError as exc:
+        raise ValueError(
+            f"Export sandbox active: output path '{path}' escapes workspace exports folder '{root}'. "
+            "Pass a relative path inside exports/ (or disable sandbox on trusted local stdio)."
+        ) from exc
+    return path
+
+
+def report_progress(progress: float, total: float | None = None, message: str | None = None) -> None:
+    """Best-effort MCP 2.x progress notification for long-running sync tools (safe no-op outside MCP)."""
+    try:
+        from mcp.server.lowlevel.server import request_ctx
+        ctx = request_ctx.get()
+        meta = getattr(ctx, "meta", None)
+        token = getattr(meta, "progressToken", None) if meta is not None else None
+        if token is None:
+            return
+        coro = ctx.session.send_progress_notification(
+            progress_token=token,
+            progress=float(progress),
+            total=float(total) if total is not None else None,
+            message=message,
+        )
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(coro)
+        except RuntimeError:
+            try:
+                coro.close()
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+
+def _register_tool_on_mcp(name: str, entry: dict[str, Any], compact: bool = False) -> None:
+    tm = getattr(mcp, "_tool_manager", None)
+    if tm is not None and hasattr(tm, "_tools") and name in tm._tools:
+        if hasattr(tm, "remove_tool"):
+            tm.remove_tool(name)
+        else:
+            tm._tools.pop(name, None)
+    wrapper = entry["wrapper"]
+    desc = _compact_doc(entry["doc"]) if compact else entry["doc"]
+    kwargs: dict[str, Any] = {}
+    if entry.get("annotations") is not None:
+        kwargs["annotations"] = entry["annotations"]
+    if entry.get("meta") is not None:
+        kwargs["meta"] = entry["meta"]
+    if desc is not None:
+        kwargs["description"] = desc
+    if entry.get("title") is not None:
+        kwargs["title"] = entry["title"]
+    try:
+        mcp.tool(**kwargs)(wrapper)
+    except TypeError:
+        kwargs.pop("meta", None)
+        kwargs.pop("title", None)
+        mcp.tool(**kwargs)(wrapper)
+
+
+def configure_server(toolset: str | None = None, compact: bool | None = None) -> dict[str, Any]:
+    """Activate a toolset profile ('full'|'core'|'game'|'desktop'|'web') and optional schema compaction."""
+    ts = str(toolset if toolset is not None else os.environ.get("UIFORGE_MCP_TOOLSET", "full")).strip().lower()
+    if ts not in TOOLSETS:
+        raise ValueError(f"toolset must be one of {', '.join(TOOLSETS)}")
+    comp = (
+        bool(compact) if compact is not None
+        else os.environ.get("UIFORGE_MCP_COMPACT_TOOLS", "0").strip().lower() in ("1", "true", "yes", "on")
+    )
+    allowed = TOOLSETS[ts]
+    tm = getattr(mcp, "_tool_manager", None)
+    if tm is not None and hasattr(tm, "_tools"):
+        for existing in list(tm._tools.keys()):
+            if hasattr(tm, "remove_tool"):
+                tm.remove_tool(existing)
+            else:
+                tm._tools.pop(existing, None)
+    for name, entry in _ALL_TOOLS.items():
+        is_app_only = (entry.get("meta") or {}).get("ui", {}).get("visibility") == ["app"]
+        if is_app_only or allowed is None or name in allowed:
+            _register_tool_on_mcp(name, entry, compact=comp)
+    return tool_stats(toolset=ts, compact=comp)
+
+
+def tool_stats(toolset: str | None = None, compact: bool | None = None) -> dict[str, Any]:
+    """Report currently registered MCP tools and estimated metadata token footprint."""
+    tm = getattr(mcp, "_tool_manager", None)
+    tmap = tm._tools if (tm is not None and hasattr(tm, "_tools")) else {}
+    total_chars = 0
+    for t in tmap.values():
+        desc = getattr(t, "description", "") or ""
+        params = getattr(t, "parameters", {}) or {}
+        total_chars += len(desc) + len(json.dumps(params, separators=(",", ":")))
+    return {
+        "toolset": toolset or os.environ.get("UIFORGE_MCP_TOOLSET", "full"),
+        "compact": bool(compact) if compact is not None else os.environ.get("UIFORGE_MCP_COMPACT_TOOLS", "0") in ("1", "true", "yes", "on"),
+        "registered_tools": len(tmap),
+        "total_available_tools": len(_ALL_TOOLS),
+        "metadata_chars": total_chars,
+        "estimated_tokens": total_chars // 4,
+    }
+
+
+def tool(fn=None, *, meta: dict[str, Any] | None = None, title: str | None = None):
+    """Register ``fn`` as an MCP tool (supports both @tool and @tool(meta=..., title=...)).
 
     The registered wrapper turns expected failures into ToolError so the model reads the real
     message (SDK 2.x hides the text of any other exception), and returns compact JSON.
     The plain function is returned unchanged so it can be called and tested directly.
     """
+    def _decorate(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            import time as _time
+            from .core import activity_log
+            t0 = _time.perf_counter()
+            canvas_hint = kwargs.get("canvas") if isinstance(kwargs.get("canvas"), str) else (
+                args[0] if args and isinstance(args[0], str) else None
+            )
+            try:
+                if _store is not None:
+                    _store.sync_from_disk()
+                result = func(*args, **kwargs)
+            except ToolError as exc:
+                activity_log.record(func.__name__, source="mcp", status="error",
+                                    duration_ms=(_time.perf_counter() - t0) * 1000.0,
+                                    detail=str(exc), canvas=canvas_hint)
+                raise
+            except MemoryError as exc:
+                activity_log.record(func.__name__, source="mcp", status="error",
+                                    duration_ms=(_time.perf_counter() - t0) * 1000.0,
+                                    detail=str(exc), canvas=canvas_hint)
+                raise ToolError(f"{func.__name__}: out of memory. Use a smaller canvas, scale, region or frame count "
+                                "and call again.") from exc
+            except KeyError as exc:
+                activity_log.record(func.__name__, source="mcp", status="error",
+                                    duration_ms=(_time.perf_counter() - t0) * 1000.0,
+                                    detail=str(exc), canvas=canvas_hint)
+                raise ToolError(f"{func.__name__}: missing key {exc}. Add it to the argument and call again.") from exc
+            except (ValueError, TypeError, OSError) as exc:
+                activity_log.record(func.__name__, source="mcp", status="error",
+                                    duration_ms=(_time.perf_counter() - t0) * 1000.0,
+                                    detail=str(exc), canvas=canvas_hint)
+                raise ToolError(f"{func.__name__}: {exc}\nFix that argument and call {func.__name__} again "
+                                "(do not repeat the identical call).") from exc
+            except Exception as exc:
+                activity_log.record(func.__name__, source="mcp", status="error",
+                                    duration_ms=(_time.perf_counter() - t0) * 1000.0,
+                                    detail=str(exc), canvas=canvas_hint)
+                raise ToolError(f"{func.__name__}: unexpected {type(exc).__name__}: {exc}. This is likely a uiforge-mcp "
+                                "bug, not your input. Do not repeat the identical call: change the value that "
+                                "triggers it, split the step into smaller calls, or take another route.") from exc
+            activity_log.record(func.__name__, source="mcp", status="ok",
+                                duration_ms=(_time.perf_counter() - t0) * 1000.0,
+                                canvas=canvas_hint)
+            if isinstance(result, dict):
+                return json.dumps(result, ensure_ascii=False, separators=(",", ":"))
+            return result
 
-    @functools.wraps(fn)
-    def wrapper(*args, **kwargs):
-        try:
-            result = fn(*args, **kwargs)
-        except ToolError:
-            raise
-        except MemoryError as exc:
-            raise ToolError(f"{fn.__name__}: out of memory. Use a smaller canvas, scale, region or frame count "
-                            "and call again.") from exc
-        except KeyError as exc:
-            raise ToolError(f"{fn.__name__}: missing key {exc}. Add it to the argument and call again.") from exc
-        except (ValueError, TypeError, OSError) as exc:
-            raise ToolError(f"{fn.__name__}: {exc}\nFix that argument and call {fn.__name__} again "
-                            "(do not repeat the identical call).") from exc
-        except Exception as exc:
-            raise ToolError(f"{fn.__name__}: unexpected {type(exc).__name__}: {exc}. This is likely a uiforge-mcp "
-                            "bug, not your input. Do not repeat the identical call: change the value that "
-                            "triggers it, split the step into smaller calls, or take another route.") from exc
-        if isinstance(result, dict):
-            return json.dumps(result, ensure_ascii=False, separators=(",", ":"))
-        return result
+        name = func.__name__
+        read_only = name.startswith(("get_", "list_", "preview", "view_", "inspect_", "measure_", "find_", "open_", "studio_app_")) or name in (
+            "review_canvas", "guide")
+        annot = (
+            ToolAnnotations(readOnlyHint=read_only, destructiveHint=name.startswith("delete_"),
+                            idempotentHint=read_only, openWorldHint=False)
+            if ToolAnnotations is not None else None
+        )
+        entry = {
+            "fn": func,
+            "wrapper": wrapper,
+            "annotations": annot,
+            "meta": meta,
+            "title": title,
+            "doc": func.__doc__,
+        }
+        _ALL_TOOLS[name] = entry
+        _register_tool_on_mcp(name, entry, compact=False)
+        return func
 
-    name = fn.__name__
-    read_only = name.startswith(("get_", "list_", "preview", "view_", "inspect_", "measure_", "find_")) or name in (
-        "review_canvas", "guide")
-    if ToolAnnotations is None:
-        mcp.tool()(wrapper)
-    else:
-        mcp.tool(annotations=ToolAnnotations(readOnlyHint=read_only, destructiveHint=name.startswith("delete_"),
-                                             idempotentHint=read_only, openWorldHint=False))(wrapper)
-    return fn
+    if fn is not None:
+        return _decorate(fn)
+    return _decorate
 
 _store: Store | None = None
 
@@ -215,6 +507,7 @@ def _out_path(path: str | None, default_name: str, subdir: str | None = None, su
             p = st.exports_dir / p
     else:
         p = st.exports_dir / (subdir or "") / default_name
+    _enforce_export_sandbox(p, st)
     if p.suffix.lower() not in suffixes:
         raise ValueError(f"Output file must end with {' or '.join(suffixes)}")
     p.parent.mkdir(parents=True, exist_ok=True)
@@ -229,6 +522,7 @@ def _out_dir(out_dir: str | None, sub: str = "") -> Path:
             p = st.exports_dir / p
     else:
         p = st.exports_dir / sub
+    _enforce_export_sandbox(p, st)
     p.mkdir(parents=True, exist_ok=True)
     return p
 
@@ -1013,32 +1307,37 @@ def add_svg(canvas: str, svg: str, x: float = 0, y: float = 0, width: float | No
 
 @tool
 def import_screenshot(path: str, canvas: str | None = None, max_width: int = 1280,
-                      max_elements: int = 60, extract_theme: bool = True, ocr: str = "auto"):
+                      max_elements: int = 60, extract_theme: bool = True, ocr: str = "auto",
+                      bind_tokens: bool = True, infer_layout: bool = True, classify_widgets: bool = True):
     """Analyze a UI screenshot (PNG/JPG/WebP) with OpenCV and reconstruct an editable layered canvas.
 
-    Extracts the canvas background, dominant K-means palette, hierarchical cards/buttons/pills/circles
-    (with estimated corner radius, solid or linear gradient fill, and inner border strokes), and text
-    regions (using rapidocr_onnxruntime or pytesseract when installed, else OpenCV morphological text
-    line detection). The resulting canvas is 100% editable vector elements ready for restyling or export.
-
-    path: path to the screenshot image file.
-    canvas: name for the new canvas (defaults to the file stem).
-    max_width: downscale oversized screenshots while keeping aspect ratio (default 1280).
-    max_elements: cap on detected vector shapes to keep the canvas clean and fast (default 60).
-    extract_theme: merge extracted palette colours into theme tokens (ss_bg, ss_c1..c5).
-    ocr: "auto" (use local OCR if installed, else OpenCV heuristic) or "off" (shapes only).
+    Extracts the canvas background, dominant K-means palette, hierarchical cards/buttons/pills/circles/toggles
+    (with estimated corner radius, solid or linear gradient fill, and inner border strokes), auto-inferred
+    row/column sibling layout groups, automatic $ss_* theme token binding, and text regions (RapidOCR /
+    Tesseract when installed, else OpenCV morphological text-line heuristic).
     """
-    from .screenshot import analyze_screenshot
+    from .screenshot import _bind_palette_tokens, analyze_screenshot
     p = Path(path).expanduser()
-    info = analyze_screenshot(p, max_width=int(max_width), max_elements=int(max_elements), ocr=str(ocr or "auto"))
+    info = analyze_screenshot(
+        p, max_width=int(max_width), max_elements=int(max_elements), ocr=str(ocr or "auto"),
+        classify_widgets=bool(classify_widgets), infer_layout=bool(infer_layout),
+    )
     st = store()
+    theme_tokens = {}
+    tokens_bound = 0
+    if extract_theme and info.get("token_map"):
+        theme_tokens = dict(info["token_map"])
+        st.set_theme(theme_tokens, None, False)
+        if bind_tokens:
+            tokens_bound = _bind_palette_tokens(info["shapes"], info["texts"], theme_tokens)
     cid = slugify(canvas or p.stem, "screenshot")
     if cid in st.canvases:
         n = 2
         while f"{cid}_{n}" in st.canvases:
             n += 1
         cid = f"{cid}_{n}"
-    c = st.create_canvas(cid, info["width"], info["height"], background=info["background"])
+    c = st.create_canvas(cid, info["width"], info["height"],
+                         background="$ss_bg" if (extract_theme and bind_tokens and "ss_bg" in theme_tokens) else info["background"])
     st.checkpoint(c)
     created_shapes: list[str] = []
     created_texts: list[str] = []
@@ -1057,12 +1356,6 @@ def import_screenshot(path: str, canvas: str | None = None, max_width: int = 128
         st.drop_checkpoint(c)
         raise
     st.save_canvas(c)
-    theme_tokens = {}
-    if extract_theme and info["palette"]:
-        theme_tokens = {"ss_bg": info["background"]}
-        for i, hx in enumerate(info["palette"][1:], 1):
-            theme_tokens[f"ss_c{i}"] = hx
-        st.set_theme(theme_tokens, None, False)
     notes = []
     if info["ocr_engine"] == "opencv_heuristic":
         notes.append("No OCR backend installed (install rapidocr-onnxruntime or pytesseract for automatic text reading); "
@@ -1074,6 +1367,8 @@ def import_screenshot(path: str, canvas: str | None = None, max_width: int = 128
         "background": info["background"],
         "palette": info["palette"],
         "theme_tokens": theme_tokens,
+        "tokens_bound": tokens_bound,
+        "layout_groups": info.get("layout_groups") or [],
         "shapes_created": len(created_shapes),
         "texts_created": len(created_texts),
         "ocr_engine": info["ocr_engine"],
@@ -1301,7 +1596,140 @@ def align_elements(canvas: str, ids: list[str], align: str | None = None, distri
 
 _BATCH_ADD = {"add_rect": "rect", "add_ellipse": "ellipse", "add_line": "line", "add_polygon": "polygon",
               "add_arc": "arc", "add_path": "path", "add_text": "text", "add_image": "image",
-              "add_input": "input", "add_scroll": "scroll"}
+              "add_input": "input", "add_scroll": "scroll", "add_slider": "slider",
+              "add_toggle": "toggle", "add_dropdown": "dropdown"}
+
+
+def _add_icon_op(st: Store, c: dict, args: dict, checkpoint: bool = True) -> dict:
+    from .icons import build_icon_element
+    name = args.get("name")
+    if not name:
+        raise ValueError("add_icon requires 'name' (e.g. 'heart', 'shield', 'settings', 'search')")
+    extra = {k: v for k, v in args.items() if k not in ("name", "x", "y", "size", "color", "stroke_width", "filled", "style")}
+    cname, el_spec = build_icon_element(
+        name=str(name),
+        x=float(args.get("x", 0)),
+        y=float(args.get("y", 0)),
+        size=float(args.get("size", 28)),
+        color=_maybe_json(args.get("color", "#f8fafc")),
+        stroke_width=float(args.get("stroke_width", 2.0)),
+        filled=args.get("filled"),
+        style=_maybe_json(args.get("style")),
+        **extra,
+    )
+    el, warnings = st.add_element(c, "path", el_spec, checkpoint=checkpoint)
+    out = _summary(st, c, el, warnings)
+    out["icon"] = cname
+    return out
+
+
+@tool
+def add_icon(canvas: str, name: str, x: float, y: float, size: float = 28,
+             color: str | dict = "#f8fafc", stroke_width: float = 2.0, filled: bool | None = None,
+             style: str | dict | None = None, id: str | None = None, group: str | None = None,
+             clip: str | None = None, layer: str | None = None, rotation: float = 0,
+             origin: list[float] | None = None):
+    """Place a crisp built-in 24x24 pure-MIT vector icon as an editable native path element.
+
+    Supports 100+ UI, media, RPG, FPS, racing and desktop icons (heart, shield, sword, crown, gem,
+    coin, potion, chest, skull, star, trophy, crosshair, gauge, settings, search, home, menu, close,
+    check, plus, lock, unlock, bell, user, play, pause, volume, mic, wifi, battery, sun, moon,
+    cart, gift, rocket, cpu, sparkles...). Read uiforge://icons for the full catalog.
+    Inherits full PBR materials, glows, gradients, strokes, animations and vector exports.
+    """
+    st = store()
+    c = st.get(canvas)
+    return _add_icon_op(st, c, dict(
+        name=name, x=x, y=y, size=size, color=color, stroke_width=stroke_width, filled=filled,
+        style=style, id=id, group=group, clip=clip, layer=layer, rotation=rotation or None, origin=origin,
+    ), checkpoint=True)
+
+
+@tool
+def add_slider(canvas: str, x: float, y: float, width: float = 220, height: float = 28,
+               min: float = 0.0, max: float = 100.0, value: float = 50.0, step: float = 1.0,
+               label: str | None = None, show_value: bool = True, bind: str | None = None,
+               track_color: str = "#1e293b", fill_color: str = "#38bdf8", thumb_color: str = "#f8fafc",
+               text_color: str = "#cbd5e1", track_height: float = 8.0, font: str = "Inter",
+               size: float = 13, style: str | dict | None = None, id: str | None = None,
+               group: str | None = None, clip: str | None = None, layer: str | None = None,
+               rotation: float = 0, origin: list[float] | None = None):
+    """Add a first-class interactive Slider widget (volume, brightness, FOV, sensitivity, zoom).
+
+    Renders a styled track + filled range + circular thumb (plus optional label & value) on canvas,
+    and exports as a genuine native slider across Web/React (<input type="range">), Godot 4 (HSlider),
+    Unity UI Toolkit (<ui:Slider>), Unity uGUI (Slider), Roblox, Unreal UMG (USlider), WPF/Avalonia/WinUI
+    (<Slider>), Qt QML (Slider) and Dear ImGui (ImGui::SliderFloat).
+    """
+    lo, hi = float(min), float(max)
+    if hi <= lo:
+        raise ValueError("slider max must be greater than min")
+    step_val = float(step)
+    if step_val <= 1e-6:
+        step_val = 1e-6
+    return _add(canvas, "slider", dict(
+        x=float(x), y=float(y), width=float(width), height=float(height),
+        min=lo, max=hi, value=float(value), step=step_val,
+        label=label, show_value=bool(show_value), bind=bind,
+        track_color=track_color, fill_color=fill_color, thumb_color=thumb_color,
+        text_color=text_color, track_height=float(track_height), font=font, size=float(size),
+        style=_merge_style(style), id=id, group=group, clip=clip, layer=layer,
+        rotation=rotation or None, origin=origin,
+    ))
+
+
+@tool
+def add_toggle(canvas: str, x: float, y: float, width: float = 52, height: float = 28,
+               checked: bool = False, variant: str = "switch", label: str | None = None,
+               bind: str | None = None, on_color: str = "#22c55e", off_color: str = "#334155",
+               thumb_color: str = "#ffffff", text_color: str = "#f8fafc", font: str = "Inter",
+               size: float = 14, style: str | dict | None = None, id: str | None = None,
+               group: str | None = None, clip: str | None = None, layer: str | None = None,
+               rotation: float = 0, origin: list[float] | None = None):
+    """Add a first-class interactive Toggle switch or Checkbox widget.
+
+    variant: "switch" (pill toggle) or "checkbox" (rounded box with checkmark).
+    Exports natively as <input type="checkbox">, Godot CheckButton/CheckBox, Unity <ui:Toggle>/Toggle,
+    Roblox toggle button, Unreal UMG CheckBox, WPF/Avalonia/WinUI CheckBox/ToggleSwitch, Qt Switch/CheckBox,
+    and Dear ImGui ImGui::Checkbox.
+    """
+    v = str(variant or "switch").lower()
+    if v not in ("switch", "checkbox"):
+        raise ValueError("toggle variant must be 'switch' or 'checkbox'")
+    return _add(canvas, "toggle", dict(
+        x=float(x), y=float(y), width=float(width), height=float(height),
+        checked=bool(checked), variant=v, label=label, bind=bind,
+        on_color=on_color, off_color=off_color, thumb_color=thumb_color,
+        text_color=text_color, font=font, size=float(size),
+        style=_merge_style(style), id=id, group=group, clip=clip, layer=layer,
+        rotation=rotation or None, origin=origin,
+    ))
+
+
+@tool
+def add_dropdown(canvas: str, x: float, y: float, width: float = 220, height: float = 40,
+                 options: list[str] | None = None, selected: int | str = 0,
+                 placeholder: str = "Select...", label: str | None = None, bind: str | None = None,
+                 radius: float = 8, corner: str = "round", padding: float = 12,
+                 font: str = "Inter", size: float = 14, text_color: str = "#f8fafc",
+                 placeholder_color: str = "#94a3b8", style: str | dict | None = None,
+                 fill: str | dict | None = None, stroke: str | dict | None = None,
+                 id: str | None = None, group: str | None = None, clip: str | None = None,
+                 layer: str | None = None, rotation: float = 0, origin: list[float] | None = None):
+    """Add a first-class interactive Dropdown / Select / ComboBox widget.
+
+    Exports natively as <select>, Godot OptionButton, Unity <ui:DropdownField>/Dropdown, Roblox selector,
+    Unreal UMG ComboBoxString, WPF/Avalonia/WinUI ComboBox, Qt ComboBox and Dear ImGui ImGui::Combo.
+    """
+    opts = [str(o) for o in (_maybe_json(options) or ["Option 1", "Option 2"])]
+    return _add(canvas, "dropdown", dict(
+        x=float(x), y=float(y), width=float(width), height=float(height),
+        options=opts, selected=selected, placeholder=str(placeholder), label=label, bind=bind,
+        radius=radius, corner=corner, padding=float(padding), font=font, size=float(size),
+        text_color=text_color, placeholder_color=placeholder_color,
+        style=_merge_style(style, fill, stroke), id=id, group=group, clip=clip, layer=layer,
+        rotation=rotation or None, origin=origin,
+    ))
 
 
 @tool
@@ -1487,6 +1915,8 @@ def batch(canvas: str, operations: list[dict]):
                     results.append(_ticks(c, op_args))
                 elif op == "add_frame":
                     results.append(_add_frame_elements(st, c, op_args))
+                elif op == "add_icon":
+                    results.append(_add_icon_op(st, c, op_args, checkpoint=False))
                 elif op == "create_layer":
                     layer = st.create_layer(c, op_args["name"], _layer_settings(
                         op_args.get("opacity"), op_args.get("blend"), op_args.get("clip"), op_args.get("visible"),
@@ -1600,7 +2030,8 @@ def undo(canvas: str):
 
 
 @tool
-def canvas_version(canvas: str, action: str = "list", name: str | None = None, note: str | None = None):
+def canvas_version(canvas: str, action: str = "list", name: str | None = None, note: str | None = None,
+                   out_path: str | None = None):
     """Named version history for a canvas (like Figma's version history), beyond the 40-step undo.
 
     action "save": snapshot the canvas now as `name` (default v1, v2...) with an optional note - do it
@@ -1609,6 +2040,8 @@ def canvas_version(canvas: str, action: str = "list", name: str | None = None, n
       version (undo returns to what was there before). "delete": remove a saved version.
     "diff": what changed between that version and now - added, removed and changed elements (with the
       changed property names), like Figma's compare changes.
+    "visual_diff": render Before | After | Diff Heatmap side-by-side PNG and return pixel-delta metrics
+      (changed_pct, mean_abs_error, max_delta) plus the comparison image (optionally written to out_path).
     Versions are stored next to the canvas file and survive restarts (at most 30 per canvas).
     """
     st = store()
@@ -1619,21 +2052,69 @@ def canvas_version(canvas: str, action: str = "list", name: str | None = None, n
         return {"saved": entry["name"], "versions": [v["name"] for v in st.list_versions(c)]}
     if act == "list":
         return {"canvas": c["id"], "versions": st.list_versions(c)}
-    if act == "diff":
+    if act in ("diff", "visual_diff"):
         if not name:
-            raise ValueError("diff needs the version name (see action='list')")
+            raise ValueError(f"{act} needs the version name (see action='list')")
         versions = st._versions(c["id"])
         key = slugify(name, "version")
         if key not in versions:
             raise ValueError(f"no version '{key}'. Versions: {', '.join(versions) or '(none)'}")
-        old = {e["id"]: e for e in versions[key]["canvas"]["elements"]}
+        old_c = versions[key]["canvas"]
+        old = {e["id"]: e for e in old_c["elements"]}
         new = {e["id"]: e for e in c["elements"]}
         changed = {i: sorted(k for k in set(old[i]) | set(new[i]) if old[i].get(k) != new[i].get(k))
                    for i in old.keys() & new.keys() if old[i] != new[i]}
-        canvas_keys = sorted(k for k in set(versions[key]["canvas"]) | set(c)
-                             if k not in ("elements",) and versions[key]["canvas"].get(k) != c.get(k))
-        return {"version": key, "added": sorted(new.keys() - old.keys()), "removed": sorted(old.keys() - new.keys()),
-                "changed": changed, "canvas_changed": canvas_keys}
+        canvas_keys = sorted(k for k in set(old_c) | set(c)
+                             if k not in ("elements",) and old_c.get(k) != c.get(k))
+        summary = {"version": key, "added": sorted(new.keys() - old.keys()),
+                   "removed": sorted(old.keys() - new.keys()),
+                   "changed": changed, "canvas_changed": canvas_keys}
+        if act == "diff":
+            return summary
+        import numpy as np
+        scale = min(1.0, 520.0 / max(1, c["width"], c["height"], old_c["width"], old_c["height"]))
+        img_old = st.renderer(old_c, scale).render()
+        img_new = st.renderer(c, scale).render()
+        w = max(img_old.width, img_new.width)
+        h = max(img_old.height, img_new.height)
+        bg_old = backdrop((w, h), "dark", st.theme.get("colors", {}))
+        bg_old.alpha_composite(img_old)
+        bg_new = backdrop((w, h), "dark", st.theme.get("colors", {}))
+        bg_new.alpha_composite(img_new)
+        a_old = np.asarray(bg_old.convert("RGB"), dtype=np.float32)
+        a_new = np.asarray(bg_new.convert("RGB"), dtype=np.float32)
+        delta = np.abs(a_new - a_old).max(axis=-1)
+        changed_mask = delta > 2.0
+        changed_pct = round(float(changed_mask.mean()) * 100.0, 2)
+        mae = round(float(np.abs(a_new - a_old).mean()), 2)
+        max_delta = round(float(delta.max()), 1)
+        gray = (a_new.mean(axis=-1, keepdims=True) * 0.35).astype(np.float32)
+        heat = np.repeat(gray, 3, axis=-1)
+        intensity = np.clip(delta / 80.0, 0.0, 1.0)
+        heat[..., 0] = np.where(changed_mask, 245.0 * (0.45 + 0.55 * intensity), heat[..., 0])
+        heat[..., 1] = np.where(changed_mask, 40.0 * (1.0 - intensity * 0.6), heat[..., 1])
+        heat[..., 2] = np.where(changed_mask, 140.0 * (0.35 + 0.65 * intensity), heat[..., 2])
+        img_heat = PILImage.fromarray(np.clip(heat, 0, 255).astype(np.uint8), "RGB")
+        gap, hdr = 12, 26
+        strip = PILImage.new("RGB", (w * 3 + gap * 4, h + hdr + gap * 2), (18, 20, 28))
+        draw = ImageDraw.Draw(strip)
+        font = _label_font(13)
+        for idx_p, (title_p, pic_p) in enumerate((
+            (f"BEFORE ({key})", bg_old.convert("RGB")),
+            ("AFTER (current)", bg_new.convert("RGB")),
+            (f"DIFF ({changed_pct:g}% changed)", img_heat),
+        )):
+            px = gap + idx_p * (w + gap)
+            draw.text((px, 6), title_p, fill=(226, 232, 240), font=font)
+            strip.paste(pic_p, (px, hdr + gap))
+        summary.update(changed_pct=changed_pct, mean_abs_error=mae, max_delta=max_delta,
+                       size=[w, h])
+        if out_path:
+            saved = _out_path(out_path, f"{c['id']}_diff_{key}.png")
+            strip.save(saved, optimize=True)
+            summary["file"] = str(saved)
+        return [json.dumps(summary, ensure_ascii=False, separators=(",", ":")),
+                Image(data=_png_bytes(strip), format="png")]
     if act in ("restore", "delete"):
         if not name:
             raise ValueError(f"{act} needs the version name (see action='list')")
@@ -1642,7 +2123,7 @@ def canvas_version(canvas: str, action: str = "list", name: str | None = None, n
             return {"restored": slugify(name, "version"), "elements": [e["id"] for e in c["elements"]]}
         st.delete_version(c, name)
         return {"deleted": slugify(name, "version"), "versions": [v["name"] for v in st.list_versions(c)]}
-    raise ValueError("action must be 'save', 'list', 'diff', 'restore' or 'delete'")
+    raise ValueError("action must be 'save', 'list', 'diff', 'visual_diff', 'restore' or 'delete'")
 
 
 
@@ -2020,16 +2501,13 @@ def export_animation(canvas: str, animation: str, format: str = "spritesheet", p
         if not anim_names:
             raise ValueError(f"canvas '{c['id']}' has no animations to bundle; call create_animation first")
         base_name = f"{c['id']}_all" if str(animation).lower() == "all" else f"{c['id']}_{slugify(animation, 'anim')}"
-        out = Path(path).expanduser() if path else st.exports_dir / "animations" / f"{base_name}.lottie"
-        if not out.is_absolute():
-            out = st.exports_dir / out
-        if out.suffix.lower() != ".lottie":
-            raise ValueError("dotlottie export path must end with .lottie")
-        out.parent.mkdir(parents=True, exist_ok=True)
+        out = _out_path(path, f"{base_name}.lottie", "animations", suffixes=(".lottie",))
+        report_progress(0.1, 1.0, f"Bundling dotLottie v2 ({len(anim_names)} animation(s))")
         blob, rep = lottie.build_dotlottie(st, c, anim_names, fps, float(scale),
                                            bool(background) or bool(c.get("background")),
                                            state_machine=_maybe_json(state_machine))
         out.write_bytes(blob)
+        report_progress(1.0, 1.0, f"Wrote {out.name}")
         res_dl = {"file": str(out), "format": "dotlottie", "spec_version": rep["spec_version"],
                   "count": rep["count"], "animations": rep["animations"], "bytes": len(blob)}
         if rep.get("state_machine"):
@@ -2041,25 +2519,17 @@ def export_animation(canvas: str, animation: str, format: str = "spritesheet", p
         from . import lottie
         if not 0.1 <= float(scale) <= 8:
             raise ValueError("scale must be between 0.1 and 8")
-        out = Path(path).expanduser() if path else st.exports_dir / "animations" / f"{base_name}.lottie.json"
-        if not out.is_absolute():
-            out = st.exports_dir / out
-        if out.suffix.lower() != ".json":
-            raise ValueError("lottie export path must end with .json")
-        out.parent.mkdir(parents=True, exist_ok=True)
+        out = _out_path(path, f"{base_name}.lottie.json", "animations", suffixes=(".json",))
+        report_progress(0.1, 1.0, f"Exporting Lottie JSON {base_name}")
         doc, report = lottie.build(st, c, anim, base_name, fps, float(scale), bool(background) or bool(c.get("background")))
         out.write_text(json.dumps(doc, separators=(",", ":")), encoding="utf-8")
+        report_progress(1.0, 1.0, f"Wrote {out.name}")
         return {"file": str(out), "frames": doc["op"], "fps": doc["fr"], "size": [doc["w"], doc["h"]],
                 "vector_layers": report["vector"], "animated_by_transform": report["transform"],
                 "baked_per_frame": report["frames"],
                 "static": report["static"], "bytes": out.stat().st_size}
     if fmt == "json":
-        out = Path(path).expanduser() if path else st.exports_dir / "animations" / f"{base_name}.anim.json"
-        if not out.is_absolute():
-            out = st.exports_dir / out
-        if out.suffix.lower() != ".json":
-            raise ValueError("json export path must end with .json")
-        out.parent.mkdir(parents=True, exist_ok=True)
+        out = _out_path(path, f"{base_name}.anim.json", "animations", suffixes=(".json",))
         data = anim_mod.describe(key, anim, c)
         if c.get("interactions"):
             data["interactions"] = c["interactions"]
@@ -2072,8 +2542,10 @@ def export_animation(canvas: str, animation: str, format: str = "spritesheet", p
     rate = float(fps or anim.get("fps", 30))
     only = {e["id"] for e in st.select(c, ids, group)} if (ids or group) else None
     own_bg = c.get("background") if fmt in ("gif", "apng", "webp", "mp4", "webm") and not background else None
+    report_progress(0.05, 1.0, f"Rendering {len(times)} frames for {base_name}")
     images, warnings = _poses(c, anim, times, float(scale), include_background=bool(own_bg), only=only,
                               motion_blur=motion_blur, fps=rate)
+    report_progress(0.75, 1.0, f"Encoding {fmt} ({len(images)} frames)")
     result: dict = {"animation": key, "frames": len(images), "fps": rate, "duration": anim["duration"],
                     "loop": bool(anim.get("loop"))}
     offset = (0, 0)
@@ -2094,10 +2566,7 @@ def export_animation(canvas: str, animation: str, format: str = "spritesheet", p
     fw, fh = images[0].size
 
     if fmt == "frames":
-        folder = Path(path).expanduser() if path else st.exports_dir / "animations" / base_name
-        if not folder.is_absolute():
-            folder = st.exports_dir / folder
-        folder.mkdir(parents=True, exist_ok=True)
+        folder = _out_dir(path, f"animations/{base_name}")
         digits = max(3, len(str(len(images) - 1)))
         for i, im in enumerate(images):
             im.save(folder / f"{base_name}_{i:0{digits}d}.png")
@@ -2127,12 +2596,7 @@ def export_animation(canvas: str, animation: str, format: str = "spritesheet", p
                               "Lower fps or scale, or tween the property in engine with format='json'.")
     else:
         suffix = {"gif": ".gif", "apng": ".png", "webp": ".webp", "mp4": ".mp4", "webm": ".webm"}[fmt]
-        st_path = Path(path).expanduser() if path else st.exports_dir / "animations" / f"{base_name}{suffix}"
-        if not st_path.is_absolute():
-            st_path = st.exports_dir / st_path
-        if st_path.suffix.lower() != suffix:
-            raise ValueError(f"{fmt} export path must end with {suffix}")
-        st_path.parent.mkdir(parents=True, exist_ok=True)
+        st_path = _out_path(path, f"{base_name}{suffix}", "animations", suffixes=(suffix,))
         ms = max(10, int(round(1000 / rate)))
         loops = 0 if anim.get("loop") else 1
         if fmt in ("mp4", "webm"):
@@ -2209,12 +2673,22 @@ def set_theme(colors: dict | None = None, styles: dict | None = None, replace: b
     styles = _maybe_json(styles)
     if tokens is not None:
         tok = _maybe_json(tokens)
-        if isinstance(tok, str) and tok.strip().lower().endswith(".md"):
+        if isinstance(tok, str) and (tok.strip().lower().endswith(".css") or ("--" in tok and ":" in tok and not tok.strip().startswith("{") and not tok.strip().lower().endswith(".md"))):
+            from .tokens import read_css_tokens
+            css_text = Path(tok).expanduser().read_text(encoding="utf-8") if tok.strip().lower().endswith(".css") else tok
+            got_colors, got_numbers, got_modes = read_css_tokens(css_text)
+            if got_modes:
+                modes = {**got_modes, **(_maybe_json(modes) or {})}
+        elif isinstance(tok, str) and (tok.strip().lower().endswith(".md") or "\n---" in tok or tok.lstrip().startswith("---")):
             from .tokens import read_design_md
-            md = Path(tok).expanduser()
-            if not md.is_file():
-                raise ValueError(f"DESIGN.md not found: {md}")
-            got_colors, got_numbers, got_styles = read_design_md(md.read_text(encoding="utf-8"))
+            if tok.strip().lower().endswith(".md"):
+                md = Path(tok).expanduser()
+                if not md.is_file():
+                    raise ValueError(f"DESIGN.md not found: {md}")
+                md_text = md.read_text(encoding="utf-8")
+            else:
+                md_text = tok
+            got_colors, got_numbers, got_styles = read_design_md(md_text)
             styles = {**got_styles, **(styles or {})}
         else:
             from .tokens import read_dtcg
@@ -2560,6 +3034,8 @@ def review_canvas(canvas: str, min_contrast: float = 4.5, min_text_size: float =
         return {o for o, b in boxes.items() if o != eid and b[0] - reach < a[2] and a[0] < b[2] + reach
                 and b[1] - reach < a[3] and a[1] < b[3] + reach}
 
+    wcag_ratios: list[float] = []
+    checked_widgets = 0
     for el in texts:
         eid = el["id"]
         tst = resolve_style(el.get("style"), st.theme)
@@ -2592,10 +3068,35 @@ def review_canvas(canvas: str, min_contrast: float = 4.5, min_text_size: float =
         around = near & ~lit
         pool = b_box[around] if around.sum() > 8 else b_box.reshape(-1, 4)
         bg = [float(v) for v in pool.mean(axis=0)]
-        ratio = _contrast(_over(fg, under), _over(bg, under))
+        bg_rgb = _over(bg, under)
+        ratio = _contrast(_over(fg, under), bg_rgb)
+        wcag_ratios.append(ratio)
         if ratio < min_contrast:
+            c_white = _contrast((255.0, 255.0, 255.0), bg_rgb)
+            c_dark = _contrast((15.0, 23.0, 42.0), bg_rgb)
+            sug = "#ffffff" if c_white >= c_dark else "#0f172a"
             add("contrast", f"text contrast {ratio:.2f}:1 is below {min_contrast:g}:1 (text ~{_hex(fg)} on "
-                            f"~{_hex(bg)}). Lighten/darken one side or add a dark outline / shadow.", [eid])
+                            f"~{_hex(bg)}). Try {sug} ({max(c_white, c_dark):.1f}:1) or add a dark outline / shadow.", [eid])
+
+    from .widgets import widget_colors_summary
+    for el in c["elements"]:
+        if not el.get("visible", True) or el["type"] not in ("input", "dropdown"):
+            continue
+        try:
+            wc = widget_colors_summary(el, colors)
+        except Exception:
+            continue
+        checked_widgets += 1
+        bg_rgb = _over(wc["bg"], under)
+        fg_rgb = _over(wc["text"], bg_rgb)
+        ratio = _contrast(fg_rgb, bg_rgb)
+        wcag_ratios.append(ratio)
+        if ratio < min_contrast:
+            c_white = _contrast((255.0, 255.0, 255.0), bg_rgb)
+            c_dark = _contrast((15.0, 23.0, 42.0), bg_rgb)
+            sug = "#ffffff" if c_white >= c_dark else "#0f172a"
+            add("contrast", f"{el['type']} widget text contrast {ratio:.2f}:1 is below {min_contrast:g}:1 "
+                            f"(text ~{_hex(wc['text'])} on ~{_hex(wc['bg'])}). Try text_color='{sug}'.", [el["id"]])
 
     order = {e["id"]: i for i, e in enumerate(c["elements"])}
     for el in texts:
@@ -2676,8 +3177,21 @@ def review_canvas(canvas: str, min_contrast: float = 4.5, min_text_size: float =
             add("animation", f"animation '{name}' has no tracks", None, "info")
     order = {"error": 0, "warn": 1, "info": 2}
     issues.sort(key=lambda i: order[i["severity"]])
-    return {"canvas": c["id"], "ok": not any(i["severity"] != "info" for i in issues),
-            "issues": issues or [{"severity": "info", "check": "all", "message": "no problems found"}]}
+    res_out: dict[str, Any] = {
+        "canvas": c["id"],
+        "ok": not any(i["severity"] != "info" for i in issues),
+        "issues": issues or [{"severity": "info", "check": "all", "message": "no problems found"}],
+    }
+    if wcag_ratios:
+        min_r = min(wcag_ratios)
+        res_out["wcag"] = {
+            "checked_texts": len(texts),
+            "checked_widgets": checked_widgets,
+            "min_ratio": round(min_r, 2),
+            "aa_pass": min_r >= min_contrast,
+            "aaa_pass": min_r >= 7.0,
+        }
+    return res_out
 
 
 def _hex(rgba) -> str:
@@ -3239,12 +3753,7 @@ def export_psd(canvas: str, path: str | None = None, scale: float = 1, include_b
     scale = float(scale)
     if not 0.1 <= scale <= 8:
         raise ValueError("scale must be between 0.1 and 8")
-    out = Path(path).expanduser() if path else st.exports_dir / f"{c['id']}.psd"
-    if not out.is_absolute():
-        out = st.exports_dir / out
-    if out.suffix.lower() != ".psd":
-        raise ValueError("Output file must end with .psd")
-    out.parent.mkdir(parents=True, exist_ok=True)
+    out = _out_path(path, f"{c['id']}.psd", suffixes=(".psd",))
     r = st.renderer(c, scale)
     stack_layers: list[dict] = []
     if include_background and c.get("background"):
@@ -3471,7 +3980,7 @@ def export_atlas(canvases: list[str], path: str | None = None, scale: float = 1,
                              "sourceSize": {"w": f["w"], "h": f["h"]}}
                 for k, f in frames.items()
             },
-            "meta": {"app": "uiforge-mcp", "version": "0.12.0", "image": out.name, "format": "RGBA8888",
+            "meta": {"app": "uiforge-mcp", "version": __version__, "image": out.name, "format": "RGBA8888",
                      "size": {"w": atlas.width, "h": atlas.height}, "scale": str(scale)},
         }
         ex.write_json(out.with_suffix(".json"), tp)
@@ -3539,10 +4048,7 @@ def write_engine_helpers(engine: str, out_dir: str, roblox_ids: dict | None = No
     if not re.fullmatch(r"res://[A-Za-z0-9_\-/.]*", godot_res_path or "") or ".." in godot_res_path:
         raise ValueError("godot_res_path must be a resource path like res://ui/generated "
                          "(letters, digits, _ - . / only, no '..')")
-    folder = Path(out_dir).expanduser()
-    if not folder.is_absolute():
-        folder = store().exports_dir / folder
-    folder.mkdir(parents=True, exist_ok=True)
+    folder = _out_dir(out_dir)
     if engine == "unity":
         if folder.name != "Editor" and "Editor" not in folder.parts:
             raise ValueError("For Unity, out_dir must be (inside) a folder named 'Editor', e.g. <Project>/Assets/Editor")
@@ -3593,6 +4099,52 @@ def write_engine_helpers(engine: str, out_dir: str, roblox_ids: dict | None = No
 from .tools_workflow import *  # noqa: E402,F401,F403  (registers the workflow tools)
 from .tools_delivery import *  # noqa: E402,F401,F403  (registers the hand-off tools)
 from .tools_design import *  # noqa: E402,F401,F403  (registers guide, palettes, restyle, path ops)
+from .studio_app import APP_ONLY_META as _APP_ONLY_META, STUDIO_APP_META as _STUDIO_APP_META
+
+
+@tool(meta=_STUDIO_APP_META, title="UIForge Studio")
+def open_studio(canvas: str | None = None, background: str = "checker",
+                show_ids: bool = False, show_guides: bool = False):
+    """Open the interactive UIForge Studio MCP App inline or in the side pane (Antigravity / Claude / ChatGPT / VS Code).
+
+    Inspect clicked elements, toggle layers, switch hover/pressed states, scrub set_binding sliders,
+    and play animations directly inside the AI client without opening an external browser tab.
+    All arguments are optional so side-pane and sidebar entrypoints open cleanly with {}.
+    """
+    from .studio_app import studio_snapshot
+    st = store()
+    snap = studio_snapshot(st, canvas, background=background, show_ids=show_ids, show_guides=show_guides,
+                           include_image=True)
+    return {
+        "studio": "open",
+        "active": snap.get("active"),
+        "canvases": len(snap.get("canvases") or []),
+        "elements": len(snap.get("elements") or []),
+        "layers": len(snap.get("layers") or []),
+        "states": snap.get("states") or [],
+        "animations": [a["name"] for a in (snap.get("animations") or [])],
+    }
+
+
+@tool(meta=_APP_ONLY_META)
+def studio_app_state(canvas: str | None = None):
+    """App-only helper returning studio workspace metadata and initial preview for the MCP App UI."""
+    from .studio_app import studio_snapshot
+    return studio_snapshot(store(), canvas, include_image=True)
+
+
+@tool(meta=_APP_ONLY_META)
+def studio_app_render(canvas: str, background: str = "checker", show_ids: bool = False,
+                      show_guides: bool = False, state: str | None = None,
+                      data: dict | None = None, hide_layers: list[str] | None = None,
+                      animation: str | None = None, t: float | None = None):
+    """App-only helper rendering a live view for the embedded MCP App Studio."""
+    from .studio_app import studio_snapshot
+    return studio_snapshot(
+        store(), canvas, background=background, show_ids=show_ids, show_guides=show_guides,
+        state=state, data=_maybe_json(data), hide_layers=_maybe_json(hide_layers),
+        animation=animation, t=t, include_image=True,
+    )
 
 
 def _register_mcp_dx() -> None:
@@ -3604,6 +4156,13 @@ def _register_mcp_dx() -> None:
             from .materials import NAMES
             custom = sorted((store().theme.get("materials") or {}).keys())
             return json.dumps({"builtin": NAMES, "custom": custom}, indent=2)
+
+        @mcp.resource("uiforge://icons")
+        def res_icons() -> str:
+            """All built-in pure-MIT 24x24 geometric vector icons available for add_icon()."""
+            from .icons import list_icons
+            items = list_icons()
+            return json.dumps({"count": len(items), "icons": items}, indent=2)
 
         @mcp.resource("uiforge://workspace")
         def res_workspace() -> str:
@@ -3626,6 +4185,21 @@ def _register_mcp_dx() -> None:
             if t == "all":
                 return "\n\n".join(f"=== {k} ===\n{v}" for k, v in TOPICS.items() if k != "index")
             return TOPICS.get(t, TOPICS["index"])
+
+        from .studio_app import STUDIO_APP_HTML, STUDIO_APP_URI
+        try:
+            @mcp.resource(STUDIO_APP_URI, name="UIForge Studio App",
+                          mime_type="text/html;profile=mcp-app",
+                          meta={"ui": {"prefersBorder": False}})
+            def res_studio_app() -> str:
+                """Interactive SEP-1865 MCP App studio for inspecting canvases, layers, states, bindings and animations."""
+                return STUDIO_APP_HTML
+        except TypeError:
+            @mcp.resource(STUDIO_APP_URI, name="UIForge Studio App",
+                          mime_type="text/html;profile=mcp-app")
+            def res_studio_app() -> str:
+                """Interactive SEP-1865 MCP App studio for inspecting canvases, layers, states, bindings and animations."""
+                return STUDIO_APP_HTML
 
     if hasattr(mcp, "prompt"):
         @mcp.prompt()

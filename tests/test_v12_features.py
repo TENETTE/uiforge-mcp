@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from uiforge_mcp import binding, effects, materials, psd, render, shader
+from uiforge_mcp import binding, materials, render
 from uiforge_mcp import server as s
 from uiforge_mcp import tools_delivery as td
 from uiforge_mcp.store import Store, default_workspace

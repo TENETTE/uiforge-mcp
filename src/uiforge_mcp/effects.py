@@ -644,3 +644,92 @@ def glass(backdrop: Image.Image, mask: Image.Image, spec, k: float, colors: dict
     out[..., :3] = out[..., :3] + glint[..., None] * (np.float32(255.0) - out[..., :3]) * (out[..., 3:4] / np.float32(255.0))
     out = Image.fromarray(np.clip(out + np.float32(0.5), 0, 255).astype(np.uint8), "RGBa").convert("RGBA")
     return Image.composite(out, backdrop, mask)
+
+
+def perspective_warp(img: Image.Image, spec: dict | float | int) -> Image.Image:
+    """Apply 3D diegetic perspective tilt (rotate_x/rotate_y/rotate_z/fov) and/or cylindrical HUD visor_curve.
+
+    Runs on premultiplied RGBA via OpenCV warpPerspective / remap for crisp halo-free edges, with a
+    pure-NumPy bilinear fallback.
+    """
+    if isinstance(spec, (int, float)):
+        spec = {"rotate_y": float(spec)}
+    if not isinstance(spec, dict):
+        return img
+    rx = max(-65.0, min(65.0, float(spec.get("rotate_x", 0.0))))
+    ry = max(-65.0, min(65.0, float(spec.get("rotate_y", 0.0))))
+    rz = max(-180.0, min(180.0, float(spec.get("rotate_z", 0.0))))
+    curve = max(-0.6, min(0.6, float(spec.get("visor_curve", spec.get("curve", 0.0)))))
+    fov = max(0.6, min(8.0, float(spec.get("fov", spec.get("depth", 1.8)))))
+    if abs(rx) < 1e-4 and abs(ry) < 1e-4 and abs(rz) < 1e-4 and abs(curve) < 1e-4:
+        return img
+
+    w, h = img.size
+    if w < 2 or h < 2:
+        return img
+    arr = np.asarray(img.convert("RGBa"), dtype=np.float32)
+
+    # 1. Optional cylindrical visor curvature (barrel/pincushion along X compressing Y cleanly)
+    if abs(curve) >= 1e-4:
+        cx, cy = (w - 1) * 0.5, (h - 1) * 0.5
+        nx = (np.arange(w, dtype=np.float32)[None, :] - cx) / max(1.0, cx)
+        ny = (np.arange(h, dtype=np.float32)[:, None] - cy) / max(1.0, cy)
+        nx2 = nx * nx
+        # Cylindrical bow: edges scale vertically and pull slightly inward toward center
+        scale_y = np.float32(1.0) + np.float32(curve) * nx2
+        src_y = cy + (ny / np.maximum(np.float32(0.35), scale_y)) * cy
+        src_x = cx + nx * (np.float32(1.0) + np.float32(abs(curve) * 0.14) * nx2) * cx
+        map_x = np.broadcast_to(src_x, (h, w)).astype(np.float32)
+        map_y = np.broadcast_to(src_y, (h, w)).astype(np.float32)
+        if cv2 is not None:
+            arr = cv2.remap(arr, map_x, map_y, cv2.INTER_LINEAR,
+                            borderMode=cv2.BORDER_CONSTANT, borderValue=(0.0, 0.0, 0.0, 0.0))
+        else:
+            valid = (map_x >= 0) & (map_x <= w - 1) & (map_y >= 0) & (map_y <= h - 1)
+            sampled = _bilinear(arr, np.clip(map_x, 0, w - 1), np.clip(map_y, 0, h - 1))
+            arr = np.where(valid[..., None], sampled, np.float32(0.0))
+
+    # 2. True 3D projective homography (Rz @ Ry @ Rx) around image center
+    if abs(rx) >= 1e-4 or abs(ry) >= 1e-4 or abs(rz) >= 1e-4:
+        ax, ay, az = math.radians(rx), math.radians(ry), math.radians(rz)
+        cx, cy = w * 0.5, h * 0.5
+        f = max(w, h) * fov
+        Rx = np.array([[1, 0, 0], [0, math.cos(ax), -math.sin(ax)], [0, math.sin(ax), math.cos(ax)]], dtype=np.float64)
+        Ry = np.array([[math.cos(ay), 0, math.sin(ay)], [0, 1, 0], [-math.sin(ay), 0, math.cos(ay)]], dtype=np.float64)
+        Rz = np.array([[math.cos(az), -math.sin(az), 0], [math.sin(az), math.cos(az), 0], [0, 0, 1]], dtype=np.float64)
+        R = Rz @ Ry @ Rx
+        src_pts = np.array([[0.0, 0.0], [w, 0.0], [w, h], [0.0, h]], dtype=np.float32)
+        dst_pts = np.empty((4, 2), dtype=np.float32)
+        for i, (px, py) in enumerate(src_pts):
+            v = R @ np.array([px - cx, py - cy, 0.0], dtype=np.float64)
+            z = max(f * 0.25, f + v[2])
+            dst_pts[i, 0] = cx + (v[0] * f) / z
+            dst_pts[i, 1] = cy + (v[1] * f) / z
+        if cv2 is not None:
+            H = cv2.getPerspectiveTransform(src_pts, dst_pts)
+            arr = cv2.warpPerspective(
+                arr, H, (w, h), flags=cv2.INTER_LINEAR,
+                borderMode=cv2.BORDER_CONSTANT, borderValue=(0.0, 0.0, 0.0, 0.0),
+            )
+        else:
+            # Pure-NumPy inverse homography fallback
+            A = []
+            b_vec = []
+            for (sx, sy), (dx, dy) in zip(src_pts, dst_pts):
+                A.append([dx, dy, 1, 0, 0, 0, -sx * dx, -sx * dy])
+                b_vec.append(sx)
+                A.append([0, 0, 0, dx, dy, 1, -sy * dx, -sy * dy])
+                b_vec.append(sy)
+            coeffs = np.linalg.solve(np.array(A, dtype=np.float64), np.array(b_vec, dtype=np.float64))
+            Hinv = np.array([[coeffs[0], coeffs[1], coeffs[2]],
+                             [coeffs[3], coeffs[4], coeffs[5]],
+                             [coeffs[6], coeffs[7], 1.0]], dtype=np.float64)
+            ys, xs = np.mgrid[0:h, 0:w].astype(np.float64)
+            denom = np.maximum(1e-6, Hinv[2, 0] * xs + Hinv[2, 1] * ys + Hinv[2, 2])
+            mx = ((Hinv[0, 0] * xs + Hinv[0, 1] * ys + Hinv[0, 2]) / denom).astype(np.float32)
+            my = ((Hinv[1, 0] * xs + Hinv[1, 1] * ys + Hinv[1, 2]) / denom).astype(np.float32)
+            valid = (mx >= 0) & (mx <= w - 1) & (my >= 0) & (my <= h - 1)
+            sampled = _bilinear(arr, np.clip(mx, 0, w - 1), np.clip(my, 0, h - 1))
+            arr = np.where(valid[..., None], sampled, np.float32(0.0))
+
+    return Image.fromarray(np.clip(arr + np.float32(0.5), 0, 255).astype(np.uint8), "RGBa").convert("RGBA")

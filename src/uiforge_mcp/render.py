@@ -72,7 +72,7 @@ def _letter_case(text: str, case: str) -> str:
 VECTOR_TYPES = {"rect", "ellipse", "polygon", "line", "path", "arc", "ticks", "boolean"}
 BOOLEAN_OPS = ("union", "subtract", "intersect", "exclude")
 BITMAP_TYPES = {"image", "instance"}
-WIDGET_TYPES = {"input", "scroll"}
+WIDGET_TYPES = {"input", "scroll", "slider", "toggle", "dropdown"}
 MAX_INSTANCE_DEPTH = 6
 LINE_TYPES = {"line", "arc", "ticks"}
 BLENDS = ("normal", "add", "screen", "multiply", "overlay", "soft-light", "hard-light", "color-dodge",
@@ -1762,10 +1762,15 @@ class Renderer:
             return (x, y, x + w, y + h)
         if t in WIDGET_TYPES:
             x, y = float(el.get("x", 0)), float(el.get("y", 0))
-            w = max(16.0, float(el.get("width", 220)))
-            h = max(20.0, float(el.get("height", 40 if t == "input" else 180)))
-            top_pad = 22.0 if (t == "input" and el.get("label")) else 0.0
-            return (x, y - top_pad, x + w, y + h)
+            def_w = 52.0 if t == "toggle" else 220.0
+            def_h = {"input": 40.0, "scroll": 180.0, "slider": 28.0, "toggle": 28.0, "dropdown": 40.0}.get(t, 40.0)
+            w = max(16.0, float(el.get("width", def_w)))
+            h = max(16.0, float(el.get("height", def_h)))
+            top_pad = 22.0 if (t in ("input", "slider", "dropdown") and el.get("label")) else 0.0
+            right_pad = 0.0
+            if t == "toggle" and el.get("label"):
+                right_pad = max(60.0, len(str(el["label"])) * float(el.get("size", 14)) * 0.65 + 14.0)
+            return (x, y - top_pad, x + w + right_pad, y + h)
         raise ValueError(f"Unknown element type '{t}'")
 
     def _source_canvas(self, el: dict) -> dict:
@@ -2118,7 +2123,7 @@ class Renderer:
         t = el.get("type")
         if t in ("instance", "image") or el.get("clip"):
             return None
-        if t == "input" and el.get("bind"):
+        if t in ("input", "slider", "toggle", "dropdown") and el.get("bind"):
             return None
         if st.get("backdrop_blur") or st.get("glass"):
             return None
@@ -2244,6 +2249,8 @@ class Renderer:
         soften, soften_prog = fxlib.blur_amount(st.get("blur"))
         feather = max(0.0, float(st.get("feather", 0) or 0))
         pad = fx.pad() + soften * 1.5 + feather * 1.5 + (3 if t == "text" else 1)
+        if st.get("perspective") or el.get("perspective"):
+            pad = max(pad, max(gbox[2] - gbox[0], gbox[3] - gbox[1]) * 0.18 + 8.0)
         pivot = self._pivot(el, box)
         if rot:
             half = max(math.hypot(px_ - pivot[0], py_ - pivot[1])
@@ -2271,7 +2278,8 @@ class Renderer:
             if st.get("adjust"):
                 layer = fxlib.adjust(layer, st["adjust"], self.colors)
             if soften > 0:
-                prog = fxlib.progressive_t((w, h), soften_prog, box_px) if soften_prog else None
+                wbox_px = (box[0] * k - px0, box[1] * k - py0, box[2] * k - px0, box[3] * k - py0)
+                prog = fxlib.progressive_t((w, h), soften_prog, wbox_px) if soften_prog else None
                 layer = fxlib.blur_image(layer, soften * k / 2, prog)
             clip_id = el.get("clip")
             if clip_id:
@@ -2405,6 +2413,9 @@ class Renderer:
         if soften > 0:
             prog = fxlib.progressive_t((w, h), soften_prog, box_px) if soften_prog else None
             layer = fxlib.blur_image(layer, soften * k / 2, prog)
+        persp = st.get("perspective") or el.get("perspective")
+        if persp:
+            layer = fxlib.perspective_warp(layer, persp)
         if not _is_none(st.get("mask")):
             layer.putalpha(ImageChops.multiply(layer.getchannel("A"),
                                                _soft_mask((w, h), st["mask"], box_px, self.colors, k,
@@ -2543,6 +2554,18 @@ class Renderer:
         if soften > 0:
             prog = fxlib.progressive_t(out.size, soften_prog, box_px) if soften_prog else None
             out = fxlib.blur_image(out, soften * k / 2, prog)
+        if st.get("perspective"):
+            lb = out.getchannel("A").getbbox()
+            if lb is not None:
+                pad_p = max(16, int(round(max(lb[2] - lb[0], lb[3] - lb[1]) * 0.18)))
+                x0 = max(0, lb[0] - pad_p)
+                y0 = max(0, lb[1] - pad_p)
+                x1 = min(out.width, lb[2] + pad_p)
+                y1 = min(out.height, lb[3] + pad_p)
+                warped = fxlib.perspective_warp(out.crop((x0, y0, x1, y1)), st["perspective"])
+                full_w = Image.new("RGBA", out.size, (0, 0, 0, 0))
+                full_w.paste(warped, (x0, y0))
+                out = full_w
         if not _is_none(st.get("mask")):
             out.putalpha(ImageChops.multiply(out.getchannel("A"), _soft_mask(out.size, st["mask"], box_px, self.colors, k,
                                                                              st.get("mask_mode", "alpha"))))

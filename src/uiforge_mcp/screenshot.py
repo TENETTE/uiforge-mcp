@@ -208,9 +208,105 @@ def _text_fg_color(patch: np.ndarray) -> str:
     return _rgb_hex(np.median(flat[idx], axis=0))
 
 
+def _hex_to_rgb(hx: str) -> np.ndarray:
+    return np.array([int(hx[1:3], 16), int(hx[3:5], 16), int(hx[5:7], 16)], dtype=np.float32)
+
+
+def _infer_layout_groups(shapes: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Detect aligned sibling rows/columns and tag them with clean group names for responsive layout."""
+    rects = [s for s in shapes if s.get("type") in ("rect", "input", "toggle", "dropdown") and not s.get("group")]
+    groups: list[dict[str, Any]] = []
+    used: set[str] = set()
+    row_idx = 0
+    for i, a in enumerate(rects):
+        if a["id"] in used:
+            continue
+        ay, ah = float(a["y"]), float(a["height"])
+        row = [a]
+        for b in rects[i + 1:]:
+            if b["id"] in used:
+                continue
+            by, bh = float(b["y"]), float(b["height"])
+            if abs(by - ay) <= 6.0 and abs(bh - ah) <= max(8.0, ah * 0.2):
+                row.append(b)
+        if len(row) >= 2:
+            row.sort(key=lambda s: float(s["x"]))
+            gaps = [float(row[k + 1]["x"]) - (float(row[k]["x"]) + float(row[k]["width"])) for k in range(len(row) - 1)]
+            if all(-2.0 <= g <= 160.0 for g in gaps):
+                row_idx += 1
+                gname = f"row_{row_idx}"
+                for item in row:
+                    item["group"] = gname
+                    used.add(item["id"])
+                groups.append({"group": gname, "direction": "row",
+                               "gap": round(sum(gaps) / max(1, len(gaps)), 1),
+                               "members": [item["id"] for item in row]})
+    col_idx = 0
+    for i, a in enumerate(rects):
+        if a["id"] in used:
+            continue
+        ax, aw = float(a["x"]), float(a["width"])
+        col = [a]
+        for b in rects[i + 1:]:
+            if b["id"] in used:
+                continue
+            bx, bw = float(b["x"]), float(b["width"])
+            if abs(bx - ax) <= 6.0 and abs(bw - aw) <= max(10.0, aw * 0.2):
+                col.append(b)
+        if len(col) >= 2:
+            col.sort(key=lambda s: float(s["y"]))
+            gaps = [float(col[k + 1]["y"]) - (float(col[k]["y"]) + float(col[k]["height"])) for k in range(len(col) - 1)]
+            if all(-2.0 <= g <= 120.0 for g in gaps):
+                col_idx += 1
+                gname = f"col_{col_idx}"
+                for item in col:
+                    item["group"] = gname
+                    used.add(item["id"])
+                groups.append({"group": gname, "direction": "column",
+                               "gap": round(sum(gaps) / max(1, len(gaps)), 1),
+                               "members": [item["id"] for item in col]})
+    return groups
+
+
+def _bind_palette_tokens(shapes: list[dict[str, Any]], texts: list[dict[str, Any]],
+                         token_map: dict[str, str], max_dist: float = 24.0) -> int:
+    """Replace matching raw hex fills/strokes/text colors with $ss_* theme tokens."""
+    if not token_map:
+        return 0
+    tok_rgbs = [(f"${name}", _hex_to_rgb(hx)) for name, hx in token_map.items() if isinstance(hx, str) and len(hx) == 7 and hx.startswith("#")]
+    bound = 0
+
+    def match(val: Any) -> Any:
+        nonlocal bound
+        if isinstance(val, str) and len(val) == 7 and val.startswith("#"):
+            rgb = _hex_to_rgb(val)
+            best_tok, best_d = None, max_dist
+            for tname, trgb in tok_rgbs:
+                d = _color_dist(rgb, trgb)
+                if d <= best_d:
+                    best_d, best_tok = d, tname
+            if best_tok:
+                bound += 1
+                return best_tok
+        return val
+
+    for s in shapes:
+        st = s.get("style")
+        if isinstance(st, dict):
+            if "fill" in st:
+                st["fill"] = match(st["fill"])
+            if isinstance(st.get("stroke"), dict) and "color" in st["stroke"]:
+                st["stroke"]["color"] = match(st["stroke"]["color"])
+    for t in texts:
+        if "color" in t:
+            t["color"] = match(t["color"])
+    return bound
+
+
 def analyze_screenshot(path: str | Path, max_width: int = 1280, max_elements: int = 60,
-                       ocr: str = "auto") -> dict[str, Any]:
-    """Analyze a UI screenshot into structured editable canvas elements + palette tokens."""
+                       ocr: str = "auto", classify_widgets: bool = True,
+                       infer_layout: bool = True) -> dict[str, Any]:
+    """Analyze a UI screenshot into structured editable canvas elements, layout groups + palette tokens."""
     p = Path(path).expanduser()
     if not p.is_file():
         raise ValueError(f"screenshot file not found: {p}")
@@ -301,17 +397,30 @@ def analyze_screenshot(path: str | Path, max_width: int = 1280, max_elements: in
                 cv2.drawContours(roi_mask, [shifted], -1, 255, thickness=-1)
                 rad = _estimate_corner_radius(roi_mask, w, h)
                 role = "card" if (w * h > W * H * 0.08) else ("button" if (26 <= h <= 64 and w >= 72) else "box")
-                shapes.append({
-                    "type": "rect",
-                    "id": f"{role}_{idx + 1}",
-                    "x": float(x0),
-                    "y": float(y0),
-                    "width": float(w),
-                    "height": float(h),
-                    "radius": rad,
-                    "style": st_obj,
-                    "note": f"imported:{role}",
-                })
+                if classify_widgets and 18 <= h <= 34 and 1.65 <= aspect <= 2.35 and rad >= h * 0.42:
+                    shapes.append({
+                        "type": "toggle",
+                        "id": f"toggle_{idx + 1}",
+                        "x": float(x0),
+                        "y": float(y0),
+                        "width": float(w),
+                        "height": float(h),
+                        "variant": "switch",
+                        "checked": False,
+                        "note": "imported:toggle",
+                    })
+                else:
+                    shapes.append({
+                        "type": "rect",
+                        "id": f"{role}_{idx + 1}",
+                        "x": float(x0),
+                        "y": float(y0),
+                        "width": float(w),
+                        "height": float(h),
+                        "radius": rad,
+                        "style": st_obj,
+                        "note": f"imported:{role}",
+                    })
 
     texts: list[dict[str, Any]] = []
     for ti, td in enumerate(raw_texts):
@@ -345,12 +454,19 @@ def analyze_screenshot(path: str | Path, max_width: int = 1280, max_elements: in
             "color": fg_col,
         })
 
+    layout_groups = _infer_layout_groups(shapes) if infer_layout else []
+    token_map: dict[str, str] = {"ss_bg": bg_hex}
+    for i, hx in enumerate(palette[1:], 1):
+        token_map[f"ss_c{i}"] = hx
+
     return {
         "width": W,
         "height": H,
         "background": bg_hex,
         "palette": palette,
+        "token_map": token_map,
         "shapes": shapes,
         "texts": texts,
+        "layout_groups": layout_groups,
         "ocr_engine": ocr_engine,
     }

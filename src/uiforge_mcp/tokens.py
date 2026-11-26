@@ -241,3 +241,104 @@ def write_design_md(name: str, colors: dict, numbers: dict, text_styles: dict, m
         body += [f"- `{k}`: " + ", ".join(f"{a} {json.dumps(b, ensure_ascii=False)}" for a, b in v.items())
                  for k, v in comp.items()]
     return "\n".join(fm + body) + "\n"
+
+
+def _oklch_to_hex(l_val: float, c_val: float, h_deg: float) -> str:
+    """Convert CSS oklch(L C H) into clamped sRGB #rrggbb."""
+    import math
+    if l_val > 1.0:
+        l_val /= 100.0
+    hr = math.radians(h_deg)
+    a = c_val * math.cos(hr)
+    b = c_val * math.sin(hr)
+    l_ = l_val + 0.3963377774 * a + 0.2158037573 * b
+    m_ = l_val - 0.1055613458 * a - 0.0638541728 * b
+    s_ = l_val - 0.0894841775 * a - 1.2914855480 * b
+    l3, m3, s3 = l_ ** 3, m_ ** 3, s_ ** 3
+    rl = +4.0767416621 * l3 - 3.3077115913 * m3 + 0.2309699292 * s3
+    gl = -1.2684380046 * l3 + 2.6097574011 * m3 - 0.3413193965 * s3
+    bl = -0.0041960863 * l3 - 0.7034186147 * m3 + 1.7076147010 * s3
+
+    def enc(v: float) -> int:
+        v = max(0.0, min(1.0, v))
+        s = 12.92 * v if v <= 0.0031308 else 1.055 * (v ** (1.0 / 2.4)) - 0.055
+        return max(0, min(255, round(s * 255)))
+
+    return f"#{enc(rl):02x}{enc(gl):02x}{enc(bl):02x}"
+
+
+def _hsl_to_hex(h_deg: float, s_pct: float, l_pct: float) -> str:
+    import colorsys
+    r, g, b = colorsys.hls_to_rgb((h_deg % 360.0) / 360.0, max(0.0, min(1.0, l_pct / 100.0)), max(0.0, min(1.0, s_pct / 100.0)))
+    return f"#{round(r * 255):02x}{round(g * 255):02x}{round(b * 255):02x}"
+
+
+def _parse_css_color(val: str) -> str | None:
+    s = val.strip()
+    if re.fullmatch(r"#[0-9a-fA-F]{3,8}", s):
+        return s.lower()
+    if re.match(r"^(?:rgba?|hsla?)\s*\(", s, re.I):
+        return s
+    # Tailwind v4 / modern CSS oklch(0.72 0.15 55) or oklch(72% 0.15 55)
+    m = re.match(r"^oklch\(\s*([\d.]+)%?\s+([\d.]+)\s+([\d.]+)(?:deg)?(?:\s*/\s*[\d.%]+)?\s*\)$", s, re.I)
+    if m:
+        return _oklch_to_hex(float(m.group(1)), float(m.group(2)), float(m.group(3)))
+    # shadcn/ui raw HSL triplet: "222.2 47.4% 11.2%"
+    m = re.fullmatch(r"([\d.]+)\s+([\d.]+)%\s+([\d.]+)%", s)
+    if m:
+        return _hsl_to_hex(float(m.group(1)), float(m.group(2)), float(m.group(3)))
+    return None
+
+
+def read_css_tokens(text: str) -> tuple[dict[str, str], dict[str, float], dict[str, dict[str, str]]]:
+    """Parse CSS custom properties (:root, Tailwind v4 @theme, shadcn HSL triplets, oklch(), .dark / [data-theme=light]).
+
+    Returns ``(colors, numbers, modes)``.
+    """
+    clean = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
+    colors: dict[str, str] = {}
+    numbers: dict[str, float] = {}
+    modes: dict[str, dict[str, str]] = {}
+
+    def _strip_prefix(raw_name: str) -> str:
+        n = raw_name.strip().lstrip("-").lower()
+        for pref in ("color-", "ui-", "tw-"):
+            if n.startswith(pref):
+                n = n[len(pref):]
+                break
+        return _name([n])
+
+    def _ingest_decls(block_body: str, target_colors: dict[str, str], collect_nums: bool) -> None:
+        for raw_key, raw_val in re.findall(r"--([\w-]+)\s*:\s*([^;}\n]+)", block_body):
+            val = raw_val.strip()
+            if val.startswith("var("):
+                continue
+            key = _strip_prefix(raw_key)
+            if not key:
+                continue
+            col = _parse_css_color(val)
+            if col:
+                target_colors[key] = col
+                continue
+            if collect_nums:
+                num = _dimension(val)
+                if num is not None:
+                    numbers[key] = num
+
+    blocks = re.findall(r"([^{}]+)\{([^{}]*)\}", clean)
+    if blocks:
+        for sel, body in blocks:
+            s_low = sel.lower()
+            if ".dark" in s_low or 'data-theme="dark"' in s_low or "data-theme='dark'" in s_low:
+                _ingest_decls(body, modes.setdefault("dark", {}), False)
+            elif ".light" in s_low or 'data-theme="light"' in s_low or "data-theme='light'" in s_low:
+                _ingest_decls(body, modes.setdefault("light", {}), False)
+            else:
+                _ingest_decls(body, colors, True)
+    else:
+        _ingest_decls(clean, colors, True)
+
+    modes = {k: v for k, v in modes.items() if v}
+    if not colors and not numbers and not modes:
+        raise ValueError("No CSS custom property tokens found (expected --name: #hex | oklch(...) | hsl | px/rem)")
+    return colors, numbers, modes

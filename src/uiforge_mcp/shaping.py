@@ -528,7 +528,7 @@ class ShapedText:
 
     def draw_color(self, img, text: str, x: float, baseline: float, size_px: float) -> None:
         """Paint colour emoji of ``text`` into the RGBA ``img`` (already offset)."""
-        from PIL import ImageDraw, ImageFont
+        from PIL import ImageDraw
         self.shape(text)
         for gx, part, fi in self.color_runs.get(text, []):
             font = _pil_font(self.chain[fi].path, max(1, int(round(size_px))))

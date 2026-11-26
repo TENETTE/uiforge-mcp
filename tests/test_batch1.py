@@ -89,7 +89,7 @@ def test_simplify_case_note_focus(ws):
     after = s.store().find(s.store().get("c"), "q")["d"].count("L")
     assert after < before / 2
     s.add_text("c", "istanbul ışık", x=0, y=0, id="t", case="tr-upper")
-    from uiforge_mcp.render import TextLayout, resolve_style
+    from uiforge_mcp.render import TextLayout
     st = s.store()
     el = st.find(st.get("c"), "t")
     assert TextLayout(el, {}, st.fonts, 1.0).lines[0][0] == "İSTANBUL IŞIK"

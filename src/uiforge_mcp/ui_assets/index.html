@@ -1,0 +1,610 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>UIForge Studio</title>
+  <link rel="icon" type="image/png" href="/assets/brand/emblem.png" />
+  <link rel="stylesheet" href="/assets/studio.css" />
+</head>
+<body>
+  <div id="sr-live" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+
+  <div class="app" id="app">
+    <header class="topbar" role="banner">
+      <div class="brand-group">
+        <button class="icon-btn mobile-toggle" id="btn-toggle-left" title="Toggle workbench" aria-label="Toggle workbench" aria-expanded="false">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+        </button>
+        <div class="brand">
+          <img class="brand-emblem" src="/assets/brand/emblem.png" width="24" height="24" alt="" aria-hidden="true" />
+          <span class="brand-name">UIForge</span>
+          <span class="ver" id="app-ver"></span>
+        </div>
+        <span class="mode-pill" id="mode-pill" title="Live workspace sync status">
+          <span class="pulse" id="sse-dot" aria-hidden="true"></span>
+          <span id="mode-label">Human Studio</span>
+        </span>
+      </div>
+
+      <div class="project-bar">
+        <select id="canvas-sel" class="sel sel-wide" aria-label="Active canvas" title="Active canvas"></select>
+        <button class="btn" id="btn-new-canvas" title="Create new canvas (N)">+ New</button>
+        <button class="icon-btn" id="btn-dup-canvas" title="Duplicate active canvas" aria-label="Duplicate canvas">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        </button>
+        <div class="vsep" aria-hidden="true"></div>
+        <button class="icon-btn" id="btn-undo" title="Undo (Ctrl+Z)" aria-label="Undo">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 7L4 12l5 5M4 12h11a5 5 0 0 1 0 10h-2"/></svg>
+        </button>
+        <button class="icon-btn" id="btn-redo" title="Redo (Ctrl+Y)" aria-label="Redo">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 7l5 5-5 5M20 12H9a5 5 0 0 0 0 10h2"/></svg>
+        </button>
+        <div class="vsep" aria-hidden="true"></div>
+        <select id="style-sel" class="sel" aria-label="Style preset" title="Visual style preset"></select>
+        <select id="quality-sel" class="sel" aria-label="Quality tier" title="Rendering quality tier"></select>
+        <button class="cmd-trigger" id="btn-cmdk" title="Command Palette (Ctrl+K)" aria-label="Open Command Palette">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+          <span>Search…</span>
+          <kbd>Ctrl K</kbd>
+        </button>
+      </div>
+
+      <div class="top-actions">
+        <button class="icon-btn" id="btn-theme-toggle" title="Switch Dark / Light Studio theme" aria-label="Toggle color theme">
+          <svg id="ico-theme" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+        </button>
+        <button class="icon-btn" id="btn-shortcuts" title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M6 9h.01M10 9h.01M14 9h.01M18 9h.01M8 15h8"/></svg>
+        </button>
+        <button class="btn" id="btn-audit" title="Run WCAG & layout quality review">Review</button>
+        <button class="btn btn-primary" id="btn-export">Export</button>
+        <button class="btn btn-gpu" id="btn-settings" title="GPU, Workspace & MCP Settings">
+          <span class="gpu-dot" id="gpu-dot" aria-hidden="true"></span>
+          <span id="gpu-label">CPU</span>
+        </button>
+        <button class="icon-btn mobile-toggle" id="btn-toggle-right" title="Toggle inspector" aria-label="Toggle inspector" aria-expanded="false">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <div class="body-grid">
+      <aside class="dock dock-left" id="dock-left" aria-label="Workbench tools">
+        <nav class="rail-tabs" role="tablist" aria-label="Workbench sections">
+          <button class="rtab on" role="tab" aria-selected="true" data-left="scene">Scene</button>
+          <button class="rtab" role="tab" aria-selected="false" data-left="forge">Create</button>
+          <button class="rtab" role="tab" aria-selected="false" data-left="materials">Materials</button>
+          <button class="rtab" role="tab" aria-selected="false" data-left="tools">Tools</button>
+          <span class="rtab-ink" id="ink-left" aria-hidden="true"></span>
+        </nav>
+
+        <section class="panel on" id="left-scene" role="tabpanel">
+          <div class="sec-head">
+            <span>Layers</span>
+            <button class="mini-btn" id="btn-add-layer">+ Layer</button>
+          </div>
+          <div id="layers-list" class="stack-list"></div>
+          <div class="sec-head sec-gap">
+            <span>Elements</span>
+            <span class="badge" id="el-count">0</span>
+          </div>
+          <input type="search" id="el-search" class="inp inp-compact" placeholder="Filter scene elements…" aria-label="Filter scene elements" />
+          <div id="elements-list" class="stack-list"></div>
+        </section>
+
+        <section class="panel" id="left-forge" role="tabpanel">
+          <div class="sec-head"><span>Primitives &amp; Native Widgets</span></div>
+          <div class="chip-grid" id="primitive-grid">
+            <button class="chip" data-create="rect">Panel</button>
+            <button class="chip" data-create="ellipse">Circle</button>
+            <button class="chip" data-create="text">Text</button>
+            <button class="chip" data-create="arc">Gauge Arc</button>
+            <button class="chip" data-create="input">Input Field</button>
+            <button class="chip" data-create="scroll">Scroll List</button>
+            <button class="chip" data-create="slider">Slider</button>
+            <button class="chip" data-create="toggle">Toggle</button>
+            <button class="chip" data-create="dropdown">Dropdown</button>
+            <button class="chip chip-accent" id="btn-import-ss">Import Screenshot → Canvas</button>
+          </div>
+          <input type="file" id="ss-file-input" accept="image/png,image/jpeg,image/webp" hidden />
+
+          <div class="sec-head sec-gap"><span>Parametric AAA Frames</span></div>
+          <div class="chip-grid" id="frames-grid"></div>
+
+          <div class="sec-head sec-gap">
+            <span>Vector Icons (MIT)</span>
+            <span class="badge" id="icon-count">0</span>
+          </div>
+          <input type="search" id="icon-search" class="inp" placeholder="Filter 142 icons (sword, shield, gear…)" aria-label="Filter vector icons" />
+          <div class="icon-grid" id="icon-grid"></div>
+        </section>
+
+        <section class="panel" id="left-materials" role="tabpanel">
+          <div class="sec-head"><span>Cook-Torrance GGX PBR (39)</span></div>
+          <input type="search" id="mat-search" class="inp" placeholder="Filter materials…" aria-label="Filter PBR materials" />
+          <p class="hint">Select an element, then click a material to apply real-time Cook-Torrance shading.</p>
+          <div id="materials-gallery"></div>
+        </section>
+
+        <section class="panel" id="left-tools" role="tabpanel">
+          <div class="sec-head">
+            <span>Core Engine Operations</span>
+            <span class="badge" id="ops-count">0</span>
+          </div>
+          <input type="search" id="ops-search" class="inp" placeholder="Search all 97 operations…" aria-label="Search core operations" />
+          <div id="ops-list" class="stack-list ops-scroll"></div>
+          <div class="runner-box">
+            <div class="sec-head"><span>Direct Runner</span><span class="mono" id="runner-op-name">batch</span></div>
+            <textarea id="runner-args" class="code-inp" rows="5" spellcheck="false" aria-label="Operation JSON arguments">{}</textarea>
+            <button class="btn btn-primary full" id="btn-run-op">Run Operation</button>
+          </div>
+        </section>
+      </aside>
+
+      <main class="stage-col" role="main">
+        <div class="stage-toolbar" role="toolbar" aria-label="Stage view controls">
+          <div class="tb-group">
+            <select id="bg-sel" class="sel" aria-label="Viewport backdrop" title="Viewport backdrop">
+              <option value="checker">Checker</option>
+              <option value="dark">Dark</option>
+              <option value="light">Light</option>
+              <option value="game">Game Scene</option>
+            </select>
+            <button class="btn-sm" id="btn-ids" aria-pressed="false" title="Toggle element ID overlay">IDs</button>
+            <button class="btn-sm" id="btn-guides" aria-pressed="false" title="Toggle safe-area & grid guides">Guides</button>
+            <select id="state-sel" class="sel" aria-label="Preview interaction state" title="Preview interaction state"><option value="">State: default</option></select>
+            <select id="sim-sel" class="sel" aria-label="Vision and localization simulator" title="Color-blindness & pseudo-localization simulator">
+              <option value="">Vision: Normal</option>
+              <option value="sim:deuteranopia">CVD: Deuteranopia</option>
+              <option value="sim:protanopia">CVD: Protanopia</option>
+              <option value="sim:tritanopia">CVD: Tritanopia</option>
+              <option value="sim:grayscale">Vision: Grayscale</option>
+              <option value="sim:low-contrast">Vision: Low-Contrast</option>
+              <option value="lang:pseudo-long">i18n: Pseudo +100%</option>
+              <option value="lang:pseudo-rtl">i18n: Pseudo-RTL</option>
+            </select>
+          </div>
+          <div class="tb-group">
+            <button class="btn-sm" id="btn-zout" title="Zoom out (-)" aria-label="Zoom out">−</button>
+            <button class="btn-sm mono" id="btn-zrst" title="Reset zoom (0)">100%</button>
+            <button class="btn-sm" id="btn-zin" title="Zoom in (+)" aria-label="Zoom in">+</button>
+            <button class="btn-sm" id="btn-fit-canvas" title="Trim canvas to artwork bounds">Fit</button>
+            <button class="btn-sm" id="btn-devices" title="Preview across Desktop, Ultrawide, Handheld & Mobile">Devices</button>
+            <button class="btn-sm" id="btn-variations" title="Generate visual palette & shape directions">Variations</button>
+            <button class="btn-sm" id="btn-diff" title="Compare against a saved snapshot">Diff</button>
+          </div>
+        </div>
+
+        <div class="viewport" id="viewport" tabindex="0" aria-label="Canvas drafting stage">
+          <div class="empty-stage" id="empty-stage">
+            <div class="empty-hero">
+              <img class="empty-emblem" src="/assets/brand/emblem.png" width="54" height="54" alt="" aria-hidden="true" />
+              <h2>Start forging local UI</h2>
+              <p>Deterministic vector geometry, 39 Cook-Torrance PBR materials, and one-click delivery to Unreal, Unity, Godot, WPF, Qt, and React.</p>
+            </div>
+            <div class="starter-grid">
+              <button class="starter-card" data-starter="tactical">
+                <div class="starter-thumb"><img src="/assets/brand/starter_tactical.png" alt="Tactical Sci-Fi HUD starter" /></div>
+                <div class="starter-meta">
+                  <strong>Tactical Sci-Fi HUD</strong>
+                  <span>Energy shield bar, telemetry widgets &amp; live bindings</span>
+                </div>
+              </button>
+              <button class="starter-card" data-starter="rpg">
+                <div class="starter-thumb"><img src="/assets/brand/starter_rpg.png" alt="Fantasy RPG Forge starter" /></div>
+                <div class="starter-meta">
+                  <strong>Fantasy RPG Forge</strong>
+                  <span>Ornate gold frame, hammered gold, gem &amp; jade PBR</span>
+                </div>
+              </button>
+              <button class="starter-card" data-starter="saas">
+                <div class="starter-thumb"><img src="/assets/brand/starter_saas.png" alt="Desktop and SaaS Workspace starter" /></div>
+                <div class="starter-meta">
+                  <strong>Desktop &amp; SaaS App</strong>
+                  <span>Clean layout ready for WPF, Qt 6 QML &amp; React TSX</span>
+                </div>
+              </button>
+            </div>
+            <div class="empty-actions">
+              <button class="btn btn-primary" id="btn-empty-new">New Blank Canvas</button>
+              <button class="btn" id="btn-empty-ss">Import Screenshot</button>
+              <button class="btn" id="btn-empty-demo" hidden>Load Starter</button>
+            </div>
+          </div>
+
+          <div class="canvas-frame" id="canvas-frame" hidden>
+            <img id="stage-img" alt="Active design canvas" draggable="false" />
+            <div class="snap-line snap-v" id="snap-v" hidden aria-hidden="true"></div>
+            <div class="snap-line snap-h" id="snap-h" hidden aria-hidden="true"></div>
+            <div class="sel-box" id="sel-box">
+              <span class="sel-tag" id="sel-tag"></span>
+              <div class="rh rh-nw" data-rh="nw" title="Resize"></div>
+              <div class="rh rh-n" data-rh="n" title="Resize"></div>
+              <div class="rh rh-ne" data-rh="ne" title="Resize"></div>
+              <div class="rh rh-e" data-rh="e" title="Resize"></div>
+              <div class="rh rh-se" data-rh="se" title="Resize"></div>
+              <div class="rh rh-s" data-rh="s" title="Resize"></div>
+              <div class="rh rh-sw" data-rh="sw" title="Resize"></div>
+              <div class="rh rh-w" data-rh="w" title="Resize"></div>
+            </div>
+            <input type="text" id="inline-text-editor" class="inline-editor" hidden aria-label="Edit element text inline" />
+          </div>
+        </div>
+
+        <footer class="console-bar" id="console-bar">
+          <div class="console-head" id="console-toggle" role="button" tabindex="0" aria-expanded="false" aria-controls="console-body">
+            <span class="mono" id="coords-readout">x: — , y: —</span>
+            <span class="console-dim" id="dim-readout"></span>
+            <span class="spacer"></span>
+            <span class="console-last" id="console-last">Ready</span>
+            <span class="mini-btn" id="btn-console-exp">Activity Log</span>
+          </div>
+          <div class="console-body" id="console-body" hidden>
+            <div id="activity-list" class="activity-list"></div>
+          </div>
+        </footer>
+      </main>
+
+      <aside class="dock dock-right" id="dock-right" aria-label="Property inspector">
+        <nav class="rail-tabs" role="tablist" aria-label="Inspector sections">
+          <button class="rtab on" role="tab" aria-selected="true" data-right="inspect">Inspect</button>
+          <button class="rtab" role="tab" aria-selected="false" data-right="theme">Theme</button>
+          <button class="rtab" role="tab" aria-selected="false" data-right="live">Live</button>
+          <button class="rtab" role="tab" aria-selected="false" data-right="audit">Audit</button>
+          <span class="rtab-ink" id="ink-right" aria-hidden="true"></span>
+        </nav>
+
+        <section class="panel on" id="right-inspect" role="tabpanel">
+          <div id="inspect-empty" class="empty-note">Select an element on the canvas or Scene list to edit geometry, PBR shading, alignment, or 3D perspective. Arrow keys nudge by 1px (Shift: 10px).</div>
+          <div id="inspect-form" hidden>
+            <div class="prop-header">
+              <div>
+                <div class="prop-id mono" id="ins-id"></div>
+                <div class="prop-type" id="ins-type"></div>
+              </div>
+              <div class="prop-btns">
+                <button class="mini-btn" id="btn-el-dup" title="Duplicate (Ctrl+D)">Duplicate</button>
+                <button class="mini-btn danger" id="btn-el-del" title="Delete (Del)">Delete</button>
+              </div>
+            </div>
+
+            <div class="quick-bar" role="group" aria-label="Alignment, distribute and layer order">
+              <button class="q-btn" data-align="left" title="Align Left" aria-label="Align Left"><svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor" aria-hidden="true"><rect x="2" y="2" width="1.5" height="12"/><rect x="5" y="4" width="8" height="3" rx="0.8"/><rect x="5" y="9" width="5" height="3" rx="0.8"/></svg></button>
+              <button class="q-btn" data-align="center" title="Align Center Horizontally" aria-label="Align Center"><svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor" aria-hidden="true"><rect x="7.25" y="2" width="1.5" height="12"/><rect x="3" y="4" width="10" height="3" rx="0.8"/><rect x="4.5" y="9" width="7" height="3" rx="0.8"/></svg></button>
+              <button class="q-btn" data-align="right" title="Align Right" aria-label="Align Right"><svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor" aria-hidden="true"><rect x="12.5" y="2" width="1.5" height="12"/><rect x="3" y="4" width="8" height="3" rx="0.8"/><rect x="6" y="9" width="5" height="3" rx="0.8"/></svg></button>
+              <button class="q-btn" data-dist="horizontal" title="Distribute selected horizontally (Shift+Click 3+ elements)" aria-label="Distribute horizontally">⇔</button>
+              <button class="q-btn" data-dist="vertical" title="Distribute selected vertically (Shift+Click 3+ elements)" aria-label="Distribute vertically">⇕</button>
+              <span class="q-sep" aria-hidden="true"></span>
+              <button class="q-btn" data-order="back" title="Send to Back" aria-label="Send to Back">⤓</button>
+              <button class="q-btn" data-order="backward" title="Send Backward" aria-label="Send Backward">↓</button>
+              <button class="q-btn" data-order="forward" title="Bring Forward" aria-label="Bring Forward">↑</button>
+              <button class="q-btn" data-order="front" title="Bring to Front" aria-label="Bring to Front">⤒</button>
+            </div>
+
+            <div class="form-grid-2">
+              <label class="fld"><span>X</span><input type="number" id="ins-x" class="inp mono" step="1" /></label>
+              <label class="fld"><span>Y</span><input type="number" id="ins-y" class="inp mono" step="1" /></label>
+              <label class="fld"><span>Width</span><input type="number" id="ins-w" class="inp mono" step="1" /></label>
+              <label class="fld"><span>Height</span><input type="number" id="ins-h" class="inp mono" step="1" /></label>
+            </div>
+
+            <div class="form-grid-2">
+              <label class="fld"><span>Radius</span><input type="number" id="ins-rad" class="inp mono" step="1" min="0" /></label>
+              <label class="fld"><span>Rotation°</span><input type="number" id="ins-rot" class="inp mono" step="1" /></label>
+            </div>
+
+            <label class="fld" id="fld-text"><span>Text / Label</span><input type="text" id="ins-text" class="inp" /></label>
+
+            <div class="form-grid-2">
+              <label class="fld"><span>Fill / Token</span>
+                <div class="color-combo">
+                  <input type="color" id="ins-fill-pick" class="col-mini" value="#1e293b" aria-label="Pick fill color" />
+                  <input type="text" id="ins-fill" class="inp mono" placeholder="#1e293b or $primary" />
+                </div>
+              </label>
+              <label class="fld"><span>Opacity</span><input type="number" id="ins-op" class="inp mono" step="0.05" min="0" max="1" /></label>
+            </div>
+
+            <div class="form-grid-2">
+              <label class="fld"><span>Stroke Color</span><input type="text" id="ins-stroke" class="inp mono" placeholder="none or $accent" /></label>
+              <label class="fld"><span>Stroke Width</span><input type="number" id="ins-sw" class="inp mono" step="0.5" min="0" max="24" /></label>
+            </div>
+
+            <label class="fld"><span>PBR Material</span>
+              <select id="ins-mat" class="sel full"><option value="">(None / Flat Fill)</option></select>
+            </label>
+
+            <details class="sub-box pbr-forge" id="pbr-forge">
+              <summary class="sec-head" style="cursor:pointer"><span>Live Cook-Torrance PBR Tuner</span><span class="list-meta">GGX</span></summary>
+              <div style="margin-top:8px">
+                <label class="fld"><span>Bevel Profile</span>
+                  <select id="pbr-prof" class="sel full">
+                    <option value="">Default</option>
+                    <option value="machined">Machined</option>
+                    <option value="round">Round</option>
+                    <option value="chamfer">Chamfer</option>
+                    <option value="dome">Dome</option>
+                    <option value="facet">Facet</option>
+                    <option value="engraved">Engraved</option>
+                  </select>
+                </label>
+                <label class="fld-row"><span>Metallic</span><input type="range" id="pbr-met" min="0" max="1" step="0.02" value="0.85" /><span class="mono" id="pbr-met-v">0.85</span></label>
+                <label class="fld-row"><span>Roughness</span><input type="range" id="pbr-rgh" min="0.04" max="1" step="0.02" value="0.22" /><span class="mono" id="pbr-rgh-v">0.22</span></label>
+                <label class="fld-row"><span>Clearcoat</span><input type="range" id="pbr-cc" min="0" max="1" step="0.05" value="0" /><span class="mono" id="pbr-cc-v">0.00</span></label>
+                <label class="fld-row"><span>Bevel px</span><input type="range" id="pbr-bev" min="0" max="20" step="0.5" value="6" /><span class="mono" id="pbr-bev-v">6.0</span></label>
+                <label class="fld-row"><span>Edge Wear</span><input type="range" id="pbr-wear" min="0" max="1" step="0.05" value="0.2" /><span class="mono" id="pbr-wear-v">0.20</span></label>
+                <div class="row-inline" style="margin-top:6px">
+                  <input type="text" id="pbr-save-name" class="inp inp-compact mono" placeholder="custom_alloy" aria-label="Custom PBR material name" />
+                  <button class="mini-btn" id="btn-save-pbr" type="button" title="Save tuned PBR as reusable workspace material">Save Mat</button>
+                </div>
+              </div>
+            </details>
+
+            <div class="sub-box">
+              <div class="sec-head"><span>3D Diegetic Perspective &amp; Visor</span></div>
+              <label class="fld-row"><span>Tilt Y</span><input type="range" id="ins-ry" min="-45" max="45" step="1" value="0" /><span class="mono" id="ins-ry-v">0°</span></label>
+              <label class="fld-row"><span>Tilt X</span><input type="range" id="ins-rx" min="-45" max="45" step="1" value="0" /><span class="mono" id="ins-rx-v">0°</span></label>
+              <label class="fld-row"><span>Visor Curve</span><input type="range" id="ins-vc" min="-0.4" max="0.4" step="0.02" value="0" /><span class="mono" id="ins-vc-v">0</span></label>
+            </div>
+
+            <button class="btn btn-primary full" id="btn-ins-apply">Apply Changes</button>
+          </div>
+        </section>
+
+        <section class="panel" id="right-theme" role="tabpanel">
+          <div class="sec-head"><span>Style &amp; HDRI Lighting</span></div>
+          <label class="fld"><span>Studio HDRI Light Tent</span>
+            <select id="hdri-sel" class="sel full">
+              <option value="bright">Bright Studio</option>
+              <option value="warm">Warm Atelier</option>
+              <option value="dark">Dark Dramatic</option>
+              <option value="sunset">Sunset Rim</option>
+              <option value="cyberpunk">Cyberpunk Dual-Neon</option>
+            </select>
+          </label>
+          <div class="sec-head sec-gap"><span>OKLCH Palette Forge</span></div>
+          <div class="row-inline">
+            <input type="color" id="pal-seed" value="#e89b3c" class="col-pick" aria-label="Base seed color" />
+            <button class="btn full" id="btn-make-palette">Generate Accessible Scale</button>
+          </div>
+          <div class="sec-head sec-gap"><span>Import CSS / Tailwind / DESIGN.md</span></div>
+          <textarea id="css-tokens-inp" class="code-inp" rows="4" spellcheck="false" placeholder=":root { --primary: #e89b3c; --surface: #141822; --radius-md: 12px; }"></textarea>
+          <button class="btn full" id="btn-import-tokens">Import Tokens to Theme</button>
+
+          <div class="sec-head sec-gap"><span>Theme Color Tokens</span></div>
+          <div id="token-swatches" class="token-grid"></div>
+        </section>
+
+        <section class="panel" id="right-live" role="tabpanel">
+          <div class="sec-head"><span>Reactive Data Bindings</span></div>
+          <div id="bindings-panel"></div>
+          <div class="sec-head sec-gap"><span>Motion &amp; Keyframe Studio</span></div>
+          <div class="sub-box">
+            <div class="form-grid-2" style="margin-bottom:6px">
+              <select id="anim-preset-sel" class="sel" aria-label="Animation preset">
+                <option value="pop">Pop Spring</option>
+                <option value="slide">Fade &amp; Slide Up</option>
+                <option value="pulse">Pulse Glow</option>
+                <option value="spin">Spin Loop</option>
+              </select>
+              <input type="number" id="anim-preset-dur" class="inp mono" value="0.45" min="0.1" max="5" step="0.05" aria-label="Duration seconds" />
+            </div>
+            <button class="btn full" id="btn-add-anim-preset">+ Animate Selected Element</button>
+          </div>
+          <div id="anim-panel"></div>
+        </section>
+
+        <section class="panel" id="right-audit" role="tabpanel">
+          <div class="sec-head">
+            <span>WCAG &amp; Layout Audit</span>
+            <button class="mini-btn" id="btn-run-audit">Run Check</button>
+          </div>
+          <div id="audit-results" class="stack-list"><div class="empty-note">Run audit to verify WCAG contrast, clipping, sub-pixels, safe areas, and alignment.</div></div>
+
+          <div class="sec-head sec-gap">
+            <span>Version Snapshots</span>
+            <button class="mini-btn" id="btn-save-ver">+ Snapshot</button>
+          </div>
+          <div id="versions-list" class="stack-list"></div>
+        </section>
+      </aside>
+    </div>
+  </div>
+
+  <!-- Command Palette Modal (Ctrl+K) -->
+  <div class="modal-bg" id="modal-cmdk" hidden role="dialog" aria-modal="true" aria-labelledby="cmdk-title">
+    <div class="modal modal-cmd">
+      <div class="cmdk-head">
+        <span id="cmdk-title" class="sr-only">Command Palette</span>
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+        <input type="search" id="cmdk-input" class="cmdk-input" placeholder="Run action, apply PBR material, insert icon, switch canvas…" autocomplete="off" />
+        <kbd class="cmdk-esc">Esc</kbd>
+      </div>
+      <div id="cmdk-list" class="cmdk-list" role="listbox"></div>
+    </div>
+  </div>
+
+  <!-- Keyboard Shortcuts Modal (?) -->
+  <div class="modal-bg" id="modal-shortcuts" hidden role="dialog" aria-modal="true" aria-labelledby="shortcuts-title">
+    <div class="modal">
+      <div class="modal-head"><h3 id="shortcuts-title">Keyboard Shortcuts</h3><button class="icon-btn modal-close" data-close="modal-shortcuts" aria-label="Close">&times;</button></div>
+      <div class="modal-body">
+        <div class="sc-grid">
+          <div class="sc-row"><span>Command Palette</span><kbd>Ctrl K</kbd></div>
+          <div class="sc-row"><span>Undo / Redo</span><span><kbd>Ctrl Z</kbd> / <kbd>Ctrl Y</kbd></span></div>
+          <div class="sc-row"><span>Duplicate Selected</span><kbd>Ctrl D</kbd></div>
+          <div class="sc-row"><span>Delete Selected</span><kbd>Del</kbd></div>
+          <div class="sc-row"><span>Nudge 1px / 10px</span><span><kbd>Arrows</kbd> / <kbd>Shift + Arrows</kbd></span></div>
+          <div class="sc-row"><span>Zoom In / Out / Reset</span><span><kbd>+</kbd> <kbd>-</kbd> <kbd>0</kbd></span></div>
+          <div class="sc-row"><span>Toggle IDs / Guides</span><span><kbd>I</kbd> / <kbd>G</kbd></span></div>
+          <div class="sc-row"><span>Close Dialog / Deselect</span><kbd>Esc</kbd></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- New Canvas Modal -->
+  <div class="modal-bg" id="modal-new" hidden role="dialog" aria-modal="true" aria-labelledby="new-title">
+    <div class="modal">
+      <div class="modal-head"><h3 id="new-title">Create Canvas</h3><button class="icon-btn modal-close" data-close="modal-new" aria-label="Close">&times;</button></div>
+      <div class="modal-body">
+        <label class="fld"><span>Canvas Name</span><input type="text" id="new-name" class="inp" value="main_hud" /></label>
+        <div class="form-grid-2">
+          <label class="fld"><span>Width (px)</span><input type="number" id="new-w" class="inp mono" value="960" min="16" max="8192" /></label>
+          <label class="fld"><span>Height (px)</span><input type="number" id="new-h" class="inp mono" value="540" min="16" max="8192" /></label>
+        </div>
+        <label class="fld"><span>Background (color or empty for transparent)</span><input type="text" id="new-bg" class="inp mono" value="#0b0e14" /></label>
+        <div class="chip-grid" style="margin-top:8px">
+          <button class="chip" data-size="1920,1080">1080p HUD</button>
+          <button class="chip" data-size="960,540">960×540 Panel</button>
+          <button class="chip" data-size="512,512">512² Asset</button>
+          <button class="chip" data-size="390,844">Mobile App</button>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn" data-close="modal-new">Cancel</button>
+        <button class="btn btn-primary" id="btn-create-confirm">Create Canvas</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Export & Delivery Modal -->
+  <div class="modal-bg" id="modal-export" hidden role="dialog" aria-modal="true" aria-labelledby="export-title">
+    <div class="modal modal-lg">
+      <div class="modal-head"><h3 id="export-title">Export &amp; Engine Delivery</h3><button class="icon-btn modal-close" data-close="modal-export" aria-label="Close">&times;</button></div>
+      <div class="modal-body">
+        <div class="export-grid">
+          <div class="exp-col">
+            <h4>Image, Vector &amp; Motion</h4>
+            <button class="exp-card" data-exp="png"><strong>PNG</strong><span>1x / 2x high-DPI raster</span></button>
+            <button class="exp-card" data-exp="svg"><strong>Editable SVG</strong><span>Vector shapes, patterns &amp; filters</span></button>
+            <button class="exp-card" data-exp="psd"><strong>Layered PSD</strong><span>PackBits RLE for Photoshop/Krita</span></button>
+            <button class="exp-card" data-exp="pbr"><strong>PBR Texture Maps</strong><span>Albedo, Normal, ORM, Height</span></button>
+            <button class="exp-card" data-exp="dotlottie"><strong>dotLottie v2 (.lottie)</strong><span>Animations + interactive state machine</span></button>
+            <button class="exp-card" data-exp="gif"><strong>Animated GIF</strong><span>Loopable preview for docs &amp; chat</span></button>
+          </div>
+          <div class="exp-col">
+            <h4>Game Engines</h4>
+            <button class="exp-card" data-exp="unreal"><strong>Unreal Engine 5 UMG</strong><span>WBP Python builder + 9-slice</span></button>
+            <button class="exp-card" data-exp="unity"><strong>Unity UI Toolkit</strong><span>.uxml + .uss + Controller.cs</span></button>
+            <button class="exp-card" data-exp="unity-ugui"><strong>Unity uGUI</strong><span>C# Canvas / RectTransform builder</span></button>
+            <button class="exp-card" data-exp="godot"><strong>Godot 4</strong><span>.tscn + _controller.gd + widgets</span></button>
+            <button class="exp-card" data-exp="roblox"><strong>Roblox Studio</strong><span>ScreenGui .client.luau</span></button>
+          </div>
+          <div class="exp-col">
+            <h4>Desktop &amp; Web</h4>
+            <button class="exp-card" data-exp="wpf"><strong>C# .NET WPF</strong><span>.xaml + .cs + ViewModel</span></button>
+            <button class="exp-card" data-exp="avalonia"><strong>.NET Avalonia</strong><span>Cross-platform .axaml</span></button>
+            <button class="exp-card" data-exp="winui"><strong>WinUI 3</strong><span>Windows App SDK .xaml</span></button>
+            <button class="exp-card" data-exp="qt-qml"><strong>C++ Qt 6 QML</strong><span>.qml with native controls</span></button>
+            <button class="exp-card" data-exp="imgui"><strong>C++ Dear ImGui</strong><span>Self-contained _ui.hpp</span></button>
+            <button class="exp-card" data-exp="web"><strong>Interactive HTML/CSS</strong><span>Live bindings &amp; Gamepad API</span></button>
+            <button class="exp-card" data-exp="react"><strong>React TSX (Tailwind)</strong><span>TypeScript 5 + React 19</span></button>
+          </div>
+        </div>
+        <div id="export-output" class="export-output" hidden>
+          <div class="sec-head">
+            <span id="exp-out-title">Export Result</span>
+            <div class="row-inline">
+              <span class="mono" id="exp-out-dir"></span>
+              <button class="mini-btn" id="btn-exp-copy" hidden>Copy Code</button>
+            </div>
+          </div>
+          <div id="exp-files" class="chip-grid"></div>
+          <pre id="exp-code" class="code-view" hidden></pre>
+          <iframe id="exp-iframe" class="html-preview" title="Exported HTML preview" hidden></iframe>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- GPU, Modes & MCP Integration Settings Modal -->
+  <div class="modal-bg" id="modal-settings" hidden role="dialog" aria-modal="true" aria-labelledby="settings-title">
+    <div class="modal modal-lg">
+      <div class="modal-head"><h3 id="settings-title">Workspace, GPU &amp; Mode Settings</h3><button class="icon-btn modal-close" data-close="modal-settings" aria-label="Close">&times;</button></div>
+      <div class="modal-body">
+        <div class="settings-grid">
+          <div class="sub-box">
+            <div class="sec-head"><span>Runtime Mode &amp; Workspace</span></div>
+            <div class="kv-row"><span>Active Mode</span><strong id="set-mode" class="mono"></strong></div>
+            <div class="kv-row"><span>Workspace</span><span id="set-ws" class="mono"></span></div>
+            <div class="kv-row"><span>MCP SDK Installed</span><span id="set-mcp" class="mono"></span></div>
+            <p class="hint" style="margin-top:8px">UIForge runs identically in <strong>Human Mode</strong> (<code>uiforge ui</code>), <strong>MCP Mode</strong> (<code>uiforge-mcp</code>), or <strong>Combined Mode</strong> (<code>uiforge combined</code>) over the same workspace folder.</p>
+          </div>
+          <div class="sub-box">
+            <div class="sec-head"><span>GPU Acceleration Backend</span></div>
+            <div class="kv-row"><span>Detected GPU</span><span id="set-gpu-hw" class="mono"></span></div>
+            <div class="kv-row"><span>Active Runtime</span><strong id="set-gpu-active" class="mono"></strong></div>
+            <div class="row-inline" style="margin-top:10px">
+              <select id="set-gpu-pref" class="sel full" aria-label="GPU backend preference">
+                <option value="auto">Auto (CUDA → WebGPU → CPU)</option>
+                <option value="cuda">NVIDIA CUDA 12</option>
+                <option value="wgpu">Cross-GPU WebGPU (Vulkan/DX12/Metal)</option>
+                <option value="cpu">Deterministic CPU (OpenCV SIMD)</option>
+              </select>
+              <button class="btn btn-primary" id="btn-apply-gpu">Apply</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="sub-box" style="margin-top:12px">
+          <div class="sec-head"><span>Optional AI Client Integration (MCP Mode / Combined Mode)</span></div>
+          <p class="hint">MCP is optional — Human Mode never requires it. If you want an AI coding agent to collaborate on this same workspace, choose your client below:</p>
+          <div class="row-inline" style="margin-top:8px">
+            <select id="ide-client-sel" class="sel" aria-label="AI client"></select>
+            <button class="btn" id="btn-ide-preview">Show Config</button>
+            <button class="btn btn-primary" id="btn-ide-write">Auto-Install Config</button>
+          </div>
+          <pre id="ide-config-out" class="code-view" style="margin-top:8px;max-height:180px" hidden></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Multi-Device Responsive Matrix Modal -->
+  <div class="modal-bg" id="modal-devices" hidden role="dialog" aria-modal="true" aria-labelledby="devices-title">
+    <div class="modal modal-lg">
+      <div class="modal-head"><h3 id="devices-title">Multi-Device Responsive Matrix</h3><button class="icon-btn modal-close" data-close="modal-devices" aria-label="Close">&times;</button></div>
+      <div class="modal-body">
+        <p class="hint">Preview your active canvas pinned across 1080p PC, 21:9 Ultrawide, Steam Deck Handheld, and Mobile Phone simultaneously.</p>
+        <div id="devices-status" class="empty-note">Rendering device matrix…</div>
+        <img id="devices-img" class="diff-img" alt="Multi-device resolution preview" hidden />
+      </div>
+    </div>
+  </div>
+
+  <!-- Visual Variations Explorer Modal -->
+  <div class="modal-bg" id="modal-variations" hidden role="dialog" aria-modal="true" aria-labelledby="var-title">
+    <div class="modal modal-lg">
+      <div class="modal-head"><h3 id="var-title">Explore Visual Directions</h3><button class="icon-btn modal-close" data-close="modal-variations" aria-label="Close">&times;</button></div>
+      <div class="modal-body">
+        <div class="row-inline" style="margin-bottom:10px">
+          <button class="btn btn-primary" id="btn-gen-vars">Generate 3 Directions</button>
+          <span class="hint">Creates 3 live editable variants exploring palette, geometry &amp; typography directions.</span>
+        </div>
+        <div id="var-pickers" class="chip-grid" style="margin-bottom:10px"></div>
+        <img id="var-img" class="diff-img" alt="Visual variations comparison sheet" hidden />
+      </div>
+    </div>
+  </div>
+
+  <!-- Visual Diff Modal -->
+  <div class="modal-bg" id="modal-diff" hidden role="dialog" aria-modal="true" aria-labelledby="diff-title">
+    <div class="modal modal-lg">
+      <div class="modal-head"><h3 id="diff-title">Pixel Visual Diff</h3><button class="icon-btn modal-close" data-close="modal-diff" aria-label="Close">&times;</button></div>
+      <div class="modal-body">
+        <div class="row-inline">
+          <select id="diff-ver-sel" class="sel" aria-label="Snapshot version"></select>
+          <button class="btn btn-primary" id="btn-run-diff">Compare With Current</button>
+          <span class="mono" id="diff-metrics"></span>
+        </div>
+        <img id="diff-img" class="diff-img" alt="Visual diff heatmap" hidden />
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-stack" id="toasts" aria-live="polite"></div>
+  <script src="/assets/studio.js"></script>
+</body>
+</html>

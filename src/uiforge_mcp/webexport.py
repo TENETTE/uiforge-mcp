@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import html
 import json
-import math
 import re
 import shutil
 from html.parser import HTMLParser
@@ -471,6 +470,61 @@ def _element(ctx: _Ctx, el: dict, svg_doc) -> tuple[str, dict, str] | None:
                 f'<div><div style="font-weight:600">{html.escape(title)}</div>{sub_h}</div>{bdg_h}</div>'
             )
         return "".join(parts_html), css, "scroll"
+    if t == "slider":
+        x, y = float(el.get("x", 0)), float(el.get("y", 0))
+        w, h = max(16.0, float(el.get("width", 220))), max(16.0, float(el.get("height", 28)))
+        lo, hi = float(el.get("min", 0.0)), float(el.get("max", 100.0))
+        val = float(el.get("value", 50.0))
+        step = float(el.get("step", 1.0))
+        fill_col = ctx.color(el.get("fill_color", "#38bdf8"))
+        css = {**_box_css(x, y, w, h), "accent-color": fill_col, "cursor": "pointer", "margin": "0"}
+        attrs = [f'type="range"', f'min="{_n(lo)}"', f'max="{_n(hi)}"', f'step="{_n(step)}"', f'value="{_n(val)}"']
+        if el.get("bind"):
+            attrs.append(f'data-bind="{html.escape(str(el["bind"]), quote=True)}"')
+        return " ".join(attrs), css, "input"
+    if t == "toggle":
+        x, y = float(el.get("x", 0)), float(el.get("y", 0))
+        w, h = max(16.0, float(el.get("width", 52))), max(16.0, float(el.get("height", 28)))
+        on_col = ctx.color(el.get("on_color", "#22c55e"))
+        css = {**_box_css(x, y, w, h), "accent-color": on_col, "cursor": "pointer", "margin": "0"}
+        attrs = ['type="checkbox"']
+        if el.get("checked"):
+            attrs.append("checked")
+        if el.get("bind"):
+            attrs.append(f'data-bind="{html.escape(str(el["bind"]), quote=True)}"')
+        return " ".join(attrs), css, "input"
+    if t == "dropdown":
+        from .widgets import widget_colors_summary
+        wc = widget_colors_summary(el, ctx.colors)
+        x, y = float(el.get("x", 0)), float(el.get("y", 0))
+        w, h = max(16.0, float(el.get("width", 220))), max(20.0, float(el.get("height", 40)))
+        rad = el.get("radius", 8)
+        rad_css = " ".join(f"{_n(float(v))}px" for v in (rad if isinstance(rad, list) else [rad]))
+        bg_r, bg_g, bg_b, bg_a = wc["bg"]
+        bd_r, bd_g, bd_b, bd_a = wc["border"]
+        tx_r, tx_g, tx_b, tx_a = wc["text"]
+        css = {
+            **_box_css(x, y, w, h),
+            "background": f"rgba({bg_r},{bg_g},{bg_b},{_n(bg_a / 255)})",
+            "border": f"{_n(wc['border_width'])}px solid rgba({bd_r},{bd_g},{bd_b},{_n(bd_a / 255)})",
+            "border-radius": rad_css,
+            "color": f"rgba({tx_r},{tx_g},{tx_b},{_n(tx_a / 255)})",
+            "font-family": f"'{el.get('font') or 'Inter'}',sans-serif",
+            "font-size": f"{_n(float(el.get('size', 14)))}px",
+            "padding": f"0 {_n(float(el.get('padding', 12)))}px",
+            "cursor": "pointer",
+        }
+        opts = [str(o) for o in (el.get("options") or [])]
+        sel = el.get("selected", 0)
+        opt_html = []
+        for i, o in enumerate(opts):
+            is_sel = (o == sel) if isinstance(sel, str) else (i == int(sel or 0))
+            opt_html.append(f'<option value="{html.escape(o, quote=True)}"{" selected" if is_sel else ""}>{html.escape(o)}</option>')
+        sel_val = sel if (isinstance(sel, str) and sel in opts) else (opts[min(len(opts) - 1, max(0, int(sel or 0)))] if opts else "")
+        bind_attr = f' data-bind="{html.escape(str(el["bind"]), quote=True)}"' if el.get("bind") else ""
+        if sel_val:
+            bind_attr += f' data-default="{html.escape(sel_val, quote=True)}"'
+        return f"{bind_attr}||{''.join(opt_html)}", css, "select"
     if t in ("polygon", "path", "boolean") or t in LINE_TYPES:
         return _svg(ctx, el, st, svg_doc)
     return None
@@ -692,6 +746,9 @@ def build(store, canvases: list[dict], out: Path, layout: str, language: str | N
                     body.append(f'<input class="el input" id="{eid}" {inner} style="{decl}"{extra_attrs}>')
                 elif kind == "scroll":
                     body.append(f'<div class="el scroll" id="{eid}" style="{decl}"{extra_attrs}>{inner}</div>')
+                elif kind == "select":
+                    b_attr, opt_body = inner.split("||", 1)
+                    body.append(f'<select class="el select" id="{eid}"{b_attr} style="{decl}"{extra_attrs}>{opt_body}</select>')
                 else:
                     body.append(f'<div class="el {kind}" id="{eid}" style="{decl}"{extra_attrs}>{inner}</div>')
             if open_group is not None:
@@ -924,14 +981,17 @@ function uiforgeAttach(root, cfg, go, onSfx) {
   }
   on('pointerover', 'hover', true); on('pointerout', 'leave', true);
   on('pointerdown', 'press'); on('pointerup', 'release'); on('click', 'click');
-  root.addEventListener('input', function (e) {
+  function syncBoundInput(e) {
     var el = e.target;
     if (el && el.dataset && el.dataset.bind) {
-      cfg.data = Object.assign({}, cfg.data || {}, {});
-      cfg.data[el.dataset.bind] = el.value;
+      cfg.data = Object.assign({}, cfg.data || {});
+      var v = el.type === 'checkbox' ? !!el.checked : (el.type === 'range' || el.type === 'number' ? Number(el.value) : el.value);
+      cfg.data[el.dataset.bind] = v;
       uiforgeApplyData(root, cfg, cfg.data);
     }
-  });
+  }
+  root.addEventListener('input', syncBoundInput);
+  root.addEventListener('change', syncBoundInput);
   root.addEventListener('click', function (e) {
     var el = e.target && e.target.closest ? e.target.closest('[data-href]') : null;
     if (el) go(el.dataset.href, el.dataset.mode, el.dataset.to);
@@ -1107,6 +1167,12 @@ class _Jsx(HTMLParser):
                 res.append(f"src={{{var}}}")
             elif tag == "input" and name == "value":
                 res.append(f"defaultValue={{{json.dumps(value, ensure_ascii=False)}}}")
+            elif tag == "input" and name == "checked":
+                res.append("defaultChecked={true}")
+            elif tag == "select" and name == "data-default":
+                res.append(f"defaultValue={{{json.dumps(value, ensure_ascii=False)}}}")
+            elif tag == "option" and name == "selected":
+                continue
             else:
                 key = _JSX_ATTR.get(name, name)
                 res.append(key if value is None else f"{key}={{{json.dumps(value, ensure_ascii=False)}}}")
@@ -1185,8 +1251,9 @@ def build_react(store, canvases: list[dict], out: Path, language: str | None, in
         else:
             sig = f"export default function {name}({{ onNavigate, onSfx, data, className }}) {{"
             ref_decl = "  const ref = useRef(null);"
+        nav_cb = "(href: string, mode?: string, to?: string)" if typescript else "(href, mode, to)"
         lines += ["", sig, ref_decl,
-                  "  useEffect(() => uiforgeAttach(ref.current, IX, (href, mode, to) => {",
+                  f"  useEffect(() => uiforgeAttach(ref.current, IX, {nav_cb} => {{",
                   "    if (onNavigate) return onNavigate(to || href, mode);",
                   "    if (mode === 'url') window.open(href, '_blank', 'noopener');",
                   "  }, onSfx), [onNavigate, onSfx]);",

@@ -6,9 +6,8 @@ from __future__ import annotations
 import copy
 import math
 import random
-from typing import Any
 
-from .render import Renderer, resolve_style, shift_element
+from .render import Renderer, shift_element
 
 PRESETS: dict[str, tuple[int, int, tuple[float, float, float, float], str]] = {
     "720p": (1280, 720, (0, 0, 0, 0), "HD"),

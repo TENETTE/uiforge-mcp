@@ -7,15 +7,13 @@ import copy
 import json
 import math
 import random
-from pathlib import Path
-from typing import Any
 
 from PIL import Image as PILImage
 from PIL import ImageDraw
 
 from . import layout as lay
 from .render import TextLayout, resolve_style
-from .server import (Image, _add, _label_font, _maybe_json, _out_dir, _png_bytes, _prepare_update, _summary,
+from .server import (Image, _label_font, _maybe_json, _out_dir, _png_bytes, _prepare_update, _summary,
                      backdrop, store, tool)
 from .store import slugify
 
