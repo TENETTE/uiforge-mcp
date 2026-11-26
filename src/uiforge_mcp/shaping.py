@@ -24,8 +24,8 @@ _NOTO = ("Arabic", "Hebrew", "Devanagari", "Bengali", "Tamil", "Thai")
 
 _CJK = {
     "ja": ["Yu Gothic", "Yu Gothic UI", "Meiryo", "MS Gothic", "Hiragino Sans", "Noto Sans CJK JP", "Noto Sans JP"],
-    "zh-hans": ["Microsoft YaHei", "Microsoft YaHei UI", "SimSun", "PingFang SC", "Noto Sans CJK SC", "Noto Sans SC"],
-    "zh-hant": ["Microsoft JhengHei", "Microsoft JhengHei UI", "PingFang TC", "Noto Sans CJK TC", "Noto Sans TC"],
+    "zh-hans": ["Microsoft YaHei", "Microsoft YaHei UI", "SimSun", "PingFang SC", "Hiragino Sans GB", "Heiti SC", "STHeiti", "Songti SC", "Noto Sans CJK SC", "Noto Sans SC"],
+    "zh-hant": ["Microsoft JhengHei", "Microsoft JhengHei UI", "PingFang TC", "PingFang HK", "Heiti TC", "Songti TC", "Noto Sans CJK TC", "Noto Sans TC"],
     "ko": ["Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans CJK KR", "Noto Sans KR"],
 }
 _SYSTEM = ["Segoe UI", "Nirmala UI", "Leelawadee UI", "Kohinoor Devanagari", "Thonburi", "Noto Sans",
@@ -532,10 +532,24 @@ class ShapedText:
         from PIL import ImageDraw
         self.shape(text)
         req_sz = max(1, int(round(size_px)))
+
+        def _draw_safe(canvas, pos, part_txt, pil_font, sz_ref):
+            draw = ImageDraw.Draw(canvas)
+            try:
+                draw.text(pos, part_txt, font=pil_font, anchor="ls", embedded_color=True)
+            except (ValueError, OSError):
+                draw.text((pos[0], pos[1] - sz_ref * 0.85), part_txt, font=pil_font, embedded_color=True)
+
         for gx, part, fi in self.color_runs.get(text, []):
-            font, actual_sz = _pil_font_with_strike(self.chain[fi].path, req_sz)
+            try:
+                font, actual_sz = _pil_font_with_strike(self.chain[fi].path, req_sz)
+            except OSError:
+                continue
             if actual_sz == req_sz:
-                ImageDraw.Draw(img).text((x + gx, baseline), part, font=font, anchor="ls", embedded_color=True)
+                try:
+                    _draw_safe(img, (x + gx, baseline), part, font, req_sz)
+                except OSError:
+                    continue
             else:
                 # Bitmap colour emoji fonts (NotoColorEmoji 109px, Apple Color Emoji SBIX strikes)
                 # only rasterise at fixed strike sizes; render at the strike size and LANCZOS-scale cleanly.
@@ -544,7 +558,10 @@ class ShapedText:
                 tmp_h = actual_sz * 2 + pad * 2
                 base_y = actual_sz + pad
                 patch = Image.new("RGBA", (tmp_w, tmp_h), (0, 0, 0, 0))
-                ImageDraw.Draw(patch).text((pad, base_y), part, font=font, anchor="ls", embedded_color=True)
+                try:
+                    _draw_safe(patch, (pad, base_y), part, font, actual_sz)
+                except OSError:
+                    continue
                 bbox = patch.getbbox()
                 if not bbox:
                     continue

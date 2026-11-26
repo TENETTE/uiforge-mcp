@@ -40,12 +40,21 @@ def test_features_trim_and_missing_feature_warning(ws):
 
 
 def test_colour_emoji_render_in_colour(ws):
+    from PIL import Image, ImageDraw
+    from uiforge_mcp.shaping import _pil_font_with_strike
     s.create_canvas("c", 120, 50)
     s.add_text("c", "A \U0001F525", x=5, y=5, size=32, color="#ffffff")
     st = s.store()
     lay = TextLayout(st.get("c")["elements"][0], {}, st.fonts, 1.0)
-    if not lay.shaper or not any(f.color and 0x1F525 in f.cmap for f in lay.shaper.chain):
+    cf = next((f for f in (lay.shaper.chain if lay.shaper else []) if f.color and 0x1F525 in f.cmap), None)
+    if cf is None:
         pytest.skip("no system colour emoji font installed (e.g. Segoe UI Emoji, Apple Color Emoji, Noto Color Emoji)")
+    try:
+        pf, psz = _pil_font_with_strike(cf.path, 32)
+        probe = Image.new("RGBA", (psz * 2, psz * 2), (0, 0, 0, 0))
+        ImageDraw.Draw(probe).text((0, 0), "\U0001F525", font=pf, embedded_color=True)
+    except OSError:
+        pytest.skip("host Pillow/FreeType build does not support this bitmap colour emoji table")
     px = np.asarray(st.renderer(st.get("c")).render(include_background=False))
     vis = px[..., 3] > 200
     assert (vis & (px[..., 0].astype(int) - px[..., 2].astype(int) > 80)).any()

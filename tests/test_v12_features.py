@@ -148,7 +148,7 @@ def test_packbits_psd_compression_and_local_workspace(ws, tmp_path, monkeypatch)
     (proj / ".uiforge").mkdir(parents=True)
     monkeypatch.delenv("UIFORGE_MCP_DIR", raising=False)
     monkeypatch.chdir(proj)
-    assert default_workspace() == proj / ".uiforge"
+    assert default_workspace().resolve() == (proj / ".uiforge").resolve()
 
 
 def test_cook_torrance_pbr_metal_clearcoat_and_studio_ibl(ws):
