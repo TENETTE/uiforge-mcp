@@ -11,6 +11,7 @@
 **100% local, MIT-licensed UI design studio & MCP server — use the standalone visual Studio UI, connect any MCP AI client, or edit live together on one workspace.**
 
 <p>
+  <a href="https://pypi.org/project/uiforge-mcp/"><img src="https://img.shields.io/pypi/v/uiforge-mcp?style=flat-square&color=38bdf8" alt="PyPI" /></a>
   <a href="https://github.com/TENETTE/uiforge-mcp/actions/workflows/tests.yml"><img src="https://img.shields.io/github/actions/workflow/status/TENETTE/uiforge-mcp/tests.yml?branch=main&style=flat-square&label=tests" alt="CI Tests" /></a>
   <a href="pyproject.toml"><img src="https://img.shields.io/badge/python-3.10%2B-3776ab?style=flat-square&logo=python&logoColor=white" alt="Python 3.10+" /></a>
   <a href="#three-modes"><img src="https://img.shields.io/badge/modes-Human_UI_%7C_MCP_%7C_Combined-e89b3c?style=flat-square" alt="Modes" /></a>
@@ -37,26 +38,26 @@ Requires Python **3.10+** and [uv](https://docs.astral.sh/uv/) (or `pip`). Zero 
 
 ```bash
 # 1. Human Mode — open the standalone Studio UI (no MCP or AI IDE required)
-uvx --from git+https://github.com/TENETTE/uiforge-mcp uiforge
-uvx --from git+https://github.com/TENETTE/uiforge-mcp uiforge ui --app   # frameless desktop window
+uvx --from uiforge-mcp uiforge
+uvx --from uiforge-mcp uiforge ui --app   # frameless desktop window
 
 # 2. Combined Mode — Studio UI + MCP server synced live on the same workspace
-uvx --from git+https://github.com/TENETTE/uiforge-mcp uiforge combined
+uvx --from uiforge-mcp uiforge combined
 
 # 3. MCP Mode — auto-configure your AI client (opencode, claude, codex, vscode, visualstudio, antigravity, cursor, windsurf)
-uvx --from git+https://github.com/TENETTE/uiforge-mcp uiforge-mcp setup claude --write
+uvx uiforge-mcp setup claude --write
 ```
 
 <details>
 <summary>Persistent install, GPU extras & token-saving MCP toolsets</summary>
 
 ```bash
-pip install "uiforge-mcp @ git+https://github.com/TENETTE/uiforge-mcp"
+pip install uiforge-mcp
 
 # Optional acceleration & features
-pip install "uiforge-mcp[nvidia] @ git+https://github.com/TENETTE/uiforge-mcp"   # CUDA 12 + WebGPU
-pip install "uiforge-mcp[wgpu] @ git+https://github.com/TENETTE/uiforge-mcp"     # AMD / Intel / Apple Metal
-pip install "uiforge-mcp[desktop] @ git+https://github.com/TENETTE/uiforge-mcp"  # pywebview native window
+pip install "uiforge-mcp[nvidia]"   # CUDA 12 + WebGPU
+pip install "uiforge-mcp[wgpu]"     # AMD / Intel / Apple Metal
+pip install "uiforge-mcp[desktop]"  # pywebview native window
 
 # Shrink MCP tool-list tokens by up to 77%
 uiforge-mcp mcp --toolset game --compact   # core | game | desktop | web | full

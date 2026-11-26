@@ -146,7 +146,7 @@ def doctor_report() -> dict[str, Any]:
     }
 
 
-def install_gpu_plan(arch: str = "auto", repo_url: str = "git+https://github.com/TENETTE/uiforge-mcp") -> dict[str, Any]:
+def install_gpu_plan(arch: str = "auto", repo_url: str | None = None) -> dict[str, Any]:
     """Build exact architecture-appropriate install plan (uv & pip commands) without duplicating packages."""
     chosen = str(arch or "auto").strip().lower()
     hw = detect_gpu_hardware()
@@ -158,7 +158,10 @@ def install_gpu_plan(arch: str = "auto", repo_url: str = "git+https://github.com
     extra = spec["extra"]
     pkgs = spec["packages"]
     pip_cmd = [sys.executable, "-m", "pip", "install", *pkgs] if pkgs else []
-    uv_cmd = f'uvx --from "uiforge-mcp[{extra}] @ {repo_url}" uiforge-mcp' if extra != "cpu" else f"uvx --from {repo_url} uiforge-mcp"
+    if repo_url:
+        uv_cmd = f'uvx --from "uiforge-mcp[{extra}] @ {repo_url}" uiforge-mcp' if extra != "cpu" else f"uvx --from {repo_url} uiforge-mcp"
+    else:
+        uv_cmd = f'uvx --from "uiforge-mcp[{extra}]" uiforge-mcp' if extra != "cpu" else "uvx uiforge-mcp"
     return {
         "detected_arch": hw["recommended_arch"],
         "selected_arch": chosen,
@@ -171,15 +174,19 @@ def install_gpu_plan(arch: str = "auto", repo_url: str = "git+https://github.com
     }
 
 
-def _launch_command(server_name: str, extra: str | None, repo_url: str, local_python: bool = False) -> tuple[str, list[str]]:
+def _launch_command(server_name: str, extra: str | None, repo_url: str | None, local_python: bool = False) -> tuple[str, list[str]]:
     if local_python:
         return sys.executable, ["-m", "uiforge_mcp.server"]
-    src = f"uiforge-mcp[{extra}] @ {repo_url}" if (extra and extra != "cpu") else repo_url
-    return "uvx", ["--from", src, "uiforge-mcp"]
+    if repo_url:
+        src = f"uiforge-mcp[{extra}] @ {repo_url}" if (extra and extra != "cpu") else repo_url
+        return "uvx", ["--from", src, "uiforge-mcp"]
+    if extra and extra != "cpu":
+        return "uvx", ["--from", f"uiforge-mcp[{extra}]", "uiforge-mcp"]
+    return "uvx", ["uiforge-mcp"]
 
 
 def client_config(client: str, scope: str = "user", gpu_arch: str = "auto",
-                  server_name: str = "uiforge", repo_url: str = "git+https://github.com/TENETTE/uiforge-mcp",
+                  server_name: str = "uiforge", repo_url: str | None = None,
                   local_python: bool = False, http_port: int = 8765) -> dict[str, Any]:
     """Generate official 2026 MCP configuration JSON, target path and CLI command for an AI IDE/client."""
     c = str(client).strip().lower()

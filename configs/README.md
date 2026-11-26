@@ -51,7 +51,7 @@ Add `--local-python` if you installed UIForge into a local virtual environment a
 
 ## 3. Manual Configuration Templates (Provider-Neutral)
 
-> Replace `git+https://github.com/TENETTE/uiforge-mcp` with `"uiforge-mcp[nvidia] @ git+..."` (NVIDIA CUDA 12 + WebGPU), `"uiforge-mcp[amd] @ git+..."`, `"uiforge-mcp[intel] @ git+..."`, or `"uiforge-mcp[apple] @ git+..."` to enable GPU acceleration.
+> To enable GPU acceleration, pass `"--from", "uiforge-mcp[nvidia]", "uiforge-mcp"` (NVIDIA CUDA 12 + WebGPU) or `"uiforge-mcp[amd]"` / `"uiforge-mcp[intel]"` / `"uiforge-mcp[apple]"` (WebGPU).
 >
 > To run **Combined Mode** automatically whenever your AI client connects, append `"combined"` (or `"serve", "--mode", "combined"`) to `args` / `command`. To cut LLM token usage by up to 77%, append `"mcp", "--toolset", "core", "--compact"` (or `game` / `desktop` / `web`).
 
@@ -64,7 +64,7 @@ Add `--local-python` if you installed UIForge into a local virtual environment a
     "servers": {
       "uiforge": {
         "type": "local",
-        "command": ["uvx", "--from", "git+https://github.com/TENETTE/uiforge-mcp", "uiforge-mcp"],
+        "command": ["uvx", "uiforge-mcp"],
         "environment": { "UIFORGE_MCP_GPU": "auto" }
       }
     }
@@ -77,13 +77,13 @@ Add `--local-python` if you installed UIForge into a local virtual environment a
 ```toml
 [mcp_servers.uiforge]
 command = "uvx"
-args = ["--from", "git+https://github.com/TENETTE/uiforge-mcp", "uiforge-mcp"]
+args = ["uiforge-mcp"]
 ```
 
 ### Claude Code (`~/.claude.json` or `<repo>/.mcp.json`)
 
 ```bash
-claude mcp add uiforge -s user -- uvx --from git+https://github.com/TENETTE/uiforge-mcp uiforge-mcp
+claude mcp add uiforge -s user -- uvx uiforge-mcp
 ```
 
 Or in JSON:
@@ -93,7 +93,7 @@ Or in JSON:
   "mcpServers": {
     "uiforge": {
       "command": "uvx",
-      "args": ["--from", "git+https://github.com/TENETTE/uiforge-mcp", "uiforge-mcp"],
+      "args": ["uiforge-mcp"],
       "env": { "UIFORGE_MCP_GPU": "auto" }
     }
   }
@@ -108,7 +108,7 @@ Or in JSON:
     "uiforge": {
       "type": "stdio",
       "command": "uvx",
-      "args": ["--from", "git+https://github.com/TENETTE/uiforge-mcp", "uiforge-mcp"],
+      "args": ["uiforge-mcp"],
       "env": { "UIFORGE_MCP_GPU": "auto" }
     }
   }
@@ -123,7 +123,7 @@ Or in JSON:
     "uiforge": {
       "type": "stdio",
       "command": "uvx",
-      "args": ["--from", "git+https://github.com/TENETTE/uiforge-mcp", "uiforge-mcp"],
+      "args": ["uiforge-mcp"],
       "env": { "UIFORGE_MCP_GPU": "auto" }
     }
   }
@@ -139,7 +139,7 @@ Or in JSON:
   "mcpServers": {
     "uiforge": {
       "command": "uvx",
-      "args": ["--from", "git+https://github.com/TENETTE/uiforge-mcp", "uiforge-mcp"],
+      "args": ["uiforge-mcp"],
       "env": { "UIFORGE_MCP_GPU": "auto" }
     }
   }

@@ -11,6 +11,7 @@
 **%100 yerel, MIT lisanslı UI tasarım stüdyosu ve MCP sunucusu — bağımsız Studio UI ile kendi başına çalış, dilediğin MCP yapay zekâ istemcisini bağla ya da ikisini canlı ortak kullan.**
 
 <p>
+  <a href="https://pypi.org/project/uiforge-mcp/"><img src="https://img.shields.io/pypi/v/uiforge-mcp?style=flat-square&color=38bdf8" alt="PyPI" /></a>
   <a href="https://github.com/TENETTE/uiforge-mcp/actions/workflows/tests.yml"><img src="https://img.shields.io/github/actions/workflow/status/TENETTE/uiforge-mcp/tests.yml?branch=main&style=flat-square&label=tests" alt="CI Testleri" /></a>
   <a href="pyproject.toml"><img src="https://img.shields.io/badge/python-3.10%2B-3776ab?style=flat-square&logo=python&logoColor=white" alt="Python 3.10+" /></a>
   <a href="#üç-çalışma-modu"><img src="https://img.shields.io/badge/modlar-Human_UI_%7C_MCP_%7C_Combined-e89b3c?style=flat-square" alt="Çalışma Modları" /></a>
@@ -37,26 +38,26 @@ Python **3.10+** ve [uv](https://docs.astral.sh/uv/) (veya `pip`) yeterlidir. Ab
 
 ```bash
 # 1. Human Mode — bağımsız Studio UI'ı aç (MCP istemcisi veya AI IDE gerekmez)
-uvx --from git+https://github.com/TENETTE/uiforge-mcp uiforge
-uvx --from git+https://github.com/TENETTE/uiforge-mcp uiforge ui --app   # çerçevesiz masaüstü penceresi
+uvx --from uiforge-mcp uiforge
+uvx --from uiforge-mcp uiforge ui --app   # çerçevesiz masaüstü penceresi
 
 # 2. Combined Mode — Studio UI + MCP sunucusu aynı çalışma alanında canlı senkron
-uvx --from git+https://github.com/TENETTE/uiforge-mcp uiforge combined
+uvx --from uiforge-mcp uiforge combined
 
 # 3. MCP Mode — dilediğin AI istemcisini tek komutla yapılandır (opencode, claude, codex, vscode, visualstudio, antigravity, cursor, windsurf)
-uvx --from git+https://github.com/TENETTE/uiforge-mcp uiforge-mcp setup claude --write
+uvx uiforge-mcp setup claude --write
 ```
 
 <details>
 <summary>Kalıcı kurulum, GPU hızlandırma ekleri ve token tasarruflu MCP toolset'leri</summary>
 
 ```bash
-pip install "uiforge-mcp @ git+https://github.com/TENETTE/uiforge-mcp"
+pip install uiforge-mcp
 
 # İsteğe bağlı GPU hızlandırma ve masaüstü pencere ekleri
-pip install "uiforge-mcp[nvidia] @ git+https://github.com/TENETTE/uiforge-mcp"   # CUDA 12 + WebGPU
-pip install "uiforge-mcp[wgpu] @ git+https://github.com/TENETTE/uiforge-mcp"     # AMD / Intel / Apple Metal
-pip install "uiforge-mcp[desktop] @ git+https://github.com/TENETTE/uiforge-mcp"  # pywebview yerel pencere
+pip install "uiforge-mcp[nvidia]"   # CUDA 12 + WebGPU
+pip install "uiforge-mcp[wgpu]"     # AMD / Intel / Apple Metal
+pip install "uiforge-mcp[desktop]"  # pywebview yerel pencere
 
 # MCP tool listesi token kullanımını %77'ye kadar azalt
 uiforge-mcp mcp --toolset game --compact   # core | game | desktop | web | full
