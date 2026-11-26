@@ -153,3 +153,5 @@ Measured locally on **Windows 11, Python 3.12, NVIDIA GeForce RTX 4060 Ti** (`UI
 - **[`SECURITY.md`](SECURITY.md)** · **[`CONTRIBUTING.md`](CONTRIBUTING.md)** · **[`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md)** · **[`CHANGELOG.md`](CHANGELOG.md)**
 
 [MIT License](LICENSE) — free for personal and commercial use (11 bundled fonts are SIL OFL-1.1). Everything you create with UIForge belongs to you.
+
+<!-- mcp-name: io.github.TENETTE/uiforge-mcp -->

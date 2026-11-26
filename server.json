@@ -1,0 +1,37 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.TENETTE/uiforge-mcp",
+  "title": "UIForge (uiforge-mcp)",
+  "description": "Local deterministic UI design studio & MCP server (Human UI, MCP & Combined Mode) with 39 Cook-Torrance PBR materials, 142 MIT icons, and exports for Unreal UMG, Unity, Godot, Roblox, .NET, C++ & React.",
+  "version": "0.15.0",
+  "repository": {
+    "url": "https://github.com/TENETTE/uiforge-mcp",
+    "source": "github"
+  },
+  "packages": [
+    {
+      "registryType": "pypi",
+      "registryBaseUrl": "https://pypi.org",
+      "identifier": "uiforge-mcp",
+      "version": "0.15.0",
+      "runtimeHint": "uvx",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "UIFORGE_MCP_GPU",
+          "description": "Compute backend preference: auto, cuda, wgpu, or cpu",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "UIFORGE_MCP_DIR",
+          "description": "Optional workspace directory override (defaults to .uiforge/ or ~/UIForge)",
+          "isRequired": false,
+          "isSecret": false
+        }
+      ]
+    }
+  ]
+}
