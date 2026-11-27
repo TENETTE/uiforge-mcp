@@ -14,16 +14,16 @@
 - `src/uiforge_mcp/core.py`: MCP-independent operation dispatcher (`invoke_operation`), unified renderer (`render_view`), thread-safe `ActivityLog`, mode state (`ui` | `mcp` | `combined`).
 - `src/uiforge_mcp/store.py`: Thread-safe (`RLock`) document store with unique atomic JSON writes (`mkstemp` + `fsync` + retry `os.replace`) and cross-process `sync_from_disk()`.
 - `src/uiforge_mcp/studio_ui.py` + `src/uiforge_mcp/ui_assets/`: Zero-CDN offline Studio UI (127.0.0.1 HTTP + SSE) backed directly by `core.invoke_operation`.
-- `src/uiforge_mcp/server.py`: 97 core operations / model-facing MCP tools + 2 SEP-1865 app-only tools (`studio_app_state`, `studio_app_render`), 4 Resources (`uiforge://materials`, `uiforge://icons`, `uiforge://workspace`, `ui://uiforge/studio.html`), 1 Template (`uiforge://guide/{topic}`), 3 Prompts. Falls back cleanly when `mcp` package is absent (`MCP_AVAILABLE = False`).
-- `src/uiforge_mcp/pbr.py`, `materials.py`, `gpu_wgpu.py`, `shader.py`: 39 Cook-Torrance GGX PBR materials, custom `.hdr`/`.exr` IBL, OpenCV SIMD + WebGPU WGSL + CUDA 12 compute backends.
-- `src/uiforge_mcp/icons.py`, `frames.py`, `widgets.py`: 142 pure-MIT vector icons, 9 parametric AAA frames, 5 native widgets (`input`, `scroll`, `slider`, `toggle`, `dropdown`).
+- `src/uiforge_mcp/server.py`: 100 core operations / model-facing MCP tools + 2 SEP-1865 app-only tools (`studio_app_state`, `studio_app_render`), 5 Resources (`uiforge://cheatsheet`, `uiforge://materials`, `uiforge://icons`, `uiforge://workspace`, `ui://uiforge/studio.html`), 1 Template (`uiforge://guide/{topic}`), 3 Prompts. Falls back cleanly when `mcp` package is absent (`MCP_AVAILABLE = False`).
+- `src/uiforge_mcp/pbr.py`, `materials.py`, `gpu_wgpu.py`, `shader.py`: 39 Cook-Torrance GGX PBR materials (with `text_safe`, `finish`, `best_for` catalog metadata), custom `.hdr`/`.exr` IBL, OpenCV SIMD + WebGPU WGSL + CUDA 12 compute backends.
+- `src/uiforge_mcp/icons.py`, `frames.py`, `widgets.py`, `components.py`: 142 pure-MIT vector icons, 9 parametric AAA frames, 5 native widgets (`input`, `scroll`, `slider`, `toggle`, `dropdown`), and 3 composite builders (`add_button`, `add_progress_bar`, `add_stack` with `in: "<frame>.inner_box"`).
 - `src/uiforge_mcp/tools_delivery.py`, `desktop_export.py`, `webexport.py`, `lottie.py`: Exporters for Unreal Engine 5.5–5.8 UMG Python, Unity 6 (UI Toolkit & uGUI), Godot 4, Roblox, C#/.NET (WPF, Avalonia, WinUI 3), C++ (Qt 6 QML, Dear ImGui), React TSX/Tailwind, HTML/CSS, SVG, PSD, PDF, dotLottie v2, MP4/WebM, PBR texture maps.
 
 ## Documentation Map
 
 - [README.md](README.md): Concise English overview, quick start, 3 modes, export targets, and measured benchmarks.
 - [README.tr.md](README.tr.md): Concise Turkish overview and quick start.
-- [docs/SHOWCASES.md](docs/SHOWCASES.md): Full Studio UI, Cook-Torrance PBR, HUD, animation showcase gallery & 97-operation index.
+- [docs/SHOWCASES.md](docs/SHOWCASES.md): Full Studio UI, Cook-Torrance PBR, HUD, animation showcase gallery & 100-operation index.
 - [configs/README.md](configs/README.md): Multi-mode launch & provider-neutral MCP setup templates (OpenCode, Codex, Claude Code, VS Code, Visual Studio, Antigravity, Cursor, Windsurf, ChatGPT HTTP).
 - [docs/GUIDE.md](docs/GUIDE.md): Complete technical reference (Turkish).
 - [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md): Verified 2026 runtime, engine, GPU, and client matrix.

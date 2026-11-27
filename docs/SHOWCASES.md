@@ -117,16 +117,16 @@ Albedo, Tangent Normal (OpenGL `+Y` & DirectX `-Y`), Roughness, Metallic, AO, He
 
 ---
 
-## All 97 Core Operations & MCP Capabilities
+## All 100 Core Operations & MCP Capabilities
 
 <details>
-<summary><strong>Expand complete operation index (97 tools + 2 SEP-1865 app tools, 4 Resources, 3 Prompts)</strong></summary>
+<summary><strong>Expand complete operation index (100 tools + 2 SEP-1865 app tools, 5 Resources, 3 Prompts)</strong></summary>
 
 | Group | Operations / Tools |
 | --- | --- |
 | **Canvas (9)** | `create_canvas`, `list_canvases`, `get_canvas`, `update_canvas`, `duplicate_canvas`, `delete_canvas`, `fit_canvas`, `resize_canvas`, `canvas_version` (`visual_diff`) |
 | **Layers (4)** | `create_layer`, `update_layer`, `delete_layer`, `set_layer` |
-| **Drawing, Frames, Icons & Widgets (19)** | `add_rect`, `add_ellipse`, `add_line`, `add_polygon`, `add_path`, `add_arc`, `add_ticks`, `add_text`, `add_image`, `add_instance`, `add_svg`, `add_frame`, `add_icon`, `add_input`, `add_scroll`, `add_slider`, `add_toggle`, `add_dropdown`, `import_screenshot` |
+| **Drawing, Frames, Icons & Widgets (22)** | `add_rect`, `add_ellipse`, `add_line`, `add_polygon`, `add_path`, `add_arc`, `add_ticks`, `add_text`, `add_image`, `add_instance`, `add_svg`, `add_frame`, `add_icon`, `add_input`, `add_scroll`, `add_slider`, `add_toggle`, `add_dropdown`, `add_button`, `add_progress_bar`, `add_stack`, `import_screenshot` |
 | **Editing & Layout (18)** | `update_element`, `delete_elements`, `duplicate_element`, `boolean_elements`, `path_ops`, `restyle`, `find_elements`, `vectorize_image`, `move_elements`, `reorder_element`, `align_elements`, `arrange_elements`, `scatter`, `copy_elements`, `set_pin`, `batch`, `undo`, `redo` |
 | **Data, States & i18n (6)** | `set_binding`, `set_state`, `delete_state`, `generate_from_template`, `set_strings`, `get_strings` |
 | **Checks, Studio & MCP App (6)** | `live_preview`, `open_studio`, `review_canvas`, `inspect_pixels`, `view_image`, `preview_nine_slice` |
@@ -137,7 +137,7 @@ Albedo, Tangent Normal (OpenGL `+Y` & DirectX `-Y`), Roughness, Metallic, AO, He
 | **Hand-off & Engines (6)** | `export_spec`, `export_theme`, `set_link`, `set_interaction`, `export_prototype`, `export_screen` |
 
 - **App-only SEP-1865 tools (`visibility: ["app"]`, 0 model tokens):** `studio_app_state`, `studio_app_render`.
-- **MCP Resources:** `uiforge://materials`, `uiforge://icons`, `uiforge://workspace`, `ui://uiforge/studio.html`, and template `uiforge://guide/{topic}`.
+- **MCP Resources:** `uiforge://cheatsheet`, `uiforge://materials`, `uiforge://icons`, `uiforge://workspace`, `ui://uiforge/studio.html`, and template `uiforge://guide/{topic}`.
 - **MCP Prompts:** `design_game_hud`, `design_rpg_panel`, `audit_and_polish`.
 
 </details>

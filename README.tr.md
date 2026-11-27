@@ -87,7 +87,7 @@ uiforge-mcp mcp --toolset game --compact   # core | game | desktop | web | full
 
 - **Deterministik Vektör + Cook-Torrance GGX PBR:** 39 hazır materyal, özel `.hdr`/`.exr` IBL, canlı PBR ayar paneli ve özel materyal kaydetme, HarfBuzz BiDi/Hintçe tipografi ve 3B kavisli visor perspektifi.
 - **Tam Özellikli Studio UI:** 3 hazır başlangıç şablonu, 8 noktalı boyutlandırma tutamakları, manyetik hizalama çizgileri, `Shift+Tık` çoklu seçim, satır içi metin düzenleme, `Ctrl+K` Komut Paleti, Koyu/Açık tema, Renk Körlüğü & Pseudo-Loc simülatörü, Çoklu Cihaz Matrisi, CSS/Tailwind/shadcn token içe aktarıcı ve WCAG kontrast denetimi.
-- **97 Çekirdek İşlem + 142 Saf MIT Vektör İkon + 9 AAA Çerçeve:** Yerel `input`, `scroll`, `slider`, `toggle` ve `dropdown` bileşenleri, `import_screenshot` v2 ve piksel `visual_diff`.
+- **100 Çekirdek İşlem + 142 Saf MIT Vektör İkon + 9 AAA Çerçeve:** Yerel `input`, `scroll`, `slider`, `toggle` ve `dropdown` bileşenleri, kompozit `add_button` / `add_progress_bar` / `add_stack`, `in: "<frame>.inner_box"` yerleşimi, `import_screenshot` v2 ve piksel `visual_diff`.
 
 <table>
   <tr>
@@ -112,7 +112,7 @@ uiforge-mcp mcp --toolset game --compact   # core | game | desktop | web | full
   </tr>
 </table>
 
-> **Daha fazlası:** [Tüm Örnek Galerisi (`docs/SHOWCASES.md`)](docs/SHOWCASES.md) — Studio karşılama ekranı, dar ekran görünümü, PBR Normal/ORM haritaları, yarış HUD'u, animasyonlar ve 97 aracın tam listesi.
+> **Daha fazlası:** [Tüm Örnek Galerisi (`docs/SHOWCASES.md`)](docs/SHOWCASES.md) — Studio karşılama ekranı, dar ekran görünümü, PBR Normal/ORM haritaları, yarış HUD'u, animasyonlar ve 100 aracın tam listesi.
 
 ---
 
@@ -146,7 +146,7 @@ uiforge-mcp mcp --toolset game --compact   # core | game | desktop | web | full
 
 ## Belgeler ve Lisans
 
-- **[`docs/SHOWCASES.md`](docs/SHOWCASES.md)** — Studio UI, PBR, HUD, animasyon ve 97 aracın tam galerisi
+- **[`docs/SHOWCASES.md`](docs/SHOWCASES.md)** — Studio UI, PBR, HUD, animasyon ve 100 aracın tam galerisi
 - **[`configs/README.md`](configs/README.md)** — 9+ yapay zekâ istemcisi için çoklu mod ve MCP yapılandırmaları
 - **[`docs/GUIDE.md`](docs/GUIDE.md)** — Tüm özellik, materyal ve motor kullanım kılavuzu
 - **[`docs/COMPATIBILITY.md`](docs/COMPATIBILITY.md)** — Doğrulanmış işletim sistemi, motor, GPU ve istemci matrisi

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "uiforge-mcp"
-version = "0.15.0"
+version = "0.16.0"
 description = "Local deterministic UI design studio & MCP server (Human UI Mode, MCP Mode, Combined Mode). PBR materials, animations, game engines, .NET/C++ desktop & web/React."
 readme = "README.md"
 license = "MIT"
