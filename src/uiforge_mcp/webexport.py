@@ -340,14 +340,63 @@ def _text_html(ctx: _Ctx, el: dict, st: dict) -> tuple[str, dict] | None:
     return f"<div{attrs}>{html.escape(raw)}</div>", css
 
 
-def _element(ctx: _Ctx, el: dict, svg_doc) -> tuple[str, dict, str] | None:
+def _bound_arc_svg(ctx: _Ctx, el: dict, st: dict, svg_doc) -> tuple[str, dict, str]:
+    """Fallback live inline SVG for an end_angle-bound arc whose fill (e.g. conic) SVG cannot draw natively."""
+    import math
+    W, H = ctx.r.canvas["width"], ctx.r.canvas["height"]
+    cx, cy = float(el.get("cx", 0)), float(el.get("cy", 0))
+    rad = float(el.get("radius", 0))
+    a0_deg, a1_deg = float(el.get("start_angle", 0)), float(el.get("end_angle", 270))
+    a0, a1 = math.radians(a0_deg), math.radians(a1_deg)
+    x0, y0 = cx + rad * math.cos(a0), cy + rad * math.sin(a0)
+    x1, y1 = cx + rad * math.cos(a1), cy + rad * math.sin(a1)
+    large = 1 if abs(a1_deg - a0_deg) > 180 else 0
+    sweep = 1 if a1_deg >= a0_deg else 0
+    thick = float(el.get("thickness", 8))
+    cap = "round" if str(el.get("cap", "round")).lower() == "round" else "butt"
+    raw_fill = st.get("fill") or el.get("color") or "#22d3ee"
+    defs = ""
+    if isinstance(raw_fill, dict) and raw_fill.get("stops"):
+        stops = ctx.stops(raw_fill["stops"])
+        gid = f"ag-{_ident(el['id'])}"
+        st_tags = "".join(f'<stop offset="{_n(o * 100)}%" stop-color="{c}"/>' for o, c in stops)
+        defs = f'<defs><linearGradient id="{gid}" x1="0%" y1="100%" x2="100%" y2="0%">{st_tags}</linearGradient></defs>'
+        stroke_ref = f"url(#{gid})"
+    else:
+        stroke_ref = ctx.color(raw_fill if isinstance(raw_fill, str) else "#22d3ee")
+    d = f"M{x0:.2f} {y0:.2f} A{_n(rad)} {_n(rad)} 0 {large} {sweep} {x1:.2f} {y1:.2f}"
+    svg = (f'<svg viewBox="0 0 {_n(W)} {_n(H)}" width="{_n(W)}" height="{_n(H)}" aria-hidden="true">'
+           f'{defs}<path id="{_ident(el["id"])}-svg" d="{d}" fill="none" stroke="{stroke_ref}" '
+           f'stroke-width="{_n(thick)}" stroke-linecap="{cap}"/></svg>')
+    css: dict[str, str] = {"left": "0", "top": "0", "width": f"{_n(W)}px", "height": f"{_n(H)}px",
+                           "transform-origin": f"{_n(cx)}px {_n(cy)}px"}
+    if st.get("glow"):
+        g = st["glow"][0] if isinstance(st["glow"], list) and st["glow"] else st["glow"]
+        if isinstance(g, dict):
+            css["filter"] = f"drop-shadow(0 0 {_n(float(g.get('blur', 12)))}px {ctx.color(g.get('color', '#ffffff@0.6'))})"
+    return svg, css, "svg"
+
+
+def _element(ctx: _Ctx, el: dict, svg_doc, bound_props: dict[str, set[str]] | None = None) -> tuple[str, dict, str] | None:
     """(tag-body, css, kind) for one element, or None for the picture fallback."""
     r = ctx.r
     el = r._nums(el)
     st = r._nums(resolve_style(el.get("style"), ctx.theme))
-    if el.get("clip") or st.get("glass") or st.get("texture") or st.get("light") or st.get("pbr") or st.get("noise"):
-        return None
     t = el["type"]
+    el_binds = (bound_props or {}).get(el.get("id", ""), set())
+    if st.get("glass") or st.get("texture") or st.get("light") or st.get("pbr") or st.get("noise"):
+        return None
+    clip_ref = el.get("clip")
+    clip_rect_el = None
+    if clip_ref:
+        # Allow a rect clipped to a sibling rect (e.g. add_progress_bar fill clipped to track)
+        # to export as a live CSS box so width & style.fill bindings animate cleanly in Web/React.
+        if t == "rect" and not (set(st) - _CSS_KEYS):
+            cand = next((e for e in r.canvas.get("elements", []) if e.get("id") == clip_ref), None)
+            if cand and cand.get("type") == "rect" and not cand.get("rotation") and not cand.get("smoothing"):
+                clip_rect_el = r._nums(cand)
+        if clip_rect_el is None:
+            return None
     if t == "text":
         got = _text_html(ctx, el, st)
         if got is None:
@@ -393,6 +442,22 @@ def _element(ctx: _Ctx, el: dict, svg_doc) -> tuple[str, dict, str] | None:
         elif el.get("radius"):
             rad = el["radius"]
             css["border-radius"] = " ".join(f"{_n(float(v))}px" for v in (rad if isinstance(rad, list) else [rad]))
+        elif clip_rect_el is not None:
+            if str(clip_rect_el.get("corner", "round")) == "cut":
+                crad = clip_rect_el.get("radius") or 0
+                crads = [float(v) for v in (crad if isinstance(crad, list) else [crad] * 4)]
+                r0, r1, r2, r3 = (crads + [0.0] * 4)[:4]
+                cw_r, ch_r = float(clip_rect_el.get("width", w)), float(clip_rect_el.get("height", h))
+                c_tl, c_tr = min(r0, cw_r * 0.5, ch_r * 0.5), min(r1, cw_r * 0.5, ch_r * 0.5)
+                c_br, c_bl = min(r2, cw_r * 0.5, ch_r * 0.5), min(r3, cw_r * 0.5, ch_r * 0.5)
+                css["clip-path"] = (
+                    f"polygon({_n(c_tl)}px 0,calc(100% - {_n(c_tr)}px) 0,100% {_n(c_tr)}px,"
+                    f"100% calc(100% - {_n(c_br)}px),calc(100% - {_n(c_br)}px) 100%,{_n(c_bl)}px 100%,"
+                    f"0 calc(100% - {_n(c_bl)}px),0 {_n(c_tl)}px)"
+                )
+            elif clip_rect_el.get("radius"):
+                rad = clip_rect_el["radius"]
+                css["border-radius"] = " ".join(f"{_n(float(v))}px" for v in (rad if isinstance(rad, list) else [rad]))
         css.update(_transform(el, box, r._pivot(el, box)))
         return "", css, "box"
     if t == "image":
@@ -561,7 +626,10 @@ def _element(ctx: _Ctx, el: dict, svg_doc) -> tuple[str, dict, str] | None:
             bind_attr += f' data-default="{html.escape(sel_val, quote=True)}"'
         return f"{bind_attr}||{''.join(opt_html)}", css, "select"
     if t in ("polygon", "path", "boolean") or t in LINE_TYPES:
-        return _svg(ctx, el, st, svg_doc)
+        res = _svg(ctx, el, st, svg_doc)
+        if res is None and t == "arc" and "end_angle" in el_binds:
+            return _bound_arc_svg(ctx, el, st, svg_doc)
+        return res
     return None
 
 
@@ -574,6 +642,10 @@ def _svg(ctx: _Ctx, el: dict, st: dict, svg_doc) -> tuple[str, dict, str] | None
     defs = "".join(svg_doc.defs[mark_defs:])
     body = "".join(svg_doc.body[mark_body:])
     del svg_doc.body[mark_body:]
+    # Avoid duplicating the outer wrapper's DOM id on the inner SVG <g>/<path>
+    raw_id_attr = f' id="{html.escape(str(el["id"]), quote=True)}"'
+    if raw_id_attr in body:
+        body = body.replace(raw_id_attr, f' id="{_ident(el["id"])}-svg"', 1)
     W, H = ctx.r.canvas["width"], ctx.r.canvas["height"]
     box = ctx.r._geom_box(el, st)
     px, py = ctx.r._pivot(el, box)
@@ -812,14 +884,22 @@ def _keyframes(ctx: _Ctx, canvas: dict, name: str, anim: dict, ids: set[str],
             ((float(b["cx"]), float(b["cy"])) if "cx" in b else (float(b.get("x", 0)), float(b.get("y", 0))))
         base_rot = baked.get(eid, 0.0)
         lines = []
+        frame_bodies = []
         for i, f in enumerate(frames):
             fx, fy = (float(f["points"][0][0]), float(f["points"][0][1])) if f.get("points") else \
                 ((float(f["cx"]), float(f["cy"])) if "cx" in f else (float(f.get("x", 0)), float(f.get("y", 0))))
             sx, sy = _scales(f)
             rot = float(f.get("rotation", 0) or 0) - base_rot
             op = float(resolve_style(f.get("style"), ctx.theme).get("opacity", 1))
-            lines.append(f"{_n(100 * i / (steps - 1))}%{{transform:translate({_n(fx - bx)}px,{_n(fy - by)}px) "
-                         f"rotate({_n(rot)}deg) scale({_n(sx)},{_n(sy)});opacity:{_n(op)}}}")
+            fbody = (f"transform:translate({_n(fx - bx)}px,{_n(fy - by)}px) "
+                     f"rotate({_n(rot)}deg) scale({_n(sx)},{_n(sy)});opacity:{_n(op)}")
+            frame_bodies.append(fbody)
+            lines.append(f"{_n(100 * i / (steps - 1))}%{{{fbody}}}")
+        # Skip emitting no-op CSS @keyframes when every frame has identical transform & opacity
+        # (e.g. animating style.glow.blur or shader uniforms not representable in CSS transforms)
+        if len(set(frame_bodies)) <= 1:
+            ctx.notes.add(f"{eid}: only movement, rotation, scale and opacity animate on the web")
+            continue
         body_str = "".join(lines)
         kf = body_to_kf.get(body_str)
         if kf is None:
@@ -865,8 +945,12 @@ def build(store, canvases: list[dict], out: Path, layout: str, language: str | N
         used_states = {rule["state"] for rule in ix if rule.get("state")}
         clickable = {rule["id"] for rule in ix if rule["trigger"] in ("click", "press", "release")}
         baked_rot: dict[str, float] = {}
+        bound_props: dict[str, set[str]] = {}
+        for b in c.get("bindings") or []:
+            if b.get("target") and b.get("property"):
+                bound_props.setdefault(str(b["target"]), set()).add(str(b["property"]))
         dynamic_ids = (
-            {b["target"] for b in (c.get("bindings") or [])}
+            set(bound_props.keys())
             | {t["target"] for a in (c.get("animations") or {}).values() for t in (a.get("tracks") or [])}
             | {rule["id"] for rule in ix if not str(rule["id"]).startswith("group:")}
             | set(links.keys())
@@ -930,7 +1014,7 @@ def build(store, canvases: list[dict], out: Path, layout: str, language: str | N
                         attrs += _ix_attrs(f"group:{grp}", ix_ids, clickable, attrs, focus.get(grp, 0))
                         body.append(f'<div class="g g-{_ident(grp)}"{attrs}>')
                     open_group = grp
-                got = _element(ctx, el, svg_doc)
+                got = _element(ctx, el, svg_doc, bound_props)
                 eid = _ident(el["id"])
                 vt = f"view-transition-name:v-{eid}"
                 extra_attrs = ""
@@ -1035,11 +1119,18 @@ def build(store, canvases: list[dict], out: Path, layout: str, language: str | N
                     for sub, decl_s in svg_extra_rules:
                         page_css.append(f"{sel}{sub}{{{decl_s};transition:all .15s ease}}")
                 if state in used_states:
-                    sel_s = f".page.s-{_ident(state)} #{_ident(eid)}"
+                    st_ident = _ident(state)
+                    eid_i = _ident(eid)
+                    sels_s = [f"#{eid_i}.s-{st_ident}"]
+                    if base_el.get("group"):
+                        sels_s.append(f".g-{_ident(base_el['group'])}.s-{st_ident} #{eid_i}")
+                    sels_s.append(f".page.s-{st_ident} #{eid_i}")
+                    sel_s = ",".join(sels_s)
                     if diff:
                         page_css.append(f"{sel_s}{{{_css_decl(diff, True)};transition:all .15s ease}}")
                     for sub, decl_s in svg_extra_rules:
-                        page_css.append(f"{sel_s}{sub}{{{decl_s};transition:all .15s ease}}")
+                        sub_s = ",".join(f"{s}{sub}" for s in sels_s)
+                        page_css.append(f"{sub_s}{{{decl_s};transition:all .15s ease}}")
         for name, anim in (c.get("animations") or {}).items():
             rules, decls = _keyframes(ctx, c, name, anim, {e["id"] for e in c["elements"]}, baked_rot)
             if rules:
@@ -1056,17 +1147,21 @@ def build(store, canvases: list[dict], out: Path, layout: str, language: str | N
             if isinstance(bg, str) and not bg.lower().endswith((".png", ".jpg", ".jpeg", ".webp")):
                 bg_css = f"background:{ctx.color(bg)};"
             else:
-                (out / "assets").mkdir(parents=True, exist_ok=True)
-                name = f"{_ident(c['id'])}-background.png"
-                big.render(include_background=True, only=set()).save(out / "assets" / name, optimize=True)
-                bg_css = f"background:url(assets/{name}) center/cover;"
+                p_bg = ctx.paint(bg, W, H) if isinstance(bg, dict) else None
+                if p_bg:
+                    bg_css = f"background:{p_bg};"
+                else:
+                    (out / "assets").mkdir(parents=True, exist_ok=True)
+                    name = f"{_ident(c['id'])}-background.png"
+                    big.render(include_background=True, only=set()).save(out / "assets" / name, optimize=True)
+                    bg_css = f"background:url(assets/{name}) center/cover;"
         size = (f"width:{_n(W)}px;height:{_n(H)}px" if layout == "fit"
                 else f"width:100vw;min-height:max(100vh,{_n(H)}px)")
         fonts_css = "".join(
             f"@font-face{{font-family:'{fam}';src:url(assets/fonts/{file});font-weight:{'100 900' if var else w};font-display:swap}}"
             for fam, (file, w, var) in ctx.fonts.items())
         all_fonts.update(ctx.fonts)
-        cfg = _ix_config(c, ix, pages)
+        cfg = _ix_config(c, ix, pages, ctx.colors)
         has_runtime = bool(ix or c.get("focus_order") or c.get("bindings") or c.get("data"))
         ix_script = ("<script>window.UIFORGE_IX=" + json.dumps(cfg, ensure_ascii=False).replace("</", "<\\/")
                      + "</script>") if has_runtime else ""
@@ -1107,7 +1202,7 @@ def _ix_attrs(key: str, ix_ids: set, clickable: set, existing: str, tab: int) ->
     return attr
 
 
-def _ix_config(c: dict, ix: list, pages: dict) -> dict:
+def _ix_config(c: dict, ix: list, pages: dict, theme_colors: dict | None = None) -> dict:
     """The page's interaction rules, focus order, and data bindings for the runtime (uiforgeAttach)."""
     from . import binding
     rules = []
@@ -1129,7 +1224,10 @@ def _ix_config(c: dict, ix: list, pages: dict) -> dict:
     binds = []
     for b in c.get("bindings") or []:
         try:
-            binds.append({"id": _ident(b["target"]), "prop": b["property"], "js": binding.js_expr(b["expr"])})
+            binds.append({
+                "id": _ident(b["target"]), "prop": b["property"],
+                "js": binding.js_expr(b["expr"], theme_colors=theme_colors),
+            })
         except Exception:
             continue
     text_tpls = {
@@ -1137,9 +1235,13 @@ def _ix_config(c: dict, ix: list, pages: dict) -> dict:
         for e in c.get("elements", [])
         if e.get("type") == "text" and "{" in str(e.get("text", ""))
     }
+    state_targets = {
+        st_name: [_ident(eid) for eid in (overrides or {}).keys()]
+        for st_name, overrides in (c.get("states") or {}).items()
+    }
     focus = [_ident(eid) for eid in (c.get("focus_order") or [])]
     return {"rules": rules, "anims": anims, "focus": focus, "data": dict(c.get("data") or {}),
-            "bindings": binds, "templates": text_tpls}
+            "bindings": binds, "templates": text_tpls, "stateTargets": state_targets}
 
 
 def _link_attrs(target: Any, pages: dict, tab: int) -> str:
@@ -1213,8 +1315,29 @@ RUNTIME_JS = """function uiforgeApplyData(root, cfg, patch) {
       else if (b.prop === 'opacity') el.style.opacity = String(Math.max(0, Math.min(1, Number(v))));
       else if (b.prop === 'visible') el.style.display = v ? '' : 'none';
       else if (b.prop === 'text') el.textContent = String(v);
-      else if (b.prop === 'style.fill' || b.prop === 'fill') el.style.background = String(v);
-      else if (b.prop === 'style.color' || b.prop === 'color') el.style.color = String(v);
+      else if (b.prop === 'style.fill' || b.prop === 'fill') {
+        if (el.classList.contains('vec')) {
+          var fNodes = el.querySelectorAll('svg path[fill]:not([fill="none"]),svg rect[fill]:not([fill="none"]),svg circle[fill]:not([fill="none"]),svg polygon[fill]:not([fill="none"])');
+          if (fNodes.length) fNodes.forEach(function (n) { n.setAttribute('fill', String(v)); });
+          else el.querySelectorAll('svg [stroke]:not([stroke="none"])').forEach(function (n) { n.setAttribute('stroke', String(v)); });
+        } else el.style.background = String(v);
+      }
+      else if (b.prop === 'style.stroke.color' || b.prop === 'style.stroke' || b.prop === 'stroke') {
+        if (el.classList.contains('vec')) {
+          el.querySelectorAll('svg [stroke]:not([stroke="none"])').forEach(function (n) { n.setAttribute('stroke', String(v)); });
+        } else {
+          el.style.borderColor = String(v);
+          if (el.style.boxShadow && el.style.boxShadow.indexOf('inset') !== -1) {
+            el.style.boxShadow = el.style.boxShadow.replace(/(inset\\s+0(?:px)?\\s+0(?:px)?\\s+0(?:px)?\\s+[\\d.]+px\\s+)(?:rgba?\\([^)]+\\)|#[0-9a-fA-F]+|var\\([^)]+\\))/, '$1' + String(v));
+          }
+        }
+      }
+      else if (b.prop === 'style.color' || b.prop === 'color') {
+        if (el.classList.contains('vec')) {
+          el.querySelectorAll('svg [stroke]:not([stroke="none"])').forEach(function (n) { n.setAttribute('stroke', String(v)); });
+          el.querySelectorAll('svg [fill]:not([fill="none"])').forEach(function (n) { n.setAttribute('fill', String(v)); });
+        } else el.style.color = String(v);
+      }
     } catch (e) {}
   });
   root.querySelectorAll('[data-bind]').forEach(function (inp) {
@@ -1232,7 +1355,14 @@ RUNTIME_JS = """function uiforgeApplyData(root, cfg, patch) {
 function uiforgeAttach(root, cfg, go, onSfx) {
   cfg = cfg || {};
   var rules = cfg.rules || [], anims = cfg.anims || {}, timers = [];
-  function act(r) {
+  function stateHost(r, srcEl) {
+    if (!srcEl || r.id === 'canvas') return root;
+    var tgts = (cfg.stateTargets && cfg.stateTargets[r.state]) || [];
+    if (!tgts.length) return root;
+    var hitLocal = (srcEl.id && tgts.indexOf(srcEl.id) !== -1) || tgts.some(function (tid) { return !!srcEl.querySelector('#' + tid); });
+    return hitLocal ? srcEl : root;
+  }
+  function act(r, srcEl) {
     var run = function () {
       if (r.sfx && onSfx) onSfx(r.sfx, r.id);
       var a = r.action;
@@ -1242,20 +1372,20 @@ function uiforgeAttach(root, cfg, go, onSfx) {
         var info = anims[r.animation];
         if (info && !info.loop) timers.push(setTimeout(function () { fire(null, 'end:' + r.animation); }, info.duration * 1000));
       } else if (a === 'stop') root.classList.remove('p-' + r.animKey);
-      else if (a === 'set_state') root.classList.add('s-' + r.stateKey);
-      else if (a === 'clear_state') root.classList.remove('s-' + r.stateKey);
-      else if (a === 'toggle_state') root.classList.toggle('s-' + r.stateKey);
+      else if (a === 'set_state') stateHost(r, srcEl).classList.add('s-' + r.stateKey);
+      else if (a === 'clear_state') stateHost(r, srcEl).classList.remove('s-' + r.stateKey);
+      else if (a === 'toggle_state') stateHost(r, srcEl).classList.toggle('s-' + r.stateKey);
       else go(r.href, a, r.to);
     };
     if (r.delay) timers.push(setTimeout(run, r.delay * 1000)); else run();
   }
-  function fire(id, trigger) {
-    rules.forEach(function (r) { if (r.trigger === trigger && (id === null || r.id === id)) act(r); });
+  function fire(id, trigger, srcEl) {
+    rules.forEach(function (r) { if (r.trigger === trigger && (id === null || r.id === id)) act(r, srcEl); });
   }
   function on(type, trigger, edge) {
     root.addEventListener(type, function (e) {
       var el = e.target && e.target.closest ? e.target.closest('[data-ix]') : null;
-      if (el && (!edge || !el.contains(e.relatedTarget))) fire(el.dataset.ix, trigger);
+      if (el && (!edge || !el.contains(e.relatedTarget))) fire(el.dataset.ix, trigger, el);
     });
   }
   function focusables() {
@@ -1290,7 +1420,13 @@ function uiforgeAttach(root, cfg, go, onSfx) {
   root.addEventListener('change', syncBoundInput);
   root.addEventListener('click', function (e) {
     var el = e.target && e.target.closest ? e.target.closest('[data-href]') : null;
-    if (el) go(el.dataset.href, el.dataset.mode, el.dataset.to);
+    if (!el) return;
+    var ixEl = e.target && e.target.closest ? e.target.closest('[data-ix]') : null;
+    if (ixEl && rules.some(function (r) {
+      return r.id === ixEl.dataset.ix && r.trigger === 'click'
+        && (r.action === 'navigate' || r.action === 'overlay' || r.action === 'back' || r.action === 'url');
+    })) return;
+    go(el.dataset.href, el.dataset.mode, el.dataset.to);
   });
   root.addEventListener('keydown', function (e) {
     if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[data-href],[data-ix]')) { e.preventDefault(); e.target.click(); }

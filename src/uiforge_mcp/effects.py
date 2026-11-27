@@ -733,3 +733,54 @@ def perspective_warp(img: Image.Image, spec: dict | float | int) -> Image.Image:
             arr = np.where(valid[..., None], sampled, np.float32(0.0))
 
     return Image.fromarray(np.clip(arr + np.float32(0.5), 0, 255).astype(np.uint8), "RGBa").convert("RGBA")
+
+
+def project_box_perspective(
+    box: tuple[float, float, float, float],
+    crop_box: tuple[float, float, float, float],
+    spec: dict | float | int,
+) -> tuple[float, float, float, float]:
+    """Project an axis-aligned box through the exact same perspective_warp transform applied to crop_box."""
+    if isinstance(spec, (int, float)):
+        spec = {"rotate_y": float(spec)}
+    if not isinstance(spec, dict):
+        return box
+    rx = max(-65.0, min(65.0, float(spec.get("rotate_x", 0.0))))
+    ry = max(-65.0, min(65.0, float(spec.get("rotate_y", 0.0))))
+    rz = max(-180.0, min(180.0, float(spec.get("rotate_z", 0.0))))
+    curve = max(-0.6, min(0.6, float(spec.get("visor_curve", spec.get("curve", 0.0)))))
+    fov = max(0.6, min(8.0, float(spec.get("fov", spec.get("depth", 1.8)))))
+    if abs(rx) < 1e-4 and abs(ry) < 1e-4 and abs(rz) < 1e-4 and abs(curve) < 1e-4:
+        return box
+    ox, oy, ox1, oy1 = crop_box
+    w, h = max(2.0, ox1 - ox), max(2.0, oy1 - oy)
+    cx, cy = w * 0.5, h * 0.5
+    ax, ay, az = math.radians(rx), math.radians(ry), math.radians(rz)
+    f = max(w, h) * fov
+    Rx = np.array([[1, 0, 0], [0, math.cos(ax), -math.sin(ax)], [0, math.sin(ax), math.cos(ax)]], dtype=np.float64)
+    Ry = np.array([[math.cos(ay), 0, math.sin(ay)], [0, 1, 0], [-math.sin(ay), 0, math.cos(ay)]], dtype=np.float64)
+    Rz = np.array([[math.cos(az), -math.sin(az), 0], [math.sin(az), math.cos(az), 0], [0, 0, 1]], dtype=np.float64)
+    R = Rz @ Ry @ Rx
+    bx0, by0, bx1, by1 = box
+    pts_x, pts_y = [], []
+    # Sample corners & edge midpoints for curved visors
+    sample_xs = (bx0, (bx0 + bx1) * 0.5, bx1)
+    sample_ys = (by0, (by0 + by1) * 0.5, by1)
+    for gx in sample_xs:
+        for gy in sample_ys:
+            lx, ly = gx - ox, gy - oy
+            if abs(curve) >= 1e-4:
+                nx = (lx - cx) / max(1.0, cx)
+                ny = (ly - cy) / max(1.0, cy)
+                nx2 = nx * nx
+                scale_y = max(0.35, 1.0 + curve * nx2)
+                lx = cx + (nx / (1.0 + abs(curve) * 0.14 * nx2)) * cx
+                ly = cy + (ny * scale_y) * cy
+            if abs(rx) >= 1e-4 or abs(ry) >= 1e-4 or abs(rz) >= 1e-4:
+                v = R @ np.array([lx - cx, ly - cy, 0.0], dtype=np.float64)
+                z = max(f * 0.25, f + v[2])
+                lx = cx + (v[0] * f) / z
+                ly = cy + (v[1] * f) / z
+            pts_x.append(ox + lx)
+            pts_y.append(oy + ly)
+    return (min(pts_x), min(pts_y), max(pts_x), max(pts_y))

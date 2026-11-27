@@ -2045,12 +2045,17 @@ def _add_stack_op(st: Store, c: dict, args: dict, frame_boxes: dict[str, list[fl
     cur_x, cur_y = sx, sy
     max_x, max_y = sx, sy
     child_results: list[dict] = []
-    for raw_ch in children:
+    for idx, raw_ch in enumerate(children):
         ch = dict(_maybe_json(raw_ch))
         cop = ch.pop("op", None)
         if not cop:
             raise ValueError("every add_stack child must specify 'op'")
-        if group and "group" not in ch:
+        # Never share a stack group across composite interactive widgets (buttons/bars),
+        # otherwise every stacked button's click interaction would fire simultaneously on group:<stack>.
+        if cop in ("add_button", "add_progress_bar"):
+            if "id" not in ch and group:
+                ch["id"] = f"{group}_{cop[4:]}_{idx}"
+        elif group and "group" not in ch:
             ch["group"] = group
         if layer and "layer" not in ch:
             ch["layer"] = layer
@@ -3358,6 +3363,33 @@ def review_canvas(canvas: str, min_contrast: float = 4.5, min_text_size: float =
         return {o for o, b in boxes.items() if o != eid and b[0] - reach < a[2] and a[0] < b[2] + reach
                 and b[1] - reach < a[3] and a[1] < b[3] + reach}
 
+    layer_persp: dict[str, Any] = {}
+    layer_members: dict[str, set[str]] = {}
+    for lay_def in c.get("layers", []):
+        lname = lay_def.get("name")
+        if not lname:
+            continue
+        lst = resolve_style(lay_def.get("style"), st.theme) if lay_def.get("style") else {}
+        if lst.get("perspective"):
+            layer_persp[lname] = lst["perspective"]
+    for e in c["elements"]:
+        if e.get("visible", True) and e.get("layer"):
+            layer_members.setdefault(e["layer"], set()).add(e["id"])
+
+    layer_crop_boxes: dict[str, tuple[float, float, float, float]] = {}
+    for lname in layer_persp:
+        l_boxes = [boxes[oid] for oid in layer_members.get(lname, ()) if oid in boxes]
+        if l_boxes:
+            lx0 = min(b[0] for b in l_boxes)
+            ly0 = min(b[1] for b in l_boxes)
+            lx1 = max(b[2] for b in l_boxes)
+            ly1 = max(b[3] for b in l_boxes)
+            pad_p = max(16.0, max(lx1 - lx0, ly1 - ly0) * 0.18)
+            layer_crop_boxes[lname] = (
+                max(0.0, lx0 - pad_p), max(0.0, ly0 - pad_p),
+                min(float(c["width"]), lx1 + pad_p), min(float(c["height"]), ly1 + pad_p),
+            )
+
     wcag_ratios: list[float] = []
     checked_widgets = 0
     for el in texts:
@@ -3370,8 +3402,26 @@ def review_canvas(canvas: str, min_contrast: float = 4.5, min_text_size: float =
             if with_all is None:
                 with_all = np.asarray(st.renderer(c, cs, language=language).render(), dtype=np.float64)
             bx = r.element_box(el)
+            lname = el.get("layer")
+            l_persp = layer_persp.get(lname) if lname else None
+            e_persp = tst.get("perspective") or el.get("perspective")
+            only_ids = nearby(eid)
+            if l_persp and lname in layer_members:
+                # Include entire perspective layer so perspective_warp uses the exact same crop bbox
+                only_ids = only_ids | (layer_members[lname] - {eid})
+                if lname in layer_crop_boxes:
+                    from .effects import project_box_perspective
+                    pbx = project_box_perspective(bx, layer_crop_boxes[lname], l_persp)
+                    bx = (pbx[0] - 8.0, pbx[1] - 8.0, pbx[2] + 8.0, pbx[3] + 8.0)
+            elif e_persp:
+                from .effects import project_box_perspective
+                pad_e = max(16.0, max(bx[2] - bx[0], bx[3] - bx[1]) * 0.18)
+                ecrop = (max(0.0, bx[0] - pad_e), max(0.0, bx[1] - pad_e),
+                         min(float(c["width"]), bx[2] + pad_e), min(float(c["height"]), bx[3] + pad_e))
+                pbx = project_box_perspective(bx, ecrop, e_persp)
+                bx = (pbx[0] - 8.0, pbx[1] - 8.0, pbx[2] + 8.0, pbx[3] + 8.0)
             hidden = dict(c, elements=[e for e in c["elements"] if e is not el])
-            without = np.asarray(st.renderer(hidden, cs, language=language).render(only=nearby(eid)),
+            without = np.asarray(st.renderer(hidden, cs, language=language).render(only=only_ids),
                                  dtype=np.float64)
         except ValueError:
             continue

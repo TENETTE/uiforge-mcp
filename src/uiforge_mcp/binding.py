@@ -10,6 +10,7 @@ from __future__ import annotations
 import ast
 import copy
 import math
+import re
 from functools import lru_cache
 from typing import Any
 
@@ -179,7 +180,29 @@ def apply_bindings(canvas: dict, extra_data: dict[str, Any] | None = None) -> di
     return out
 
 
-def js_expr(expr: str) -> str:
+def _resolve_color_literal(val: str, theme_colors: dict | None, target: str) -> str:
+    """Resolve UIForge '$token' and '#hex@alpha' colour literals for JS/CSS or Godot GDScript."""
+    s = val.strip()
+    if not s:
+        return val
+    looks_token = s.startswith("$") and len(s) > 1 and not any(ch.isspace() for ch in s)
+    looks_alpha_hex = bool(re.fullmatch(r"#[0-9a-fA-F]{3,8}@[0-9]*\.?[0-9]+", s))
+    if not (looks_token or looks_alpha_hex):
+        return val
+    try:
+        from .colors import parse_color
+        r, g, b, a = parse_color(s, theme_colors or {})
+        if target == "gdscript":
+            return f"#{r:02x}{g:02x}{b:02x}" if a == 255 else f"#{r:02x}{g:02x}{b:02x}{a:02x}"
+        if a == 255:
+            return f"#{r:02x}{g:02x}{b:02x}"
+        alpha_s = f"{round(a / 255.0, 3):g}"
+        return f"rgba({r},{g},{b},{alpha_s})"
+    except Exception:
+        return val
+
+
+def js_expr(expr: str, theme_colors: dict | None = None) -> str:
     """Translate a validated binding expression to a safe JavaScript expression for web/React runtime."""
     tree = ast.parse(str(expr).strip(), mode="eval")
 
@@ -188,7 +211,7 @@ def js_expr(expr: str) -> str:
             if isinstance(n.value, bool):
                 return "true" if n.value else "false"
             if isinstance(n.value, str):
-                return repr(n.value)
+                return repr(_resolve_color_literal(n.value, theme_colors, "js"))
             return repr(float(n.value)) if isinstance(n.value, float) else str(n.value)
         if isinstance(n, ast.Name):
             return f"d[{n.id!r}]"
@@ -249,7 +272,7 @@ def js_expr(expr: str) -> str:
     return emit(tree.body)
 
 
-def gdscript_expr(expr: str) -> str:
+def gdscript_expr(expr: str, theme_colors: dict | None = None) -> str:
     """Translate a validated binding expression to a safe Godot 4 GDScript expression."""
     compile_expr(expr)
     tree = ast.parse(str(expr).strip(), mode="eval")
@@ -259,7 +282,8 @@ def gdscript_expr(expr: str) -> str:
             if isinstance(n.value, bool):
                 return "true" if n.value else "false"
             if isinstance(n.value, str):
-                escaped = n.value.replace("\\", "\\\\").replace('"', '\\"')
+                resolved = _resolve_color_literal(n.value, theme_colors, "gdscript")
+                escaped = resolved.replace("\\", "\\\\").replace('"', '\\"')
                 return f'"{escaped}"'
             return repr(float(n.value)) if isinstance(n.value, float) else str(n.value)
         if isinstance(n, ast.Name):

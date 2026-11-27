@@ -212,8 +212,10 @@ def export_spec(canvas: str, out_dir: str | None = None, name: str | None = None
     palette = [(255, 77, 109), (77, 210, 255), (255, 210, 77), (125, 255, 122), (213, 155, 255)]
     for i, item in enumerate(items):
         col = palette[i % len(palette)]
-        bx = [item["x"] * scale, item["y"] * scale, (item["x"] + item["width"]) * scale - 1,
-              (item["y"] + item["height"]) * scale - 1]
+        rx0, ry0 = item["x"] * scale, item["y"] * scale
+        rx1 = max(rx0, (item["x"] + item["width"]) * scale - 1)
+        ry1 = max(ry0, (item["y"] + item["height"]) * scale - 1)
+        bx = [rx0, ry0, rx1, ry1]
         d.rectangle(bx, outline=col + (220,), width=1)
         label = f"{item['id']}  {item['width']:g}x{item['height']:g} @ {item['x']:g},{item['y']:g}"
         if item["type"] == "text":
@@ -428,18 +430,35 @@ def set_interaction(canvas: str, id: str, trigger: str, action: str, animation: 
     remove=true deletes the rule with this id + trigger + action."""
     st = store()
     c = st.get(canvas)
+    trigger = str(trigger).strip()
+    action = str(action).lower()
+    if remove:
+        rows = [
+            r for r in (c.get("interactions") or [])
+            if not (
+                r.get("id") == id
+                and r.get("trigger") == trigger
+                and str(r.get("action", "")).lower() == action
+                and (animation is None or r.get("animation") == animation)
+                and (state is None or r.get("state") == state)
+            )
+        ]
+        if rows:
+            c["interactions"] = rows
+        else:
+            c.pop("interactions", None)
+        st.save_canvas(c)
+        return {"canvas": c["id"], "interactions": rows}
     if id != "canvas":
         if id.startswith("group:"):
             if not any(e.get("group") == id[6:] for e in c["elements"]):
                 raise ValueError(f"no group '{id[6:]}' on canvas '{c['id']}'")
         else:
             id = st.find(c, id)["id"]
-    trigger = str(trigger).strip()
     if trigger not in _TRIGGERS and not re.match(r"^(key:.+|end:.+)$", trigger):
         raise ValueError(f"trigger must be one of {', '.join(_TRIGGERS)}, key:<Key> or end:<animation>")
     if trigger.startswith("end:"):
         trigger = "end:" + st.get_animation(c, trigger[4:])[0]
-    action = str(action).lower()
     if action not in _ACTIONS:
         raise ValueError(f"action must be one of {', '.join(_ACTIONS)}")
     rule: dict = {"id": id, "trigger": trigger, "action": action}
@@ -697,11 +716,20 @@ ROBLOX_WEIGHT = {100: "Thin", 200: "ExtraLight", 300: "Light", 400: "Regular", 5
 
 
 def _pieces(c: dict, scale: float, bake_text: bool, language: str | None):
-    """Split a screen into image pieces (one per group, or per ungrouped element) and text nodes,
-    in draw order."""
+    """Split a screen into image pieces (one per group, or per ungrouped/dynamic element) and text nodes,
+    in draw order. Elements targeted by data bindings, animation tracks, links or individual click rules
+    are kept as independent nodes so generated engine controllers can look them up by exact id."""
     st = store()
     r = st.renderer(c, scale, language=language)
     r1 = st.renderer(c, 1.0, language=language)
+    dynamic_ids = (
+        {b.get("target") for b in (c.get("bindings") or []) if b.get("target")}
+        | {t.get("target") for a in (c.get("animations") or {}).values()
+           for t in (a.get("tracks") or []) if t.get("target") and not str(t.get("target")).startswith("group:")}
+        | {rule.get("id") for rule in (c.get("interactions") or [])
+           if rule.get("id") and rule.get("id") != "canvas" and not str(rule.get("id")).startswith("group:")}
+        | set((c.get("links") or {}).keys())
+    )
     nodes = []
     groups_done: set[str] = set()
     for el in c["elements"]:
@@ -727,11 +755,12 @@ def _pieces(c: dict, scale: float, bake_text: bool, language: str | None):
             nodes.append({"kind": el["type"], "id": el["id"], "box": (x0, y0, x1, y1), "pin": el.get("pin") or {},
                           "el": el})
             continue
-        if el.get("group"):
+        if el.get("group") and el["id"] not in dynamic_ids:
             if el["group"] in groups_done:
                 continue
             groups_done.add(el["group"])
             members = [e for e in c["elements"] if e.get("group") == el["group"] and e.get("visible", True)
+                       and e["id"] not in dynamic_ids
                        and e["type"] not in ("input", "scroll", "slider", "toggle", "dropdown")
                        and (bake_text or e["type"] != "text" or e.get("arc"))]
             if not members:
@@ -1224,7 +1253,7 @@ def _pascal_id(name: str) -> str:
     return out if out[0].isalpha() else "Screen" + out
 
 
-def _write_godot_controller(c: dict, nodes: list, folder: Path, name: str) -> Path | None:
+def _write_godot_controller(c: dict, nodes: list, folder: Path, name: str, colors: dict | None = None) -> Path | None:
     """Emit a Godot 4 GDScript controller wiring data bindings, interactions, sfx signals and gamepad focus."""
     ix = c.get("interactions") or []
     data = c.get("data") or {}
@@ -1323,7 +1352,7 @@ def _write_godot_controller(c: dict, nodes: list, folder: Path, name: str) -> Pa
         prop = str(b.get("property", ""))
         try:
             from . import binding as _bnd
-            gexpr = _bnd.gdscript_expr(b["expr"])
+            gexpr = _bnd.gdscript_expr(b["expr"], theme_colors=colors)
         except Exception:
             lines.append(f"\t# binding: {b['target']}.{prop} = {b['expr']}")
             continue
@@ -1918,7 +1947,7 @@ def export_screen(canvas: str, engine: str, out_dir: str | None = None, name: st
     if engine == "godot":
         out = _write_godot(c, nodes, folder, godot_res_path or f"res://ui/{base}", base, colors)
         files.append(out.name)
-        ctrl = _write_godot_controller(c, nodes, folder, base)
+        ctrl = _write_godot_controller(c, nodes, folder, base, colors=colors)
         if ctrl:
             files.append(ctrl.name)
         nxt = (f"Copy the folder to {godot_res_path or f'res://ui/{base}'} in your Godot 4 project and instance "

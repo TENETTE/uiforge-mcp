@@ -12,17 +12,28 @@ from .icons import build_icon_element
 from .store import slugify
 
 
-def _contrast_ink(bg_color: str, theme_colors: dict | None = None) -> str:
-    """Choose crisp high-contrast ink (#060b14 or #f8fafc) over a fill colour."""
-    try:
-        r, g, b, _ = parse_color(bg_color, theme_colors or {})
-        # Relative sRGB luminance (WCAG)
-        def _lin(c: int) -> float:
-            s = c / 255.0
-            return s / 12.92 if s <= 0.03928 else ((s + 0.055) / 1.055) ** 2.4
+def _rel_lum(bg_color: str, theme_colors: dict | None = None) -> float:
+    r, g, b, _ = parse_color(bg_color, theme_colors or {})
 
-        lum = 0.2126 * _lin(r) + 0.7152 * _lin(g) + 0.0722 * _lin(b)
-        return "#060b14" if lum > 0.36 else "#f8fafc"
+    def _lin(c: int) -> float:
+        s = c / 255.0
+        return s / 12.92 if s <= 0.03928 else ((s + 0.055) / 1.055) ** 2.4
+
+    return 0.2126 * _lin(r) + 0.7152 * _lin(g) + 0.0722 * _lin(b)
+
+
+def _wcag_ratio(c1: str, c2: str, theme_colors: dict | None = None) -> float:
+    l1, l2 = _rel_lum(c1, theme_colors), _rel_lum(c2, theme_colors)
+    hi, lo = max(l1, l2), min(l1, l2)
+    return (hi + 0.05) / (lo + 0.05)
+
+
+def _contrast_ink(bg_color: str, theme_colors: dict | None = None) -> str:
+    """Choose crisp high-contrast ink (#060b14 or #f8fafc) maximizing WCAG contrast ratio."""
+    try:
+        r_dark = _wcag_ratio("#060b14", bg_color, theme_colors)
+        r_light = _wcag_ratio("#f8fafc", bg_color, theme_colors)
+        return "#060b14" if r_dark >= r_light else "#f8fafc"
     except Exception:
         return "#f8fafc"
 
@@ -83,34 +94,49 @@ def button_operations(
         eff_rad = round(float(radius))
 
     acc = accent or (
-        "#f43f5e" if var == "danger" else
+        "#be123c" if var == "danger" else
         "#f59e0b" if var == "gold" else
         tc.get("primary") or ("#22d3ee" if sp == "scifi" else "#3b82f6")
     )
-    acc_hi = _mix_hex(acc, "#ffffff", 0.22, tc)
-    acc_lo = _mix_hex(acc, "#060b14", 0.38, tc)
-
     if var in ("primary", "danger", "gold"):
+        # Pick ink maximizing WCAG contrast and ensure gradient stops stay >= 4.8:1
+        text_col = _contrast_ink(acc, tc)
+        if text_col == "#f8fafc" and _wcag_ratio("#f8fafc", acc, tc) < 4.8:
+            for step in (0.18, 0.32, 0.45):
+                cand = _mix_hex(acc, "#060b14", step, tc)
+                if _wcag_ratio("#f8fafc", cand, tc) >= 4.8:
+                    acc = cand
+                    break
+        elif text_col == "#060b14" and _wcag_ratio("#060b14", acc, tc) < 4.8:
+            for step in (0.16, 0.28, 0.42):
+                cand = _mix_hex(acc, "#ffffff", step, tc)
+                if _wcag_ratio("#060b14", cand, tc) >= 4.8:
+                    acc = cand
+                    break
+        acc_hi = _mix_hex(acc, "#ffffff", 0.14 if text_col == "#f8fafc" else 0.22, tc)
+        acc_lo = _mix_hex(acc, "#060b14", 0.36 if text_col == "#f8fafc" else 0.20, tc)
         body_fill: Any = {"type": "linear", "angle": 90, "stops": [[0, acc_hi], [0.55, acc], [1, acc_lo]]}
         stroke_col = f"{acc_hi}@0.85"
-        text_col = _contrast_ink(acc, tc)
-        hover_fill: Any = {"type": "linear", "angle": 90, "stops": [[0, _mix_hex(acc, "#ffffff", 0.34, tc)], [1, acc]]}
+        hover_fill: Any = {"type": "linear", "angle": 90, "stops": [[0, _mix_hex(acc, "#ffffff", 0.28, tc)], [1, acc]]}
         press_fill: Any = {"type": "linear", "angle": 90, "stops": [[0, acc_lo], [1, _mix_hex(acc, "#020617", 0.55, tc)]]}
         glow_col = f"{acc}@0.55"
-    elif var == "ghost":
-        body_fill = "#0f172a@0.35"
-        stroke_col = f"{acc}@0.55"
-        text_col = "#f8fafc"
-        hover_fill = f"{acc}@0.18"
-        press_fill = f"{acc}@0.28"
-        glow_col = f"{acc}@0.45"
-    else:  # secondary
-        body_fill = {"type": "linear", "angle": 180, "stops": [[0, "#17253d@0.95"], [1, "#0b1322@0.98"]]}
-        stroke_col = f"{acc}@0.62"
-        text_col = "#f8fafc"
-        hover_fill = {"type": "linear", "angle": 180, "stops": [[0, "#1e3252@0.98"], [1, "#101b30@0.98"]]}
-        press_fill = {"type": "linear", "angle": 180, "stops": [[0, "#0b1322"], [1, "#060b14"]]}
-        glow_col = f"{acc}@0.55"
+    else:
+        acc_hi = _mix_hex(acc, "#ffffff", 0.22, tc)
+        acc_lo = _mix_hex(acc, "#060b14", 0.38, tc)
+        if var == "ghost":
+            body_fill = "#0f172a@0.35"
+            stroke_col = f"{acc}@0.55"
+            text_col = "#f8fafc"
+            hover_fill = f"{acc}@0.18"
+            press_fill = f"{acc}@0.28"
+            glow_col = f"{acc}@0.45"
+        else:  # secondary
+            body_fill = {"type": "linear", "angle": 180, "stops": [[0, "#17253d@0.95"], [1, "#0b1322@0.98"]]}
+            stroke_col = f"{acc}@0.62"
+            text_col = "#f8fafc"
+            hover_fill = {"type": "linear", "angle": 180, "stops": [[0, "#1e3252@0.98"], [1, "#101b30@0.98"]]}
+            press_fill = {"type": "linear", "angle": 180, "stops": [[0, "#0b1322"], [1, "#060b14"]]}
+            glow_col = f"{acc}@0.55"
 
     body_style: dict[str, Any] = {
         "fill": body_fill,
@@ -135,12 +161,13 @@ def button_operations(
     kc_w = 0
     if keycap:
         kc_txt = str(keycap).upper()
-        kc_h = max(20, min(26, ih - 14))
-        kc_w = max(28, round(len(kc_txt) * 8.5 + 16))
+        kc_h = max(22, min(26, ih - 12))
+        kc_w = max(30, round(len(kc_txt) * 9.0 + 16))
         kc_x = ix + iw - kc_w - 12
         kc_y = round(iy + (ih - kc_h) * 0.5)
-        kc_bg = "#060b14@0.35" if text_col == "#060b14" else "#020617@0.65"
-        kc_bd = "#060b14@0.45" if text_col == "#060b14" else f"{acc}@0.55"
+        kc_bg = "#090d16@0.88"
+        kc_bd = "#060b14@0.65" if text_col == "#060b14" else f"{acc}@0.6"
+        kc_ink = "#f8fafc"
         specs.append({
             "type": "rect", "id": f"{base}_keycap", "group": grp, "layer": layer,
             "x": kc_x, "y": kc_y, "width": kc_w, "height": kc_h, "radius": 4,
@@ -149,8 +176,8 @@ def button_operations(
         specs.append({
             "type": "text", "id": f"{base}_keytxt", "group": grp, "layer": layer,
             "text": kc_txt, "x": round(kc_x + kc_w * 0.5), "y": round(kc_y + kc_h * 0.5),
-            "anchor": "center", "size": 11, "weight": 700, "font": "JetBrains Mono",
-            "color": text_col,
+            "anchor": "center", "size": 12, "weight": 700, "font": "JetBrains Mono",
+            "color": kc_ink,
         })
 
     # Icon + label placement
