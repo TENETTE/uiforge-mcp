@@ -94,8 +94,12 @@
         </section>
 
         <section class="panel" id="left-forge" role="tabpanel">
-          <div class="sec-head"><span>Primitives &amp; Native Widgets</span></div>
+          <div class="sec-head"><span>Primitives &amp; Composite Widgets</span></div>
           <div class="chip-grid" id="primitive-grid">
+            <button class="chip" data-create="button">AAA Button</button>
+            <button class="chip" data-create="progress_bar">Progress Bar</button>
+            <button class="chip" data-create="stack">Form Stack</button>
+            <button class="chip" data-create="ticks">360° Dial Ticks</button>
             <button class="chip" data-create="rect">Panel</button>
             <button class="chip" data-create="ellipse">Circle</button>
             <button class="chip" data-create="text">Text</button>
@@ -121,18 +125,24 @@
         </section>
 
         <section class="panel" id="left-materials" role="tabpanel">
-          <div class="sec-head"><span>Cook-Torrance GGX PBR (39)</span></div>
-          <input type="search" id="mat-search" class="inp" placeholder="Filter materials…" aria-label="Filter PBR materials" />
-          <p class="hint">Select an element, then click a material to apply real-time Cook-Torrance shading.</p>
+          <div class="sec-head">
+            <span>Cook-Torrance GGX PBR (39)</span>
+            <button class="mini-btn" id="btn-mat-textsafe" aria-pressed="false" title="Show only text-safe matte/satin materials with no specular glare hotspots">Text-Safe</button>
+          </div>
+          <input type="search" id="mat-search" class="inp" placeholder="Filter materials, finish, use…" aria-label="Filter PBR materials" />
+          <p class="hint">Green dot = text-safe behind HUD labels. Hover any swatch for finish &amp; best-for notes.</p>
           <div id="materials-gallery"></div>
         </section>
 
         <section class="panel" id="left-tools" role="tabpanel">
           <div class="sec-head">
             <span>Core Engine Operations</span>
-            <span class="badge" id="ops-count">0</span>
+            <div class="row-inline">
+              <button class="mini-btn" id="btn-cheatsheet" title="Open compact engine cheatsheet">Cheatsheet</button>
+              <span class="badge" id="ops-count">0</span>
+            </div>
           </div>
-          <input type="search" id="ops-search" class="inp" placeholder="Search all 97 operations…" aria-label="Search core operations" />
+          <input type="search" id="ops-search" class="inp" placeholder="Search all 100 operations…" aria-label="Search core operations" />
           <div id="ops-list" class="stack-list ops-scroll"></div>
           <div class="runner-box">
             <div class="sec-head"><span>Direct Runner</span><span class="mono" id="runner-op-name">batch</span></div>
@@ -289,8 +299,14 @@
               <label class="fld"><span>Height</span><input type="number" id="ins-h" class="inp mono" step="1" /></label>
             </div>
 
-            <div class="form-grid-2">
+            <div class="form-grid-3">
               <label class="fld"><span>Radius</span><input type="number" id="ins-rad" class="inp mono" step="1" min="0" /></label>
+              <label class="fld"><span>Corner</span>
+                <select id="ins-corner" class="sel full">
+                  <option value="round">Round</option>
+                  <option value="cut">Cut (Sci-Fi)</option>
+                </select>
+              </label>
               <label class="fld"><span>Rotation°</span><input type="number" id="ins-rot" class="inp mono" step="1" /></label>
             </div>
 
@@ -342,10 +358,14 @@
             </details>
 
             <div class="sub-box">
-              <div class="sec-head"><span>3D Diegetic Perspective &amp; Visor</span></div>
+              <div class="sec-head">
+                <span>3D Diegetic Perspective &amp; Visor</span>
+                <button class="mini-btn" id="btn-apply-layer-3d" type="button" title="Apply these 3D tilt/visor values to the active layer">To Layer</button>
+              </div>
               <label class="fld-row"><span>Tilt Y</span><input type="range" id="ins-ry" min="-45" max="45" step="1" value="0" /><span class="mono" id="ins-ry-v">0°</span></label>
               <label class="fld-row"><span>Tilt X</span><input type="range" id="ins-rx" min="-45" max="45" step="1" value="0" /><span class="mono" id="ins-rx-v">0°</span></label>
               <label class="fld-row"><span>Visor Curve</span><input type="range" id="ins-vc" min="-0.4" max="0.4" step="0.02" value="0" /><span class="mono" id="ins-vc-v">0</span></label>
+              <div class="persp-badge" id="ins-persp-hint">Flat (no 3D warp)</div>
             </div>
 
             <button class="btn btn-primary full" id="btn-ins-apply">Apply Changes</button>
@@ -600,6 +620,22 @@
           <span class="mono" id="diff-metrics"></span>
         </div>
         <img id="diff-img" class="diff-img" alt="Visual diff heatmap" hidden />
+      </div>
+    </div>
+  </div>
+
+  <!-- Cheatsheet Modal -->
+  <div class="modal-bg" id="modal-cheatsheet" hidden role="dialog" aria-modal="true" aria-labelledby="cs-title">
+    <div class="modal modal-lg">
+      <div class="modal-head">
+        <h3 id="cs-title">UIForge Engine Cheatsheet</h3>
+        <div class="row-inline">
+          <button class="mini-btn" id="btn-cs-copy" type="button">Copy</button>
+          <button class="icon-btn modal-close" data-close="modal-cheatsheet" aria-label="Close">&times;</button>
+        </div>
+      </div>
+      <div class="modal-body">
+        <pre id="cs-body" class="code-view" style="max-height:66vh;white-space:pre-wrap"></pre>
       </div>
     </div>
   </div>

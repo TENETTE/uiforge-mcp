@@ -221,7 +221,9 @@ input[type=range]{width:100%;accent-color:var(--acc)}
     } else {
       for (const ly of layers) {
         const chk = !hiddenLayers.has(ly.name);
-        lh += `<label class="row"><span>${ly.name}</span><input type="checkbox" data-layer="${ly.name}" ${chk?'checked':''}/></label>`;
+        const p = ly.perspective;
+        const pTag = p ? `<span class="lbl" style="color:${Math.abs(Number(p.visor_curve||0))>1e-5?'#f59e0b':'#4ade80'}">${Math.abs(Number(p.visor_curve||0))>1e-5?'3D Visor':'3D CSS'}</span>` : '';
+        lh += `<label class="row"><span>${ly.name} ${pTag}</span><input type="checkbox" data-layer="${ly.name}" ${chk?'checked':''}/></label>`;
       }
     }
     lPane.innerHTML = lh;
@@ -236,10 +238,12 @@ input[type=range]{width:100%;accent-color:var(--acc)}
 
     const dPane = panes.data;
     const entries = Object.entries(liveData);
+    const conflicts = state.conflicts || [];
+    const confHtml = conflicts.map(cf => `<div class="row" style="border-color:#f59e0b;color:#fde68a;font-size:11px">⚠ ${cf}</div>`).join('');
     if (!entries.length) {
-      dPane.innerHTML = '<div class="empty">No data bindings yet. Use set_binding(data={...}) to test live variables here.</div>';
+      dPane.innerHTML = confHtml + '<div class="empty">No data bindings yet. Use set_binding(data={...}) or add_progress_bar(bind_value=...) to test live variables here.</div>';
     } else {
-      dPane.innerHTML = entries.map(([k, v]) => {
+      dPane.innerHTML = confHtml + entries.map(([k, v]) => {
         if (typeof v === 'boolean') return `<label class="row"><span>${k}</span><input type="checkbox" data-dk="${k}" ${v?'checked':''}/></label>`;
         if (typeof v === 'number') {
           const mx = Math.max(100, Math.abs(v) * 2);
@@ -295,6 +299,8 @@ input[type=range]{width:100%;accent-color:var(--acc)}
       `<div class="row"><span class="lbl">Box</span><span class="val">${x}, ${y} · ${w}×${h}</span></div>` +
       (el.layer ? `<div class="row"><span class="lbl">Layer</span><span class="val">${el.layer}</span></div>` : '') +
       (el.group ? `<div class="row"><span class="lbl">Group</span><span class="val">${el.group}</span></div>` : '') +
+      (el.material ? `<div class="row"><span class="lbl">Material</span><span class="val">${typeof el.material==='string'?el.material:(el.material.name||'pbr')}</span></div>` : '') +
+      (el.bind ? `<div class="row"><span class="lbl">Bind</span><span class="val">${el.bind}</span></div>` : '') +
       (el.note ? `<div class="row"><span class="lbl">Note</span><span class="val">${el.note}</span></div>` : '');
     if (dims[0] && dims[1]) {
       hl.style.display = 'block';
@@ -405,16 +411,28 @@ def studio_snapshot(st, canvas_id: str | None = None, *, background: str = "chec
         st, cid, background=background, show_ids=show_ids, show_guides=show_guides,
         state=state, data=data, hide_layers=hide_layers, animation=animation, t=t, max_dim=960.0,
     )
+    bound_props = {
+        (b.get("target"), "opacity" if b.get("property") == "style.opacity" else b.get("property"))
+        for b in (base_c.get("bindings") or [])
+    }
+    conflicts: list[str] = []
+    for aname, anim in (base_c.get("animations") or {}).items():
+        for tr in anim.get("tracks") or []:
+            tp = "opacity" if tr.get("property") == "style.opacity" else tr.get("property")
+            if (tr.get("target"), tp) in bound_props:
+                conflicts.append(f"{tr.get('target')}.{tp} has both set_binding & anim '{aname}' (binding wins)")
     out: dict[str, Any] = {
         "canvases": canvases_list,
         "active": cid,
         "width": base_c["width"],
         "height": base_c["height"],
         "rev": st.rev,
-        "layers": [{"name": ly["name"], "visible": bool(ly.get("visible", True)), "blend": ly.get("blend", "normal")}
+        "layers": [{"name": ly["name"], "visible": bool(ly.get("visible", True)), "blend": ly.get("blend", "normal"),
+                    "perspective": (ly.get("style") or {}).get("perspective") if isinstance(ly.get("style"), dict) else None}
                    for ly in (base_c.get("layers") or [])],
         "states": sorted((base_c.get("states") or {}).keys()),
         "data": dict(base_c.get("data") or {}),
+        "conflicts": conflicts,
         "animations": [{"name": k, "duration": float(v.get("duration", 1.0)), "loop": bool(v.get("loop"))}
                        for k, v in sorted((base_c.get("animations") or {}).items())],
         "elements": el_rows,

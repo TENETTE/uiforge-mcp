@@ -291,6 +291,7 @@ html, body {
 .mat-group-title { font-size: 11px; font-weight: 600; color: var(--muted); margin: 10px 0 6px; }
 .mat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
 .mat-card {
+  position: relative;
   display: flex; flex-direction: column; align-items: center; gap: 4px;
   padding: 5px; background: var(--raised); border: 1px solid var(--line); border-radius: 7px;
   cursor: pointer; color: var(--ink);
@@ -298,6 +299,27 @@ html, body {
 }
 .mat-card img { width: 100%; aspect-ratio: 1; border-radius: 5px; object-fit: cover; display: block; background: var(--void); }
 .mat-card span { font-size: 10px; color: var(--muted); text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.mat-safe-dot {
+  position: absolute; top: 8px; right: 8px; width: 7px; height: 7px; border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.55); pointer-events: none;
+}
+.mat-safe-dot.safe { background: var(--green); }
+.mat-safe-dot.gloss { background: var(--amber); }
+.mini-btn.on { background: var(--green-tint); border-color: var(--green); color: var(--green-ink); font-weight: 600; }
+.form-grid-3 { display: grid; grid-template-columns: 1fr 1.15fr 1fr; gap: 6px; margin-bottom: 7px; }
+.persp-badge {
+  margin-top: 6px; padding: 4px 7px; border-radius: 5px; font: 500 10.5px/1.3 var(--mono);
+  background: var(--void); border: 1px solid var(--line); color: var(--muted);
+}
+.persp-badge.live3d { border-color: rgba(34, 197, 94, 0.45); color: var(--green-ink); background: var(--green-tint); }
+.persp-badge.visor { border-color: var(--amber-border); color: var(--amber); background: var(--amber-tint); }
+.layer-tag { font: 600 9.5px/1 var(--mono); padding: 2px 5px; border-radius: 4px; border: 1px solid var(--line); color: var(--muted); }
+.layer-tag.live3d { border-color: rgba(34, 197, 94, 0.45); color: var(--green-ink); }
+.layer-tag.visor { border-color: var(--amber-border); color: var(--amber); }
+.layer-del { background: transparent; border: 0; color: var(--dim); cursor: pointer; padding: 0 3px; font-size: 13px; line-height: 1; }
+.layer-del:hover { color: var(--red); }
+.audit-card.clickable { cursor: pointer; }
+.audit-card.clickable:hover { border-color: var(--amber); background: var(--hover); }
 
 /* Tools Runner */
 .ops-scroll { max-height: 220px; overflow-y: auto; }

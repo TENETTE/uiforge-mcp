@@ -124,7 +124,9 @@ function renderPanels() {
   if (!(meta.layers || []).length) lh += '<div class="row"><span>base</span><span class="lbl">visible</span></div>';
   else for (const ly of meta.layers) {
     const chk = !hiddenLayers.has(ly.name);
-    lh += `<label class="row"><span>${ly.name}</span><input type="checkbox" data-layer="${ly.name}" ${chk?'checked':''}/></label>`;
+    const p = ly.perspective;
+    const pTag = p ? `<span class="lbl" style="color:${Math.abs(Number(p.visor_curve||0))>1e-5?'#f59e0b':'#4ade80'}">${Math.abs(Number(p.visor_curve||0))>1e-5?'3D Visor':'3D CSS'}</span>` : '';
+    lh += `<label class="row"><span>${ly.name} ${pTag}</span><input type="checkbox" data-layer="${ly.name}" ${chk?'checked':''}/></label>`;
   }
   lp.innerHTML = lh;
   const stSel = lp.querySelector('#st-sel');
@@ -135,10 +137,11 @@ function renderPanels() {
 
   const dp = panes.data;
   const entries = Object.entries(meta.data || {});
+  const confHtml = (meta.conflicts || []).map(cf => `<div class="row" style="border-color:#f59e0b;color:#fde68a;font-size:11px">⚠ ${cf}</div>`).join('');
   if (!entries.length) {
-    dp.innerHTML = '<div class="empty">No set_binding(data={...}) variables on this canvas yet.</div>';
+    dp.innerHTML = confHtml + '<div class="empty">No set_binding(data={...}) variables on this canvas yet.</div>';
   } else {
-    dp.innerHTML = entries.map(([k, v]) => {
+    dp.innerHTML = confHtml + entries.map(([k, v]) => {
       const cur = (k in liveData) ? liveData[k] : v;
       if (typeof v === 'boolean') return `<label class="row"><span>${k}</span><input type="checkbox" data-dk="${k}" ${cur?'checked':''}/></label>`;
       if (typeof v === 'number') {
@@ -192,6 +195,8 @@ function inspectEl(el) {
     `<div class="row"><span class="lbl">BBox</span><span class="val">${x}, ${y} · ${w}×${h}</span></div>` +
     (el.layer ? `<div class="row"><span class="lbl">Layer</span><span class="val">${el.layer}</span></div>` : '') +
     (el.group ? `<div class="row"><span class="lbl">Group</span><span class="val">${el.group}</span></div>` : '') +
+    (el.material ? `<div class="row"><span class="lbl">Material</span><span class="val">${typeof el.material==='string'?el.material:(el.material.name||'pbr')}</span></div>` : '') +
+    (el.bind ? `<div class="row"><span class="lbl">Bind</span><span class="val">${el.bind}</span></div>` : '') +
     (el.note ? `<div class="row"><span class="lbl">Note</span><span class="val">${el.note}</span></div>` : '') +
     `<button id="cp-id" type="button">Copy ID</button>`;
   const cp = document.getElementById('cp-id');

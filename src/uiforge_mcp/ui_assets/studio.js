@@ -22,6 +22,7 @@
     drag: null,
     resize: null,
     elFilter: "",
+    matTextSafeOnly: false,
     activeModal: null,
     modalOpener: null,
     cmdkItems: [],
@@ -208,10 +209,15 @@
     if (prof.quality) qSel.value = prof.quality;
 
     const mSel = $("ins-mat");
+    const catByName = Object.fromEntries(((b.materials && b.materials.catalog) || []).map((x) => [x.name, x]));
     const allMats = [...b.materials.all, ...(b.materials.custom || [])];
     const curM = mSel.value;
     mSel.innerHTML = '<option value="">(None / Flat Fill)</option>' +
-      allMats.map((m) => `<option value="${m}">${m}</option>`).join("");
+      allMats.map((m) => {
+        const meta = catByName[m];
+        const tag = meta ? ` (${meta.finish}${meta.text_safe ? " · text-safe" : ""})` : "";
+        return `<option value="${m}">${m}${tag}</option>`;
+      }).join("");
     if (curM) mSel.value = curM;
 
     const ideSel = $("ide-client-sel");
@@ -296,13 +302,27 @@
     }
     box.innerHTML = layers.map((ly) => {
       const checked = !state.hiddenLayers.has(ly.name);
-      return `<label class="list-item"><span>${ly.name}</span><input type="checkbox" data-layer="${ly.name}" ${checked ? "checked" : ""} /></label>`;
+      const p = ly.perspective;
+      let pTag = "";
+      if (p) {
+        const isVisor = Math.abs(Number(p.visor_curve || 0)) > 1e-5;
+        pTag = `<span class="layer-tag ${isVisor ? "visor" : "live3d"}" title="${isVisor ? "Curved visor warp (PNG on Web)" : "Live CSS 3D perspective on Web"}">${isVisor ? "3D Visor" : "3D CSS"}</span>`;
+      }
+      return `<div class="list-item"><label class="row-inline" style="flex:1;cursor:pointer"><input type="checkbox" data-layer="${ly.name}" ${checked ? "checked" : ""} /><span>${ly.name}</span></label><div class="row-inline">${pTag}<button class="layer-del" type="button" data-del-layer="${ly.name}" title="Delete layer (keeps elements in base)" aria-label="Delete layer ${ly.name}">&times;</button></div></div>`;
     }).join("");
     box.querySelectorAll("input[data-layer]").forEach((cb) => {
       cb.onchange = () => {
         if (cb.checked) state.hiddenLayers.delete(cb.dataset.layer);
         else state.hiddenLayers.add(cb.dataset.layer);
         refreshStageImage();
+      };
+    });
+    box.querySelectorAll("[data-del-layer]").forEach((btn) => {
+      btn.onclick = async () => {
+        if (!state.canvasId) return;
+        await apiOp("delete_layer", { canvas: state.canvasId, layer: btn.dataset.delLayer, keep_elements: true });
+        toast(`Deleted layer '${btn.dataset.delLayer}' (elements moved to base)`, "ok");
+        await loadCanvas(state.canvasId);
       };
     });
   }
@@ -395,6 +415,7 @@
     $("ins-w").value = Math.round(raw.width ?? (raw.rx ? raw.rx * 2 : b[2]));
     $("ins-h").value = Math.round(raw.height ?? (raw.ry ? raw.ry * 2 : b[3]));
     $("ins-rad").value = typeof raw.radius === "number" ? raw.radius : 0;
+    if ($("ins-corner")) $("ins-corner").value = raw.corner === "cut" ? "cut" : "round";
     $("ins-rot").value = raw.rotation || 0;
     $("ins-text").value = raw.text ?? raw.label ?? "";
     const st = (typeof raw.style === "object" && raw.style) ? raw.style : {};
@@ -418,6 +439,23 @@
     $("ins-ry").value = persp.rotate_y || 0; $("ins-ry-v").textContent = `${persp.rotate_y || 0}°`;
     $("ins-rx").value = persp.rotate_x || 0; $("ins-rx-v").textContent = `${persp.rotate_x || 0}°`;
     $("ins-vc").value = persp.visor_curve || 0; $("ins-vc-v").textContent = String(persp.visor_curve || 0);
+    updatePerspHint();
+  }
+
+  function updatePerspHint() {
+    const el = $("ins-persp-hint");
+    if (!el) return;
+    const ry = Number($("ins-ry").value || 0), rx = Number($("ins-rx").value || 0), vc = Number($("ins-vc").value || 0);
+    el.classList.remove("live3d", "visor");
+    if (Math.abs(vc) > 1e-5) {
+      el.classList.add("visor");
+      el.textContent = "Curved Visor Warp · rasterized PNG on Web";
+    } else if (ry || rx) {
+      el.classList.add("live3d");
+      el.textContent = "Live CSS 3D · interactive bindings stay live on Web";
+    } else {
+      el.textContent = "Flat (no 3D perspective)";
+    }
   }
 
   function renderFramesGrid(presets) {
@@ -497,13 +535,27 @@
 
   function renderMaterialsGallery(groups, filter) {
     const q = (filter || "").trim().toLowerCase();
+    const catByName = Object.fromEntries(((state.boot && state.boot.materials && state.boot.materials.catalog) || []).map((x) => [x.name, x]));
     const host = $("materials-gallery");
     let html = "";
     for (const [gname, mats] of Object.entries(groups)) {
-      const kept = q ? mats.filter((m) => m.includes(q)) : mats;
+      const kept = mats.filter((m) => {
+        const meta = catByName[m];
+        if (state.matTextSafeOnly && meta && !meta.text_safe) return false;
+        if (!q) return true;
+        return m.includes(q) || (meta && (`${meta.category} ${meta.finish} ${meta.best_for}`).toLowerCase().includes(q));
+      });
       if (!kept.length) continue;
       html += `<div class="mat-group-title">${gname}</div><div class="mat-grid">` +
-        kept.map((m) => `<button class="mat-card" data-mat="${m}" title="Apply ${m} PBR material"><img src="/api/swatch/${encodeURIComponent(m)}" loading="lazy" alt="${m}"/><span>${m}</span></button>`).join("") +
+        kept.map((m) => {
+          const meta = catByName[m];
+          const safe = meta ? !!meta.text_safe : true;
+          const tip = meta
+            ? `${m} · ${meta.finish} (${meta.brightness}) · ${safe ? "text-safe" : "specular/accent"} — ${meta.best_for}`
+            : `Apply ${m} PBR material`;
+          const dot = meta ? `<i class="mat-safe-dot ${safe ? "safe" : "gloss"}" aria-hidden="true"></i>` : "";
+          return `<button class="mat-card" data-mat="${m}" title="${tip.replace(/"/g, "&quot;")}">${dot}<img src="/api/swatch/${encodeURIComponent(m)}" loading="lazy" alt="${m}"/><span>${m}</span></button>`;
+        }).join("") +
         "</div>";
     }
     host.innerHTML = html || '<div class="empty-note">No matching materials.</div>';
@@ -688,32 +740,31 @@
       return;
     }
 
-    // Default: Tactical Sci-Fi HUD
+    // Default: Tactical Sci-Fi HUD (showcasing add_frame + inner_box + add_progress_bar + add_button + add_stack!)
     await apiOp("set_theme", { style_preset: "scifi", quality: "advanced" });
     const cid = (await apiOp("create_canvas", { name: suffix("tactical_hud"), width: 960, height: 540, background: "#070b14" })).canvas;
-    await apiOp("set_binding", { canvas: cid, data: { shield: 84, volume: 72, autopilot: true, mode: "Tactical" } });
-    await apiOp("add_frame", { canvas: cid, x: 24, y: 20, width: 912, height: 500, preset: "scifi_hud", title: "ORBITAL TELEMETRY" });
+    await apiOp("set_binding", { canvas: cid, data: { shield: 84, max_shield: 100, volume: 72, autopilot: true, mode: "Tactical" } });
     await apiOp("batch", {
       canvas: cid,
       operations: [
-        { op: "add_icon", name: "shield", x: 64, y: 84, size: 34, color: "#22d3ee", id: "ico_shield" },
-        { op: "add_text", text: "SHIELD INTEGRITY", x: 112, y: 88, size: 13, weight: 700, color: "#7dd3fc", id: "lbl_sh" },
-        { op: "add_rect", x: 112, y: 110, width: 320, height: 14, radius: 7, fill: "#1e293b", id: "sh_bg" },
-        { op: "add_rect", x: 112, y: 110, width: 268, height: 14, radius: 7, style: { material: "energy_shield" }, id: "sh_fill" },
-        { op: "add_slider", x: 64, y: 180, width: 368, height: 28, min: 0, max: 100, value: 72, label: "Thruster Output", bind: "volume", id: "sl_thrust" },
-        { op: "add_toggle", x: 64, y: 244, width: 52, height: 28, checked: true, variant: "switch", label: "Auto-Stabilizer", bind: "autopilot", id: "tg_auto" },
-        { op: "add_dropdown", x: 64, y: 316, width: 260, height: 40, options: ["Stealth", "Tactical", "Overdrive"], selected: "Tactical", label: "Flight Profile", bind: "mode", id: "dd_mode" },
-        { op: "add_input", x: 64, y: 400, width: 368, height: 42, placeholder: "Enter waypoint...", value: "SECTOR-7G", label: "Navigation Target", id: "inp_nav" },
-        { op: "add_scroll", x: 500, y: 92, width: 396, height: 350, items: [
+        { op: "add_frame", x: 24, y: 20, width: 912, height: 500, preset: "scifi_hud", title: "ORBITAL TELEMETRY", id_prefix: "hud_frm" },
+        { op: "add_stack", in: "hud_frm.inner_box", x: 16, y: 12, width: 380, direction: "column", gap: 16, align: "stretch", children: [
+          { op: "add_progress_bar", label: "Shield Integrity", value: 84, max_value: 100, bind_value: "shield", bind_max: "max_shield", color: "#22d3ee", corner: "cut", id: "sh_bar" },
+          { op: "add_slider", min: 0, max: 100, value: 72, label: "Thruster Output", bind: "volume", id: "sl_thrust" },
+          { op: "add_toggle", checked: true, variant: "switch", label: "Auto-Stabilizer", bind: "autopilot", id: "tg_auto" },
+          { op: "add_dropdown", options: ["Stealth", "Tactical", "Overdrive"], selected: "Tactical", label: "Flight Profile", bind: "mode", id: "dd_mode" },
+          { op: "add_input", placeholder: "Enter waypoint...", value: "SECTOR-7G", label: "Navigation Target", id: "inp_nav" },
+        ] },
+        { op: "add_scroll", in: "hud_frm.inner_box", x: 432, y: 12, width: 420, height: 344, items: [
           { title: "Reactor Core", subtitle: "Cook-Torrance GGX · 98.4% Nominal", badge: "OK" },
           { title: "Ion Thrusters", subtitle: "Vector nozzles calibrated", badge: "72%" },
           { title: "Nav Beacon", subtitle: "Long-range telemetry locked", badge: "LOCK" },
           { title: "Hull Plating", subtitle: "Carbon twill composite", badge: "100%" },
           { title: "Cryo Coolant", subtitle: "Thermal loop steady", badge: "312K" },
         ], id: "sc_sys" },
+        { op: "add_button", in: "hud_frm.inner_box", x: 432, y: 374, width: 420, height: 48, label: "Deploy Telemetry", icon: "rocket", keycap: "TAB", variant: "primary", id: "btn_deploy" },
       ],
     });
-    await apiOp("set_binding", { canvas: cid, target: "sh_fill", property: "width", expr: "clamp(shield / 100, 0, 1) * 320" });
     await apiOp("canvas_version", { canvas: cid, action: "save", name: "v1", note: "Initial starter HUD" });
     toast("Loaded Tactical Sci-Fi HUD starter", "ok");
     await bootstrap(cid);
@@ -723,6 +774,11 @@
   function buildCmdkCatalog() {
     const items = [
       { label: "New Blank Canvas", cat: "Action", run: () => openModal("modal-new") },
+      { label: "Add AAA Button (icon + keycap + auto states)", cat: "Create", run: () => document.querySelector('[data-create="button"]').click() },
+      { label: "Add Progress Bar (auto binding + low threshold)", cat: "Create", run: () => document.querySelector('[data-create="progress_bar"]').click() },
+      { label: "Add Auto-Headroom Form Stack", cat: "Create", run: () => document.querySelector('[data-create="stack"]').click() },
+      { label: "Add 360° Dial Ticks", cat: "Create", run: () => document.querySelector('[data-create="ticks"]').click() },
+      { label: "Open Engine Cheatsheet", cat: "Help", run: () => openCheatsheet() },
       { label: "Export & Engine Delivery", cat: "Action", run: () => $("btn-export").click() },
       { label: "Run WCAG & Layout Audit", cat: "Action", run: () => runAudit() },
       { label: "Toggle Dark / Light Studio Theme", cat: "Action", run: () => $("btn-theme-toggle").click() },
@@ -914,7 +970,20 @@
       const kind = btn.dataset.create;
       const c = state.canvas;
       const cx = Math.round(c.width * 0.5), cy = Math.round(c.height * 0.5);
+      const boxKeys = Object.keys((c && c.boxes) || {});
+      const firstBox = boxKeys.length ? `${boxKeys[0]}.inner_box` : null;
       const defs = {
+        button: ["add_button", { canvas: state.canvasId, x: cx - 105, y: cy - 24, width: 210, height: 48, label: "Deploy Action", icon: "play", keycap: "E", variant: "primary" }],
+        progress_bar: ["add_progress_bar", { canvas: state.canvasId, x: cx - 140, y: cy - 8, width: 280, height: 16, value: 78, max_value: 100, label: "Energy Core", bind_value: "energy", bind_max: "max_energy" }],
+        stack: ["add_stack", Object.assign(
+          { canvas: state.canvasId, direction: "column", gap: 14, align: "stretch", width: 280, children: [
+            { op: "add_input", label: "Callsign", value: "VANGUARD-01" },
+            { op: "add_slider", label: "Power Output", min: 0, max: 100, value: 75 },
+            { op: "add_button", label: "Confirm", icon: "check", variant: "primary" },
+          ] },
+          firstBox ? { in_box: firstBox, x: 12, y: 12 } : { x: cx - 140, y: cy - 90 }
+        )],
+        ticks: ["add_ticks", { canvas: state.canvasId, cx, cy, radius: 92, start_angle: 0, end_angle: 360, count: 48, major_every: 6, color: "#94a3b8@0.55", major_color: "#e89b3c", labels: ["E", "SE", "S", "SW", "W", "NW", "N", "NE"] }],
         rect: ["add_rect", { canvas: state.canvasId, x: cx - 100, y: cy - 40, width: 200, height: 80, radius: 10, fill: "#1e293b", stroke: { color: "#e89b3c", width: 1.5 } }],
         ellipse: ["add_ellipse", { canvas: state.canvasId, cx, cy, rx: 46, ry: 46, style: { material: "gold" } }],
         text: ["add_text", { canvas: state.canvasId, text: "HEADING", x: cx, y: cy, anchor: "center", size: 28, weight: 700, color: "#f8fafc" }],
@@ -927,9 +996,10 @@
       };
       const [op, args] = defs[kind];
       const res = await apiOp(op, args);
-      toast(`Added ${kind}`, "ok");
+      toast(`Added ${kind.replace(/_/g, " ")}`, "ok");
       await loadCanvas(state.canvasId);
-      if (res && res.id) selectElement(res.id);
+      const focusId = res && (res.id || res.body_id || res.track_id);
+      if (focusId) selectElement(focusId);
     };
   });
 
@@ -961,10 +1031,41 @@
     await loadCanvas(state.canvasId);
   };
 
-  // Search filters & Tool runner
+  // Search filters, Material Text-Safe filter, Cheatsheet & Tool runner
   $("el-search").oninput = (e) => { state.elFilter = e.target.value; if (state.canvas) renderElementsList(state.canvas.elements || []); };
   $("icon-search").oninput = (e) => renderIconsGrid(state.boot.icons, e.target.value);
-  $("mat-search").oninput = (e) => renderMaterialsGallery(state.boot.materials.groups, e.target.value);
+  function currentMatGroups() {
+    if (!state.boot || !state.boot.materials) return {};
+    return (state.boot.materials.custom && state.boot.materials.custom.length)
+      ? Object.assign({ "Custom Workspace PBR": state.boot.materials.custom }, state.boot.materials.groups)
+      : state.boot.materials.groups;
+  }
+  $("mat-search").oninput = (e) => renderMaterialsGallery(currentMatGroups(), e.target.value);
+  if ($("btn-mat-textsafe")) {
+    $("btn-mat-textsafe").onclick = () => {
+      state.matTextSafeOnly = !state.matTextSafeOnly;
+      $("btn-mat-textsafe").classList.toggle("on", state.matTextSafeOnly);
+      $("btn-mat-textsafe").setAttribute("aria-pressed", String(state.matTextSafeOnly));
+      renderMaterialsGallery(currentMatGroups(), $("mat-search").value || "");
+    };
+  }
+  async function openCheatsheet(opener) {
+    const r = await fetch("/api/cheatsheet");
+    const d = await r.json();
+    $("cs-body").textContent = d.cheatsheet || "";
+    openModal("modal-cheatsheet", opener || $("btn-cheatsheet"));
+  }
+  if ($("btn-cheatsheet")) $("btn-cheatsheet").onclick = (e) => openCheatsheet(e.currentTarget);
+  if ($("btn-cs-copy")) {
+    $("btn-cs-copy").onclick = async () => {
+      try {
+        await navigator.clipboard.writeText($("cs-body").textContent || "");
+        confirmButton($("btn-cs-copy"), "Copied ✓");
+      } catch (_) {
+        toast("Clipboard unavailable", "err");
+      }
+    };
+  }
   $("ops-search").oninput = (e) => renderOpsList(state.boot.operations, e.target.value);
   $("btn-run-op").onclick = async () => {
     const op = $("runner-op-name").textContent.trim();
@@ -1309,9 +1410,32 @@
 
   // Inspector live controls, PBR Material Forge & apply
   $("ins-fill-pick").oninput = (e) => { $("ins-fill").value = e.target.value; };
-  $("ins-ry").oninput = (e) => { $("ins-ry-v").textContent = `${e.target.value}°`; };
-  $("ins-rx").oninput = (e) => { $("ins-rx-v").textContent = `${e.target.value}°`; };
-  $("ins-vc").oninput = (e) => { $("ins-vc-v").textContent = e.target.value; };
+  $("ins-ry").oninput = (e) => { $("ins-ry-v").textContent = `${e.target.value}°`; updatePerspHint(); };
+  $("ins-rx").oninput = (e) => { $("ins-rx-v").textContent = `${e.target.value}°`; updatePerspHint(); };
+  $("ins-vc").oninput = (e) => { $("ins-vc-v").textContent = e.target.value; updatePerspHint(); };
+  if ($("btn-apply-layer-3d")) {
+    $("btn-apply-layer-3d").onclick = async () => {
+      if (!state.canvasId) return;
+      const ry = Number($("ins-ry").value), rx = Number($("ins-rx").value), vc = Number($("ins-vc").value);
+      const raw = state.selectedId ? state.canvas.raw_elements[state.selectedId] : null;
+      let targetLayer = raw && raw.layer;
+      if (!targetLayer) {
+        const layers = (state.canvas && state.canvas.layers) || [];
+        if (layers.length) {
+          targetLayer = layers[layers.length - 1].name;
+        } else {
+          targetLayer = "hud_3d";
+          await apiOp("create_layer", { canvas: state.canvasId, name: targetLayer });
+          if (state.selectedId) await apiOp("set_layer", { canvas: state.canvasId, layer: targetLayer, ids: Array.from(state.selectedIds) });
+        }
+      }
+      const pStyle = (ry || rx || vc) ? { perspective: { rotate_y: ry, rotate_x: rx, visor_curve: vc } } : { perspective: null };
+      await apiOp("update_layer", { canvas: state.canvasId, layer: targetLayer, style: pStyle });
+      confirmButton($("btn-apply-layer-3d"), "Applied ✓");
+      toast(`Updated 3D perspective on layer '${targetLayer}'`, "ok");
+      await loadCanvas(state.canvasId);
+    };
+  }
   $("pbr-met").oninput = (e) => { $("pbr-met-v").textContent = Number(e.target.value).toFixed(2); };
   $("pbr-rgh").oninput = (e) => { $("pbr-rgh-v").textContent = Number(e.target.value).toFixed(2); };
   $("pbr-cc").oninput = (e) => { $("pbr-cc-v").textContent = Number(e.target.value).toFixed(2); };
@@ -1350,6 +1474,7 @@
     if (raw.type === "ellipse") { props.cx = nx; props.cy = ny; props.rx = nw / 2; props.ry = nh / 2; }
     else if ("x" in raw || raw.type !== "path") { props.x = nx; props.y = ny; if (nw > 0 && "width" in raw) props.width = nw; if (nh > 0 && "height" in raw) props.height = nh; }
     if ("radius" in raw || raw.type === "rect") props.radius = Number($("ins-rad").value) || 0;
+    if (raw.type === "rect" && $("ins-corner")) props.corner = $("ins-corner").value;
     props.rotation = Number($("ins-rot").value) || 0;
     if (raw.type === "text") props.text = $("ins-text").value;
     else if (["input", "slider", "toggle", "dropdown"].includes(raw.type) && $("ins-text").value) props.label = $("ins-text").value;
@@ -1445,8 +1570,21 @@
     if (res.wcag) {
       html += `<div class="audit-card ${res.wcag.aa_pass ? "pass" : "warn"}"><strong>WCAG Contrast:</strong> min ${res.wcag.min_ratio}:1 (${res.wcag.aa_pass ? "AA PASS" : "BELOW AA"}) · ${res.wcag.checked_texts} texts, ${res.wcag.checked_widgets} widgets</div>`;
     }
-    html += (res.issues || []).map((i) => `<div class="audit-card ${i.severity}"><strong>[${i.check}]</strong> ${i.message}</div>`).join("");
+    html += (res.issues || []).map((i) => {
+      const firstId = Array.isArray(i.ids) && i.ids.length ? i.ids[0] : "";
+      const clk = firstId ? ` clickable" data-audit-id="${firstId}" title="Click to select '${firstId}'` : "";
+      return `<div class="audit-card ${i.severity}${clk}"><strong>[${i.check}]</strong> ${i.message}</div>`;
+    }).join("");
     box.innerHTML = html || '<div class="audit-card pass">Zero issues found.</div>';
+    box.querySelectorAll("[data-audit-id]").forEach((card) => {
+      card.onclick = () => {
+        const eid = card.dataset.auditId;
+        if (state.canvas && state.canvas.raw_elements[eid]) {
+          selectElement(eid, false);
+          document.querySelector('.rtab[data-right="inspect"]').click();
+        }
+      };
+    });
   }
   $("btn-audit").onclick = $("btn-run-audit").onclick = runAudit;
   $("btn-save-ver").onclick = async () => {

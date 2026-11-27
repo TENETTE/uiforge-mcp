@@ -199,3 +199,67 @@ def test_godot_executable_gdscript_bindings_and_key_shortcuts(ws, tmp_path):
     assert "b_hp_fill.modulate = Color.html(str(" in gd
     assert "func _unhandled_input(event: InputEvent) -> void:" in gd
     assert 'if k == "tab":' in gd
+
+
+def test_human_combined_studio_ui_and_mcp_app_expose_all_v16_features(ws):
+    import json
+    import urllib.request
+    from uiforge_mcp.studio_app import STUDIO_APP_HTML, studio_snapshot
+    from uiforge_mcp.studio_ui import StudioServer
+
+    for mode in ("ui", "combined"):
+        srv = StudioServer(s.store, port=0, mode=mode)
+        info = srv.start()
+        try:
+            with urllib.request.urlopen(info["url"] + "/api/bootstrap", timeout=5) as r:
+                boot = json.loads(r.read().decode("utf-8"))
+            assert boot["mode"] == mode
+            assert len(boot["materials"]["catalog"]) == 39
+            op_names = {o["name"]: o["category"] for o in boot["operations"]}
+            assert op_names["add_button"] == "widgets"
+            assert op_names["add_progress_bar"] == "widgets"
+            assert op_names["add_stack"] == "widgets"
+
+            with urllib.request.urlopen(info["url"] + "/api/cheatsheet", timeout=5) as r:
+                cs = json.loads(r.read().decode("utf-8"))
+            assert "add_button" in cs["cheatsheet"] and "add_stack" in cs["cheatsheet"]
+
+            with urllib.request.urlopen(info["url"] + "/", timeout=5) as r:
+                html = r.read().decode("utf-8")
+            assert 'data-create="button"' in html and 'data-create="progress_bar"' in html
+            assert 'data-create="stack"' in html and 'data-create="ticks"' in html
+            assert 'id="btn-mat-textsafe"' in html and 'id="btn-cheatsheet"' in html
+            assert 'id="ins-corner"' in html and 'id="btn-apply-layer-3d"' in html
+
+            # Exercise /api/op in both Human Mode and Combined Mode
+            def post_op(op, args):
+                req = urllib.request.Request(
+                    info["url"] + "/api/op",
+                    data=json.dumps({"op": op, "args": args}).encode("utf-8"),
+                    headers={"Content-Type": "application/json"},
+                )
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    return json.loads(resp.read().decode("utf-8"))
+
+            cname = f"studio_{mode}"
+            assert post_op("create_canvas", {"name": cname, "width": 800, "height": 480, "background": "#070b14"})["ok"]
+            assert post_op("create_layer", {"canvas": cname, "name": "hud_3d", "style": {"perspective": {"rotate_y": 15, "visor_curve": 0}}})["ok"]
+            assert post_op("add_frame", {"canvas": cname, "x": 20, "y": 20, "width": 760, "height": 440, "preset": "scifi_hud", "id_prefix": "f1"})["ok"]
+            assert post_op("add_button", {"canvas": cname, "x": 50, "y": 80, "width": 220, "height": 48, "label": "Deploy", "icon": "rocket", "keycap": "E", "id": "b1"})["ok"]
+            assert post_op("add_progress_bar", {"canvas": cname, "x": 50, "y": 160, "width": 260, "height": 16, "label": "Shield", "bind_value": "sh", "bind_max": "max_sh", "id": "pb1"})["ok"]
+            assert post_op("create_animation", {"canvas": cname, "name": "intro", "duration": 0.4})["ok"]
+            assert post_op("set_keyframes", {"canvas": cname, "animation": "intro", "target": "pb1_fill", "property": "width", "keyframes": [[0, 0], [0.4, 200]]})["ok"]
+
+            with urllib.request.urlopen(info["url"] + f"/api/canvas/{cname}", timeout=5) as r:
+                cjson = json.loads(r.read().decode("utf-8"))
+            assert "f1" in cjson["boxes"]
+            assert cjson["layers"][0]["perspective"]["rotate_y"] == 15
+
+            # MCP App Studio + Live Preview v2 snapshot carries 3D layer perspective + binding/anim conflicts
+            snap = studio_snapshot(s.store(), cname, include_image=False)
+            assert snap["layers"][0]["perspective"]["rotate_y"] == 15
+            assert any("pb1_fill.width" in cf for cf in snap["conflicts"])
+            assert "3D CSS" in STUDIO_APP_HTML and "conflicts" in STUDIO_APP_HTML
+        finally:
+            srv.stop()
+

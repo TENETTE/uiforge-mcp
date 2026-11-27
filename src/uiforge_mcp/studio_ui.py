@@ -265,7 +265,8 @@ class StudioServer:
                                           for k, v in profiles.STYLE_PRESETS.items()},
                         "frame_presets": list(frames.FRAME_PRESETS),
                         "materials": {"all": list(materials.NAMES), "groups": _MATERIAL_GROUPS,
-                                      "custom": sorted((s.theme.get("materials") or {}).keys())},
+                                      "custom": sorted((s.theme.get("materials") or {}).keys()),
+                                      "catalog": materials.material_catalog()},
                         "icons": icon_catalog,
                         "operations": core.list_operations(),
                         "activity": core.activity_log.list(60),
@@ -288,8 +289,10 @@ class StudioServer:
                             "background": c.get("background"),
                             "profile": profiles.resolve_profile(s.theme, c),
                             "layers": [{"name": ly["name"], "visible": bool(ly.get("visible", True)),
-                                        "blend": ly.get("blend", "normal"), "clip": bool(ly.get("clip", False))}
+                                        "blend": ly.get("blend", "normal"), "clip": bool(ly.get("clip", False)),
+                                        "perspective": (ly.get("style") or {}).get("perspective") if isinstance(ly.get("style"), dict) else None}
                                        for ly in (c.get("layers") or [])],
+                            "boxes": dict(c.get("_boxes") or {}),
                             "states": sorted((c.get("states") or {}).keys()),
                             "data": dict(c.get("data") or {}),
                             "bindings": list(c.get("bindings") or []),
@@ -358,6 +361,11 @@ class StudioServer:
 
                 if path == "/api/activity":
                     self._send_json(200, {"activity": core.activity_log.list(80)})
+                    return
+
+                if path == "/api/cheatsheet":
+                    from .reference import CHEATSHEET
+                    self._send_json(200, {"cheatsheet": CHEATSHEET})
                     return
 
                 if path.startswith("/api/ide_config/"):
