@@ -247,3 +247,77 @@ def js_expr(expr: str) -> str:
         raise ValueError(f"cannot translate binding expr: {expr}")
 
     return emit(tree.body)
+
+
+def gdscript_expr(expr: str) -> str:
+    """Translate a validated binding expression to a safe Godot 4 GDScript expression."""
+    compile_expr(expr)
+    tree = ast.parse(str(expr).strip(), mode="eval")
+
+    def emit(n: ast.AST) -> str:
+        if isinstance(n, ast.Constant):
+            if isinstance(n.value, bool):
+                return "true" if n.value else "false"
+            if isinstance(n.value, str):
+                escaped = n.value.replace("\\", "\\\\").replace('"', '\\"')
+                return f'"{escaped}"'
+            return repr(float(n.value)) if isinstance(n.value, float) else str(n.value)
+        if isinstance(n, ast.Name):
+            return f'data.get("{n.id}", 0)'
+        if isinstance(n, ast.UnaryOp):
+            inner = emit(n.operand)
+            if isinstance(n.op, ast.USub):
+                return f"(-({inner}))"
+            if isinstance(n.op, ast.UAdd):
+                return f"(+({inner}))"
+            if isinstance(n.op, ast.Not):
+                return f"(not ({inner}))"
+        if isinstance(n, ast.BoolOp):
+            op = " and " if isinstance(n.op, ast.And) else " or "
+            return "(" + op.join(emit(v) for v in n.values) + ")"
+        if isinstance(n, ast.BinOp):
+            l, r = emit(n.left), emit(n.right)
+            if isinstance(n.op, ast.Pow):
+                return f"pow(float({l}), float({r}))"
+            if isinstance(n.op, ast.FloorDiv):
+                return f"floor(float({l}) / float({r}))"
+            if isinstance(n.op, ast.Div):
+                return f"(float({l}) / float({r}))"
+            ops = {ast.Add: "+", ast.Sub: "-", ast.Mult: "*", ast.Mod: "%"}
+            return f"(({l}) {ops[type(n.op)]} ({r}))"
+        if isinstance(n, ast.Compare):
+            ops = {ast.Lt: "<", ast.Gt: ">", ast.LtE: "<=", ast.GtE: ">=", ast.Eq: "==", ast.NotEq: "!="}
+            parts = []
+            left = emit(n.left)
+            for op, comp in zip(n.ops, n.comparators):
+                right = emit(comp)
+                parts.append(f"(({left}) {ops[type(op)]} ({right}))")
+                left = right
+            return "(" + " and ".join(parts) + ")"
+        if isinstance(n, ast.IfExp):
+            return f"(({emit(n.body)}) if ({emit(n.test)}) else ({emit(n.orelse)}))"
+        if isinstance(n, ast.Call):
+            fn = n.func.id
+            a = [emit(arg) for arg in n.args]
+            if fn in ("min", "max", "abs", "round", "floor", "ceil", "sqrt"):
+                return f"{fn}({', '.join(a)})"
+            if fn == "clamp":
+                lo = a[1] if len(a) > 1 else "0.0"
+                hi = a[2] if len(a) > 2 else "1.0"
+                return f"clampf(float({a[0]}), float({lo}), float({hi}))"
+            if fn in ("mix", "lerp"):
+                return f"lerpf(float({a[0]}), float({a[1]}), float({a[2]}))"
+            if fn == "where":
+                return f"(({a[1]}) if ({a[0]}) else ({a[2]}))"
+            if fn == "int":
+                return f"int({a[0]})"
+            if fn == "float":
+                return f"float({a[0]})"
+            if fn == "str":
+                return f"str({a[0]})"
+            if fn == "pct":
+                hi = a[1] if len(a) > 1 else "100.0"
+                return f'(str(int(round(100.0 * float({a[0]}) / max(1e-9, float({hi}))))) + "%")'
+        raise ValueError(f"cannot translate binding expr to GDScript: {expr}")
+
+    return emit(tree.body)

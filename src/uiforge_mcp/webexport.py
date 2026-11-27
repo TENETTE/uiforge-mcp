@@ -357,8 +357,31 @@ def _element(ctx: _Ctx, el: dict, svg_doc) -> tuple[str, dict, str] | None:
     if t in ("rect", "ellipse"):
         if set(st) - _CSS_KEYS:
             return None
-        if t == "rect" and (str(el.get("corner", "round")) == "cut" or el.get("smoothing")):
+        if t == "rect" and el.get("smoothing"):
             return _svg(ctx, el, st, svg_doc)
+        if t == "rect" and str(el.get("corner", "round")) == "cut":
+            if st.get("stroke") or st.get("inner_shadow") or st.get("inner_glow"):
+                return _svg(ctx, el, st, svg_doc)
+            box = r._geom_box(el, st)
+            w, h = box[2] - box[0], box[3] - box[1]
+            css = _style_css(ctx, el, st, w, h)
+            if css is None:
+                return None
+            css.update(_box_css(box[0], box[1], w, h))
+            rad = el.get("radius") or 0
+            rads = [float(v) for v in (rad if isinstance(rad, list) else [rad] * 4)]
+            r0, r1, r2, r3 = (rads + [0.0] * 4)[:4]
+            c_tl, c_tr = min(r0, w * 0.5, h * 0.5), min(r1, w * 0.5, h * 0.5)
+            c_br, c_bl = min(r2, w * 0.5, h * 0.5), min(r3, w * 0.5, h * 0.5)
+            pts = [
+                f"{_n(c_tl)}px 0", f"calc(100% - {_n(c_tr)}px) 0",
+                f"100% {_n(c_tr)}px", f"100% calc(100% - {_n(c_br)}px)",
+                f"calc(100% - {_n(c_br)}px) 100%", f"{_n(c_bl)}px 100%",
+                f"0 calc(100% - {_n(c_bl)}px)", f"0 {_n(c_tl)}px",
+            ]
+            css["clip-path"] = f"polygon({','.join(pts)})"
+            css.update(_transform(el, box, r._pivot(el, box)))
+            return "", css, "box"
         box = r._geom_box(el, st)
         w, h = box[2] - box[0], box[3] - box[1]
         css = _style_css(ctx, el, st, w, h)
@@ -776,6 +799,7 @@ def _keyframes(ctx: _Ctx, canvas: dict, name: str, anim: dict, ids: set[str],
     poses = [apply_animation(canvas, anim, duration * i / (steps - 1), colors)[0] for i in range(steps)]
     base = {e["id"]: e for e in canvas["elements"]}
     rules, decls = [], {}
+    body_to_kf: dict[str, str] = {}
     for eid in ids:
         frames = [next((e for e in p["elements"] if e["id"] == eid), None) for p in poses]
         if any(f is None for f in frames) or all(f == base[eid] for f in frames):
@@ -796,8 +820,12 @@ def _keyframes(ctx: _Ctx, canvas: dict, name: str, anim: dict, ids: set[str],
             op = float(resolve_style(f.get("style"), ctx.theme).get("opacity", 1))
             lines.append(f"{_n(100 * i / (steps - 1))}%{{transform:translate({_n(fx - bx)}px,{_n(fy - by)}px) "
                          f"rotate({_n(rot)}deg) scale({_n(sx)},{_n(sy)});opacity:{_n(op)}}}")
-        kf = f"a-{_ident(canvas['id'])}-{_ident(name)}-{_ident(eid)}"
-        rules.append(f"@keyframes {kf}{{{''.join(lines)}}}")
+        body_str = "".join(lines)
+        kf = body_to_kf.get(body_str)
+        if kf is None:
+            kf = f"a-{_ident(canvas['id'])}-{_ident(name)}-{_ident(eid)}"
+            body_to_kf[body_str] = kf
+            rules.append(f"@keyframes {kf}{{{body_str}}}")
         decls[eid] = f"{kf} {_n(duration)}s linear {'infinite' if anim.get('loop') else '1 both'}"
     return "\n".join(rules), decls
 
@@ -847,7 +875,14 @@ def build(store, canvases: list[dict], out: Path, layout: str, language: str | N
             props = r.layer_props(lay) if lay else None
             if props and not props["visible"]:
                 continue
-            if props and (props["style"] or props["clip"]):
+            css_3d_persp = None
+            if props and props["style"] and not props["clip"]:
+                l_st = props["style"] if isinstance(props["style"], dict) else {}
+                p_cfg = l_st.get("perspective")
+                if (isinstance(p_cfg, dict) and set(l_st) == {"perspective"}
+                        and abs(float(p_cfg.get("visor_curve", 0) or 0)) < 1e-6):
+                    css_3d_persp = p_cfg
+            if props and (props["style"] or props["clip"]) and css_3d_persp is None:
                 ids = {e["id"] for e in elements}
                 beneath.extend(ids)
                 dyn_hit = sorted((ids & dynamic_ids) | {e["id"] for e in elements if e.get("type") in ("input", "scroll", "slider", "toggle", "dropdown")})
@@ -865,14 +900,22 @@ def build(store, canvases: list[dict], out: Path, layout: str, language: str | N
                     body.append(f'<img class="el" alt="" src="assets/{name}" style="{_css_decl(_box_css(bbox[0] / s, bbox[1] / s, (bbox[2] - bbox[0]) / s, (bbox[3] - bbox[1]) / s))}">')
                     report["picture"].append(f"{c['id']}:layer:{props['name']}")
                 continue
-            layer_open = bool(props and (props["opacity"] < 1 or props["blend"] != "normal"))
+            layer_open = bool(props and (props["opacity"] < 1 or props["blend"] != "normal" or css_3d_persp is not None))
             if layer_open:
                 lstyle = {"position": "absolute", "inset": "0", "pointer-events": "none"}
                 if props["opacity"] < 1:
                     lstyle["opacity"] = _n(props["opacity"])
                 if props["blend"] != "normal" and props["blend"] in _BLENDS:
                     lstyle["mix-blend-mode"] = props["blend"]
-                body.append(f'<div class="layer" style="{_css_decl(lstyle)}">')
+                if css_3d_persp is not None:
+                    fov = max(200.0, float(css_3d_persp.get("distance", css_3d_persp.get("perspective", max(W, H) * 0.9))))
+                    ry = float(css_3d_persp.get("rotate_y", 0) or 0)
+                    rx = float(css_3d_persp.get("rotate_x", 0) or 0)
+                    lstyle["transform-origin"] = "center center"
+                    lstyle["transform"] = f"perspective({_n(fov)}px) rotateY({_n(ry)}deg) rotateX({_n(rx)}deg)"
+                    lstyle["transform-style"] = "preserve-3d"
+                lcls = "layer layer-3d" if css_3d_persp is not None else "layer"
+                body.append(f'<div class="{lcls}" style="{_css_decl(lstyle)}">')
             for el in elements:
                 beneath.append(el["id"])
                 grp = el.get("group")
@@ -922,7 +965,14 @@ def build(store, canvases: list[dict], out: Path, layout: str, language: str | N
                     brot = float(el.get("rotation", 0) or 0)
                     baked_rot[el["id"]] = brot
                     rot_attr = f' data-base-rot="{_n(brot)}"' if brot else ""
-                    body.append(f'<div class="el vec" id="{eid}" style="{decl}"{rot_attr}{extra_attrs}>{inner}</div>')
+                    arc_attr = ""
+                    if el.get("type") == "arc":
+                        arc_meta = json.dumps({
+                            "cx": float(el.get("cx", 0)), "cy": float(el.get("cy", 0)),
+                            "r": float(el.get("radius", 0)), "start": float(el.get("start_angle", 0)),
+                        })
+                        arc_attr = f' data-arc="{html.escape(arc_meta, quote=True)}"'
+                    body.append(f'<div class="el vec" id="{eid}" style="{decl}"{rot_attr}{arc_attr}{extra_attrs}>{inner}</div>')
                 elif kind == "input":
                     body.extend(_widget_chrome(ctx, el, eid, layout, W, H))
                     body.append(f'<input class="el input" id="{eid}" {inner} style="{decl}"{extra_attrs}>')
@@ -956,9 +1006,21 @@ def build(store, canvases: list[dict], out: Path, layout: str, language: str | N
                 if base_el is None or new_el is None:
                     continue
                 a, b = _element(ctx, base_el, svgexport._Doc()), _element(pctx, new_el, svgexport._Doc())
+                svg_extra_rules: list[tuple[str, str]] = []
                 if a is None or b is None or a[2] in ("svg", "img"):
                     diff = _state_fallback_diff(ctx, base_el, new_el, state)
-                    if not diff:
+                    if a is not None and a[2] == "svg":
+                        base_st = resolve_style(base_el.get("style"), ctx.theme)
+                        new_st = resolve_style(new_el.get("style"), ctx.theme)
+                        if isinstance(new_st.get("fill"), str) and new_st.get("fill") != base_st.get("fill"):
+                            svg_extra_rules.append((' path[fill]:not([fill="none"])', f"fill:{ctx.color(new_st['fill'])}!important"))
+                        ns = new_st.get("stroke")
+                        bs = base_st.get("stroke")
+                        if ns != bs and ns is not None:
+                            scol = ns.get("color") if isinstance(ns, dict) else (ns if isinstance(ns, str) else None)
+                            if isinstance(scol, str):
+                                svg_extra_rules.append((" path[stroke]", f"stroke:{ctx.color(scol)}!important"))
+                    if not diff and not svg_extra_rules:
                         report["notes"].add(f"{c['id']}: the {state} look of '{eid}' is not reproduced on the web")
                         continue
                 else:
@@ -968,16 +1030,26 @@ def build(store, canvases: list[dict], out: Path, layout: str, language: str | N
                 if pseudo:
                     sel = (f".g-{_ident(base_el['group'])}{pseudo} #{_ident(eid)}" if base_el.get("group")
                            else f"#{_ident(eid)}{pseudo}")
-                    page_css.append(f"{sel}{{{_css_decl(diff, True)};transition:all .15s ease}}")
+                    if diff:
+                        page_css.append(f"{sel}{{{_css_decl(diff, True)};transition:all .15s ease}}")
+                    for sub, decl_s in svg_extra_rules:
+                        page_css.append(f"{sel}{sub}{{{decl_s};transition:all .15s ease}}")
                 if state in used_states:
-                    page_css.append(f".page.s-{_ident(state)} #{_ident(eid)}{{{_css_decl(diff, True)};transition:all .15s ease}}")
+                    sel_s = f".page.s-{_ident(state)} #{_ident(eid)}"
+                    if diff:
+                        page_css.append(f"{sel_s}{{{_css_decl(diff, True)};transition:all .15s ease}}")
+                    for sub, decl_s in svg_extra_rules:
+                        page_css.append(f"{sel_s}{sub}{{{decl_s};transition:all .15s ease}}")
         for name, anim in (c.get("animations") or {}).items():
             rules, decls = _keyframes(ctx, c, name, anim, {e["id"] for e in c["elements"]}, baked_rot)
             if rules:
                 page_css.append(rules)
+                by_decl: dict[str, list[str]] = {}
                 for eid, decl in decls.items():
                     sel = f".page.p-{_ident(name)} #{_ident(eid)}" if name in played else f"#{_ident(eid)}"
-                    page_css.append(f"{sel}{{animation:{decl}}}")
+                    by_decl.setdefault(decl, []).append(sel)
+                for decl, sels in by_decl.items():
+                    page_css.append(f"{','.join(sels)}{{animation:{decl}}}")
         bg = c.get("background") if include_background else None
         bg_css = ""
         if bg and not _is_none(bg):
@@ -1098,6 +1170,7 @@ body.fit .page{transform-origin:center center}
 .vec svg{display:block;overflow:visible;pointer-events:none}
 .vec svg *{pointer-events:visiblePainted}
 .vec{pointer-events:none}
+.layer-3d>*{pointer-events:auto}
 .g{display:contents}
 .w-label,.w-val,.w-toggle-lbl{user-select:none}
 .toggle-switch{appearance:none;-webkit-appearance:none;border-radius:999px;background:var(--off-col,#334155);border:1px solid rgba(255,255,255,.15);transition:background .18s ease}
@@ -1128,6 +1201,15 @@ RUNTIME_JS = """function uiforgeApplyData(root, cfg, patch) {
       else if (b.prop === 'x') el.style.left = Number(v) + 'px';
       else if (b.prop === 'y') el.style.top = Number(v) + 'px';
       else if (b.prop === 'rotation') el.style.transform = 'rotate(' + (Number(v) - Number(el.dataset.baseRot || 0)) + 'deg)';
+      else if (b.prop === 'end_angle' && el.dataset.arc) {
+        var am = JSON.parse(el.dataset.arc), pth = el.querySelector('svg path');
+        if (pth) {
+          var a0 = am.start * Math.PI / 180, a1 = Number(v) * Math.PI / 180, span = Math.abs(Number(v) - am.start);
+          var x0 = am.cx + am.r * Math.cos(a0), y0 = am.cy + am.r * Math.sin(a0);
+          var x1 = am.cx + am.r * Math.cos(a1), y1 = am.cy + am.r * Math.sin(a1);
+          pth.setAttribute('d', 'M' + x0.toFixed(2) + ' ' + y0.toFixed(2) + ' A' + am.r + ' ' + am.r + ' 0 ' + (span > 180 ? 1 : 0) + ' ' + (Number(v) >= am.start ? 1 : 0) + ' ' + x1.toFixed(2) + ' ' + y1.toFixed(2));
+        }
+      }
       else if (b.prop === 'opacity') el.style.opacity = String(Math.max(0, Math.min(1, Number(v))));
       else if (b.prop === 'visible') el.style.display = v ? '' : 'none';
       else if (b.prop === 'text') el.textContent = String(v);

@@ -258,10 +258,15 @@ def transform_svg_path_24(d: str, x: float, y: float, size: float) -> str:
 def build_icon_element(name: str, x: float, y: float, size: float = 28.0, color: Any = "#f8fafc",
                        stroke_width: float = 2.0, filled: bool | None = None,
                        style: Any = None, **extra: Any) -> tuple[str, dict[str, Any]]:
-    """Build a native 'path' element dict ready for Store.add_element."""
+    """Build a native 'path' element dict ready for Store.add_element.
+
+    Keeps the SVG path in local [0..size] coordinates and stores absolute canvas x/y on the element
+    so subsequent update_element(id, {"x": ..., "y": ...}) moves it to the exact position without
+    double-offsetting.
+    """
     cname, d24, default_mode = resolve_icon(name)
     sz = max(4.0, float(size))
-    d_scaled = transform_svg_path_24(d24, float(x), float(y), sz)
+    d_scaled = transform_svg_path_24(d24, 0.0, 0.0, sz)
     use_fill = (default_mode == "fill") if filled is None else bool(filled)
 
     st: dict[str, Any]
@@ -281,6 +286,8 @@ def build_icon_element(name: str, x: float, y: float, size: float = 28.0, color:
 
     el: dict[str, Any] = {
         "d": d_scaled,
+        "x": float(x),
+        "y": float(y),
         "closed": False,
         "style": st,
         "note": f"icon:{cname}",

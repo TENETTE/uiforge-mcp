@@ -1359,9 +1359,11 @@ def vector_geometry(el: dict, res: float) -> Geometry:
         every = int(el.get("every", 1) or 1)
         skip_every = int(el.get("skip_every", 0) or 0)
         full = abs(end - start) >= 360 - 1e-6
-        step = (end - start) / (count if full else count - 1)
+        major_n = every if every > 1 else skip_every
+        eff_count = count - 1 if (full and major_n > 1 and count % major_n == 1 and count - 1 >= major_n) else count
+        step = (end - start) / (eff_count if full else count - 1)
         cap = str(el.get("cap", "butt")).lower()
-        for i in range(count):
+        for i in range(eff_count):
             if i % every or (skip_every and i % skip_every == 0):
                 continue
             a = math.radians(start + step * i)

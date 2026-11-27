@@ -362,6 +362,69 @@ _MATERIALS: dict[str, dict] = {
 
 NAMES = sorted(_MATERIALS)
 
+_MATERIAL_META: dict[str, dict[str, Any]] = {
+    "gold":             {"category": "metal",    "finish": "metallic",    "brightness": "bright", "text_safe": False, "best_for": "ornate bezels, coins, crests, luxury accents (use dark ink if placing text)"},
+    "silver":           {"category": "metal",    "finish": "metallic",    "brightness": "bright", "text_safe": False, "best_for": "clean metallic trim, hubs, sci-fi badges"},
+    "chrome":           {"category": "metal",    "finish": "glossy",      "brightness": "bright", "text_safe": False, "best_for": "mirror rims, gauge rings, specular accents"},
+    "bronze":           {"category": "metal",    "finish": "metallic",    "brightness": "mid",    "text_safe": False, "best_for": "RPG frames, antique clasps, warm trim"},
+    "copper":           {"category": "metal",    "finish": "metallic",    "brightness": "mid",    "text_safe": False, "best_for": "industrial pipes, warm rivets, accents"},
+    "steel":            {"category": "metal",    "finish": "metallic",    "brightness": "mid",    "text_safe": False, "best_for": "brushed armor plates, clasps, sci-fi chassis"},
+    "iron":             {"category": "metal",    "finish": "satin",       "brightness": "dark",   "text_safe": True,  "best_for": "dark forged borders, medieval panels, heavy buttons"},
+    "radial_metal":     {"category": "metal",    "finish": "metallic",    "brightness": "bright", "text_safe": False, "best_for": "dial hubs, rotary knobs, spun-metal medallions"},
+    "hammered_gold":    {"category": "metal",    "finish": "metallic",    "brightness": "bright", "text_safe": False, "best_for": "royal RPG moldings, crests, treasure frames"},
+    "rust":             {"category": "metal",    "finish": "matte",       "brightness": "dark",   "text_safe": True,  "best_for": "weathered post-apocalyptic plates and grime trim"},
+    "wood":             {"category": "organic",  "finish": "satin",       "brightness": "dark",   "text_safe": True,  "best_for": "RPG boards, scroll rollers, tavern panels"},
+    "stone":            {"category": "stone",    "finish": "matte",       "brightness": "mid",    "text_safe": True,  "best_for": "medieval panel beds, carved tablets, slate cards"},
+    "runic_stone":      {"category": "stone",    "finish": "emissive",    "brightness": "dark",   "text_safe": False, "best_for": "glowing fantasy runes, magic borders (animated via t)"},
+    "marble":           {"category": "stone",    "finish": "glossy",      "brightness": "bright", "text_safe": True,  "best_for": "classical light cards with dark text, prestige plaques"},
+    "obsidian":         {"category": "stone",    "finish": "glossy",      "brightness": "dark",   "text_safe": False, "best_for": "glossy dark bevels & swatches (high clearcoat glare; avoid behind small dial numbers or raise pbr.roughness)"},
+    "jade":             {"category": "gem",      "finish": "glossy",      "brightness": "mid",    "text_safe": False, "best_for": "ornamental stones, eastern RPG medallions, rare gems"},
+    "leather":          {"category": "organic",  "finish": "matte",       "brightness": "dark",   "text_safe": True,  "best_for": "stitched RPG inventory panels, journal covers"},
+    "paper":            {"category": "craft",    "finish": "matte",       "brightness": "bright", "text_safe": True,  "best_for": "clean notes, quest logs with dark ink"},
+    "aged_parchment":   {"category": "craft",    "finish": "matte",       "brightness": "bright", "text_safe": True,  "best_for": "fantasy scrolls, maps, codex pages with dark brown ink"},
+    "fabric":           {"category": "organic",  "finish": "matte",       "brightness": "dark",   "text_safe": True,  "best_for": "woven banners, royal panel beds behind light text"},
+    "carbon_twill":     {"category": "scifi",    "finish": "satin",       "brightness": "dark",   "text_safe": True,  "best_for": "racing/tactical HUD chassis, cockpit bezels"},
+    "lava":             {"category": "scifi",    "finish": "emissive",    "brightness": "mid",    "text_safe": False, "best_for": "volcanic hazard bars, boss accents (animated via t)"},
+    "ice":              {"category": "gem",      "finish": "glossy",      "brightness": "bright", "text_safe": False, "best_for": "cryo/frost abilities, crystal accents"},
+    "gem":              {"category": "gem",      "finish": "glossy",      "brightness": "mid",    "text_safe": False, "best_for": "faceted jewels, rarity pips, currency icons"},
+    "ruby":             {"category": "gem",      "finish": "glossy",      "brightness": "mid",    "text_safe": False, "best_for": "health/royal crest jewels, legendary pips"},
+    "emerald":          {"category": "gem",      "finish": "glossy",      "brightness": "mid",    "text_safe": False, "best_for": "stamina/nature jewels, uncommon rarity gems"},
+    "foil_holographic": {"category": "scifi",    "finish": "glossy",      "brightness": "bright", "text_safe": False, "best_for": "collectible card foils, mythic borders (animated via t)"},
+    "energy_shield":    {"category": "scifi",    "finish": "emissive",    "brightness": "mid",    "text_safe": False, "best_for": "hex forcefields, shield overlays (animated via t)"},
+    "plastic":          {"category": "stylized", "finish": "satin",       "brightness": "mid",    "text_safe": True,  "best_for": "clean toy/casual buttons and control caps"},
+    "candy_gloss":      {"category": "stylized", "finish": "glossy",      "brightness": "mid",    "text_safe": True,  "best_for": "casual/mobile CTA buttons with bold outlined text"},
+    "clay_3d":          {"category": "stylized", "finish": "matte",       "brightness": "mid",    "text_safe": True,  "best_for": "kids/friendly 3D clay badges and soft tiles"},
+    "enamel":           {"category": "craft",    "finish": "glossy",      "brightness": "mid",    "text_safe": True,  "best_for": "gold-rimmed heraldic badges, achievement pins"},
+    "wax_seal":         {"category": "craft",    "finish": "satin",       "brightness": "dark",   "text_safe": False, "best_for": "parchment stamps, royal seals, quest emblems"},
+    "rubber":           {"category": "scifi",    "finish": "matte",       "brightness": "dark",   "text_safe": True,  "best_for": "matte tactical surfaces, dial faces behind small text, grips"},
+    "jelly":            {"category": "stylized", "finish": "glossy",      "brightness": "mid",    "text_safe": True,  "best_for": "bouncy casual/arcade pills and orbs (animated via t)"},
+    "hologram":         {"category": "scifi",    "finish": "emissive",    "brightness": "mid",    "text_safe": False, "best_for": "scanline holographic projections (animated via t)"},
+    "glass":            {"category": "glass",    "finish": "translucent", "brightness": "dark",   "text_safe": True,  "best_for": "frosted HUD cards over dark scenes"},
+    "liquid_glass":     {"category": "glass",    "finish": "translucent", "brightness": "dark",   "text_safe": True,  "best_for": "refractive lens cards, modern floating modals"},
+    "neon":             {"category": "scifi",    "finish": "emissive",    "brightness": "bright", "text_safe": False, "best_for": "cyberpunk tubes, glowing outlines and dividers"},
+}
+
+
+def material_catalog() -> list[dict[str, Any]]:
+    """Return structured metadata for all 39 built-in materials so AI picks contrast-safe surfaces."""
+    out: list[dict[str, Any]] = []
+    for name in NAMES:
+        meta = _MATERIAL_META.get(name, {})
+        m = _MATERIALS[name]
+        pbr = m.get("pbr") or {}
+        out.append({
+            "name": name,
+            "default_color": m.get("color"),
+            "category": meta.get("category", "other"),
+            "finish": meta.get("finish", "satin"),
+            "brightness": meta.get("brightness", "mid"),
+            "text_safe": bool(meta.get("text_safe", False)),
+            "roughness": pbr.get("roughness"),
+            "metallic": pbr.get("metallic"),
+            "best_for": meta.get("best_for", ""),
+        })
+    return out
+
 
 def _own(name: str, spec: dict, custom: dict, theme: dict, depth: int) -> dict:
     """A theme material: any style keys, optionally built on another material ("material": "wood")."""

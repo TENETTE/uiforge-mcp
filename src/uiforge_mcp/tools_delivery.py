@@ -1317,8 +1317,49 @@ def _write_godot_controller(c: dict, nodes: list, folder: Path, name: str) -> Pa
                 "\t\tfor k in data: txt_" + _ident_node(n["id"]) + ' = txt_' + _ident_node(n["id"]) + '.replace("{" + str(k) + "}", str(data[k]))',
                 f"\t\tlbl_{_ident_node(n['id'])}.text = txt_{_ident_node(n['id'])}",
             ]
+    declared_b: set[str] = set()
     for b in binds:
-        lines.append(f"\t# binding: {b['target']}.{b['property']} = {b['expr']}")
+        tgt = _ident_node(b["target"])
+        prop = str(b.get("property", ""))
+        try:
+            from . import binding as _bnd
+            gexpr = _bnd.gdscript_expr(b["expr"])
+        except Exception:
+            lines.append(f"\t# binding: {b['target']}.{prop} = {b['expr']}")
+            continue
+        if tgt not in declared_b:
+            lines.append(f'\tvar b_{tgt} := get_node_or_null("{tgt}")')
+            declared_b.add(tgt)
+        if prop == "width":
+            lines.append(f"\tif b_{tgt} is Control: b_{tgt}.size.x = maxf(0.0, float({gexpr}))")
+        elif prop == "height":
+            lines.append(f"\tif b_{tgt} is Control: b_{tgt}.size.y = maxf(0.0, float({gexpr}))")
+        elif prop == "x":
+            lines.append(f"\tif b_{tgt} is Control: b_{tgt}.position.x = float({gexpr})")
+        elif prop == "y":
+            lines.append(f"\tif b_{tgt} is Control: b_{tgt}.position.y = float({gexpr})")
+        elif prop == "rotation":
+            lines.append(f"\tif b_{tgt} is Control: b_{tgt}.rotation_degrees = float({gexpr})")
+        elif prop in ("opacity", "style.opacity"):
+            lines.append(f"\tif b_{tgt} is CanvasItem: b_{tgt}.modulate.a = clampf(float({gexpr}), 0.0, 1.0)")
+        elif prop == "visible":
+            lines.append(f"\tif b_{tgt} is CanvasItem: b_{tgt}.visible = bool({gexpr})")
+        elif prop == "text":
+            lines.append(f'\tif b_{tgt} and b_{tgt}.has_method("set_text"): b_{tgt}.text = str({gexpr})')
+        elif prop in ("style.fill", "fill", "style.color", "color"):
+            lines.append(f"\tif b_{tgt} is CanvasItem: b_{tgt}.modulate = Color.html(str({gexpr}))")
+        else:
+            lines.append(f"\t# binding: {b['target']}.{prop} = {gexpr}")
+    key_rules = [r for r in ix if str(r.get("trigger", "")).startswith("key:")]
+    if key_rules:
+        lines += [
+            "", "func _unhandled_input(event: InputEvent) -> void:",
+            "\tif event is InputEventKey and event.pressed and not event.echo:",
+            "\t\tvar k := OS.get_keycode_string(event.keycode).to_lower()",
+        ]
+        for kr in key_rules:
+            kname = str(kr["trigger"]).split(":", 1)[1].strip().lower()
+            lines.append(f'\t\tif k == {json.dumps(kname)}: _run_rule({json.dumps(kr, ensure_ascii=False)})')
     lines += [
         "", "func _run_rule(rule: Dictionary) -> void:",
         '\tif rule.has("sfx"): sfx_requested.emit(str(rule["sfx"]))',

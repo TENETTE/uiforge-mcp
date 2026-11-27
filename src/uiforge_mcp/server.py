@@ -111,7 +111,8 @@ Style keys: material (39 Cook-Torrance PBR presets), pbr (metallic, roughness, c
 anisotropy, sss, studio, env_map, shine), fill, stroke, shadow, glow, inner_shadow, inner_glow, bevel,
 light, glass, blur, backdrop_blur, mask, adjust, opacity, blend, noise, texture.
 
-Full reference: call guide(topic) before using an unfamiliar feature.
+Full reference: read MCP resource uiforge://cheatsheet (single-call summary of all signatures & layout rules)
+or call guide(topic) before using an unfamiliar feature.
 Topics: fills, shader, style, design, layers, geometry, text, reuse, review, animation, export.
 """
 
@@ -125,39 +126,40 @@ TOOLSETS: dict[str, set[str] | None] = {
     "core": {
         "set_theme", "get_theme", "create_canvas", "list_canvases", "get_canvas", "update_canvas",
         "duplicate_canvas", "fit_canvas", "delete_canvas", "create_layer", "update_layer",
-        "delete_layer", "set_layer", "batch", "add_frame", "add_icon", "add_input", "add_scroll",
-        "add_slider", "add_toggle", "add_dropdown", "update_element", "delete_elements",
-        "move_elements", "reorder_element", "align_elements", "arrange_elements", "undo", "redo",
-        "canvas_version", "preview", "live_preview", "open_studio", "review_canvas", "export_png",
-        "export_svg", "guide", "make_palette", "import_screenshot", "list_fonts", "measure_text",
-        "set_pin", "set_state", "set_binding", "set_interaction", "find_elements", "restyle",
+        "delete_layer", "set_layer", "batch", "add_frame", "add_icon", "add_button", "add_progress_bar",
+        "add_stack", "add_input", "add_scroll", "add_slider", "add_toggle", "add_dropdown",
+        "update_element", "delete_elements", "move_elements", "reorder_element", "align_elements",
+        "arrange_elements", "undo", "redo", "canvas_version", "preview", "live_preview", "open_studio",
+        "review_canvas", "export_png", "export_svg", "guide", "make_palette", "import_screenshot",
+        "list_fonts", "measure_text", "set_pin", "set_state", "set_binding", "set_interaction",
+        "find_elements", "restyle",
     },
     "game": {
         "set_theme", "get_theme", "create_canvas", "list_canvases", "get_canvas", "update_canvas",
         "duplicate_canvas", "fit_canvas", "delete_canvas", "create_layer", "update_layer",
-        "delete_layer", "set_layer", "batch", "add_frame", "add_icon", "add_input", "add_scroll",
-        "add_slider", "add_toggle", "add_dropdown", "add_instance", "add_arc", "add_ticks",
-        "add_path", "add_svg", "add_image", "boolean_elements", "path_ops", "scatter",
-        "update_element", "delete_elements", "move_elements", "reorder_element", "align_elements",
-        "arrange_elements", "undo", "redo", "canvas_version", "create_animation", "set_keyframes",
-        "delete_keyframes", "get_animations", "delete_animation", "preview_animation",
-        "export_animation", "preview", "contact_sheet", "live_preview", "open_studio",
-        "review_canvas", "preview_resolutions", "preview_nine_slice", "export_png", "export_svg",
-        "export_layers", "export_psd", "export_asset", "export_atlas", "export_pbr_maps",
-        "export_screen", "export_bitmap_font", "export_theme", "write_engine_helpers",
-        "set_pin", "set_state", "delete_state", "set_strings", "get_strings", "set_binding",
-        "set_interaction", "guide", "make_palette", "make_variations", "restyle", "find_elements",
-        "import_screenshot", "list_fonts", "measure_text",
+        "delete_layer", "set_layer", "batch", "add_frame", "add_icon", "add_button", "add_progress_bar",
+        "add_stack", "add_input", "add_scroll", "add_slider", "add_toggle", "add_dropdown",
+        "add_instance", "add_arc", "add_ticks", "add_path", "add_svg", "add_image",
+        "boolean_elements", "path_ops", "scatter", "update_element", "delete_elements", "move_elements",
+        "reorder_element", "align_elements", "arrange_elements", "undo", "redo", "canvas_version",
+        "create_animation", "set_keyframes", "delete_keyframes", "get_animations", "delete_animation",
+        "preview_animation", "export_animation", "preview", "contact_sheet", "live_preview",
+        "open_studio", "review_canvas", "preview_resolutions", "preview_nine_slice", "export_png",
+        "export_svg", "export_layers", "export_psd", "export_asset", "export_atlas", "export_pbr_maps",
+        "export_screen", "export_bitmap_font", "export_theme", "write_engine_helpers", "set_pin",
+        "set_state", "delete_state", "set_strings", "get_strings", "set_binding", "set_interaction",
+        "guide", "make_palette", "make_variations", "restyle", "find_elements", "import_screenshot",
+        "list_fonts", "measure_text",
     },
     "desktop": {
         "set_theme", "get_theme", "create_canvas", "list_canvases", "get_canvas", "update_canvas",
         "duplicate_canvas", "fit_canvas", "delete_canvas", "create_layer", "update_layer",
-        "delete_layer", "set_layer", "batch", "add_frame", "add_icon", "add_input", "add_scroll",
-        "add_slider", "add_toggle", "add_dropdown", "add_instance", "add_svg", "add_image",
-        "update_element", "delete_elements", "move_elements", "reorder_element", "align_elements",
-        "arrange_elements", "undo", "redo", "canvas_version", "preview", "live_preview",
-        "open_studio", "review_canvas", "preview_resolutions", "export_png", "export_svg",
-        "export_layers", "export_psd", "export_screen", "export_spec", "export_theme",
+        "delete_layer", "set_layer", "batch", "add_frame", "add_icon", "add_button", "add_progress_bar",
+        "add_stack", "add_input", "add_scroll", "add_slider", "add_toggle", "add_dropdown",
+        "add_instance", "add_svg", "add_image", "update_element", "delete_elements", "move_elements",
+        "reorder_element", "align_elements", "arrange_elements", "undo", "redo", "canvas_version",
+        "preview", "live_preview", "open_studio", "review_canvas", "preview_resolutions", "export_png",
+        "export_svg", "export_layers", "export_psd", "export_screen", "export_spec", "export_theme",
         "set_pin", "set_state", "delete_state", "set_strings", "get_strings", "set_binding",
         "set_interaction", "guide", "make_palette", "make_variations", "restyle", "find_elements",
         "import_screenshot", "list_fonts", "measure_text",
@@ -165,15 +167,15 @@ TOOLSETS: dict[str, set[str] | None] = {
     "web": {
         "set_theme", "get_theme", "create_canvas", "list_canvases", "get_canvas", "update_canvas",
         "duplicate_canvas", "fit_canvas", "delete_canvas", "create_layer", "update_layer",
-        "delete_layer", "set_layer", "batch", "add_frame", "add_icon", "add_input", "add_scroll",
-        "add_slider", "add_toggle", "add_dropdown", "add_instance", "add_svg", "add_image",
-        "update_element", "delete_elements", "move_elements", "reorder_element", "align_elements",
-        "arrange_elements", "undo", "redo", "canvas_version", "create_animation", "set_keyframes",
-        "delete_keyframes", "get_animations", "delete_animation", "preview_animation",
-        "export_animation", "preview", "live_preview", "open_studio", "review_canvas",
-        "preview_resolutions", "export_png", "export_svg", "export_web", "export_react",
-        "export_pdf", "export_prototype", "export_spec", "export_theme", "set_link", "set_pin",
-        "set_state", "delete_state", "set_strings", "get_strings", "set_binding",
+        "delete_layer", "set_layer", "batch", "add_frame", "add_icon", "add_button", "add_progress_bar",
+        "add_stack", "add_input", "add_scroll", "add_slider", "add_toggle", "add_dropdown",
+        "add_instance", "add_svg", "add_image", "update_element", "delete_elements", "move_elements",
+        "reorder_element", "align_elements", "arrange_elements", "undo", "redo", "canvas_version",
+        "create_animation", "set_keyframes", "delete_keyframes", "get_animations", "delete_animation",
+        "preview_animation", "export_animation", "preview", "live_preview", "open_studio",
+        "review_canvas", "preview_resolutions", "export_png", "export_svg", "export_web",
+        "export_react", "export_pdf", "export_prototype", "export_spec", "export_theme", "set_link",
+        "set_pin", "set_state", "delete_state", "set_strings", "get_strings", "set_binding",
         "set_interaction", "guide", "make_palette", "make_variations", "restyle", "find_elements",
         "import_screenshot", "list_fonts", "measure_text",
     },
@@ -1055,13 +1057,14 @@ def _ticks(c: dict, args: dict) -> dict:
         import math
         every = major_every if major_every >= 1 else 1
         full = abs(end - start) >= 360 - 1e-6
-        positions = [i for i in range(count) if i % every == 0]
+        eff_count = count - 1 if (full and every > 1 and count % every == 1 and count - 1 >= every) else count
+        positions = [i for i in range(eff_count) if i % every == 0]
         if len(labels) != len(positions):
             raise ValueError(f"labels: got {len(labels)} but there are {len(positions)} "
                              f"{'major ' if major_every >= 1 else ''}ticks to label")
         size = float(a.get("label_size", 14))
         label_radius = float(a.get("label_radius", radius - (major_length if major_every >= 1 else length) - size * 0.95))
-        step = (end - start) / (count if full else count - 1)
+        step = (end - start) / (eff_count if full else count - 1)
         for n, (i, text) in enumerate(zip(positions, labels)):
             ang = math.radians(start + step * i)
             label = dict(text=str(text), x=round(cx + label_radius * math.cos(ang), 2),
@@ -1089,8 +1092,10 @@ def add_ticks(canvas: str, cx: float, cy: float, radius: float, start_angle: flo
               id: str | None = None, group: str | None = None, layer: str | None = None):
     """Add dial tick marks (speedometer, tachometer, compass, clock) in one call.
 
-    `count` ticks are spread evenly from start_angle to end_angle (both ends included), each drawn from
-    `radius` inwards by `length`. Angles: 0 = 3 o'clock, clockwise; gauges usually run 135 -> 405.
+    `count` ticks are spread evenly from start_angle to end_angle (both ends included on open arcs), each drawn
+    from `radius` inwards by `length`. Angles: 0 = 3 o'clock, clockwise; gauges usually run 135 -> 405.
+    For a full 360° closed ring (0 -> 360), pass the number of divisions directly (e.g. count=48, major_every=6
+    for 8 majors at 45°); if you pass divisions+1 (e.g. 49), the overlapping 360° end tick is collapsed automatically.
     major_every=N makes every Nth tick a major tick (longer / thicker / own color); 0 = all the same.
     labels: one string per major tick (or per tick when there are no majors), placed upright at
     label_radius (default: just inside the ticks). Example, a 0-8 x1000 rpm dial with 4 minor steps
@@ -1840,9 +1845,296 @@ def _add_frame_elements(st: Store, c: dict, args: dict) -> dict:
         warnings.extend(w)
     out: dict = {"preset": preset, "quality": q, "group": specs[0].get("group"),
                  "ids": ids, "inner_box": inner}
+    boxes = c.setdefault("_boxes", {})
+    for bk in (args.get("id_prefix"), out["group"], ids[0] if ids else None):
+        if bk:
+            boxes[str(bk)] = list(inner)
     if warnings:
         out["warnings"] = sorted(set(warnings))
     return out
+
+
+def _add_button_op(st: Store, c: dict, args: dict) -> dict:
+    import copy
+    from . import profiles
+    from .components import button_operations
+    prof = profiles.resolve_profile(st.theme, c)
+    q = profiles.normalize_quality(args.get("quality")) or prof["quality"]
+    sp = str(args.get("style_preset") or prof.get("style_preset") or "scifi")
+    built = button_operations(
+        args["x"], args["y"], args.get("width", 180), args.get("height", 44),
+        args.get("label", "Button"),
+        icon=args.get("icon"), keycap=args.get("keycap"),
+        variant=args.get("variant", "primary"), corner=args.get("corner"),
+        radius=args.get("radius"), accent=args.get("accent"),
+        font=args.get("font"), size=args.get("size"),
+        states=args.get("states", "auto"), style_preset=sp, quality=q,
+        theme_colors=st.theme.get("colors", {}),
+        id=args.get("id"), group=args.get("group"), layer=args.get("layer"),
+    )
+    ids: list[str] = []
+    warnings: list[str] = []
+    created_by_id: dict[str, dict] = {}
+    for raw in built["specs"]:
+        item = dict(raw)
+        etype = item.pop("type")
+        el, w = st.add_element(c, etype, _prepare(etype, item), checkpoint=False)
+        ids.append(el["id"])
+        created_by_id[el["id"]] = el
+        warnings.extend(w)
+    if built["states"]:
+        states_map = c.setdefault("states", {})
+        for st_name, tgt_id, props in built["states"]:
+            if tgt_id in created_by_id:
+                patch = _prepare_update(copy.deepcopy(created_by_id[tgt_id]), props)
+                states_map.setdefault(slugify(st_name, "state"), {}).setdefault(tgt_id, {}).update(patch)
+    body_id = built["body_id"]
+    grp = built["group"]
+    link = _maybe_json(args.get("link"))
+    if link:
+        if isinstance(link, dict):
+            target = str(link.get("target") or link.get("url") or "")
+            mode = str(link.get("mode", "navigate")).lower()
+        else:
+            target = str(link)
+            mode = "url" if re.match(r"^(https?://|mailto:|#)", target) else "navigate"
+        if target:
+            c.setdefault("links", {})[body_id] = {"target": target, "mode": mode}
+    sfx = args.get("sfx")
+    if sfx:
+        rule: dict[str, Any] = {"id": f"group:{grp}", "trigger": "click", "sfx": str(sfx)}
+        if link:
+            linfo = c.get("links", {}).get(body_id, {})
+            act = linfo.get("mode", "navigate")
+            if linfo.get("target") == "back":
+                act = "back"
+            rule["action"] = act
+            if act != "back":
+                rule["target"] = linfo.get("target")
+        else:
+            rule["action"] = "toggle_state"
+            rule["state"] = "pressed"
+        c.setdefault("interactions", []).append(rule)
+    out: dict[str, Any] = {"group": grp, "body_id": body_id, "ids": ids, "bbox": built["bbox"]}
+    if warnings:
+        out["warnings"] = sorted(set(warnings))
+    return out
+
+
+def _add_progress_bar_op(st: Store, c: dict, args: dict) -> dict:
+    from .components import progress_bar_operations
+    built = progress_bar_operations(
+        args["x"], args["y"], args.get("width", 240), args.get("height", 16),
+        value=args.get("value", 75.0), max_value=args.get("max_value", 100.0),
+        label=args.get("label"), show_value=args.get("show_value", True),
+        value_format=args.get("value_format"), color=args.get("color"),
+        track_color=args.get("track_color", "#0b1322@0.92"),
+        low_color=args.get("low_color", "#fb6b84"),
+        low_threshold=float(args.get("low_threshold", 0.3)),
+        bind_value=args.get("bind_value"), bind_max=args.get("bind_max"),
+        corner=args.get("corner", "round"), radius=args.get("radius"),
+        font=args.get("font", "Rajdhani"),
+        id=args.get("id"), group=args.get("group"), layer=args.get("layer"),
+        theme_colors=st.theme.get("colors", {}),
+    )
+    ids: list[str] = []
+    warnings: list[str] = []
+    for raw in built["specs"]:
+        item = dict(raw)
+        etype = item.pop("type")
+        el, w = st.add_element(c, etype, _prepare(etype, item), checkpoint=False)
+        ids.append(el["id"])
+        warnings.extend(w)
+    if built["data_defaults"]:
+        data_map = c.setdefault("data", {})
+        for k, v in built["data_defaults"].items():
+            data_map.setdefault(k, v)
+    if built["bindings"]:
+        binds = c.setdefault("bindings", [])
+        for b in built["bindings"]:
+            binds[:] = [x for x in binds if not (x.get("target") == b["target"] and x.get("property") == b["property"])]
+            binds.append(b)
+    out: dict[str, Any] = {
+        "group": built["group"], "track_id": built["track_id"], "fill_id": built["fill_id"],
+        "ids": ids, "bbox": built["bbox"],
+    }
+    if warnings:
+        out["warnings"] = sorted(set(warnings))
+    return out
+
+
+@tool
+def add_button(canvas: str, x: float, y: float, width: float = 180, height: float = 44, label: str = "Button",
+               icon: str | None = None, keycap: str | None = None, variant: str = "primary",
+               corner: str | None = None, radius: float | None = None, accent: str | None = None,
+               font: str | None = None, size: float | None = None, link: str | dict | None = None,
+               sfx: str | None = "ui_click", states: str | bool = "auto",
+               id: str | None = None, group: str | None = None, layer: str | None = None):
+    """Build a complete AAA interactive button in one call (body + optional icon + label + keycap + states).
+
+    variant: "primary" | "secondary" | "ghost" | "danger" | "gold".
+    icon: any built-in icon name from uiforge://icons (e.g. "play", "sliders", "arrow_left", "check").
+    keycap: optional right-aligned shortcut badge (e.g. "TAB", "ESC", "E").
+    states="auto" wires hover, pressed, focused and disabled overrides automatically.
+    link: optional target canvas id, "back", URL, or {"target": ..., "mode": "navigate"|"overlay"|"url"}.
+    """
+    st = store()
+    c = st.get(canvas)
+    st.checkpoint(c)
+    try:
+        res = _add_button_op(st, c, dict(
+            x=x, y=y, width=width, height=height, label=label, icon=icon, keycap=keycap, variant=variant,
+            corner=corner, radius=radius, accent=accent, font=font, size=size, link=link, sfx=sfx,
+            states=states, id=id, group=group, layer=layer,
+        ))
+    except Exception:
+        st.drop_checkpoint(c)
+        raise
+    st.save_canvas(c)
+    return {"canvas": c["id"], **res}
+
+
+@tool
+def add_progress_bar(canvas: str, x: float, y: float, width: float = 240, height: float = 16,
+                     value: float = 75.0, max_value: float = 100.0, label: str | None = None,
+                     show_value: bool = True, value_format: str | None = None, color: str | None = None,
+                     track_color: str = "#0b1322@0.92", low_color: str = "#fb6b84", low_threshold: float = 0.3,
+                     bind_value: str | None = None, bind_max: str | None = None, corner: str = "round",
+                     radius: float | None = None, font: str = "Rajdhani",
+                     id: str | None = None, group: str | None = None, layer: str | None = None):
+    """Build a complete game HUD progress/health/shield/XP bar in one call (track + clipped fill + label + bindings).
+
+    If bind_value (and optional bind_max) are set, automatically seeds canvas data defaults and wires live
+    set_binding expressions for both bar width AND low-threshold warning colour (low_color when ratio < low_threshold).
+    """
+    st = store()
+    c = st.get(canvas)
+    st.checkpoint(c)
+    try:
+        res = _add_progress_bar_op(st, c, dict(
+            x=x, y=y, width=width, height=height, value=value, max_value=max_value, label=label,
+            show_value=show_value, value_format=value_format, color=color, track_color=track_color,
+            low_color=low_color, low_threshold=low_threshold, bind_value=bind_value, bind_max=bind_max,
+            corner=corner, radius=radius, font=font, id=id, group=group, layer=layer,
+        ))
+    except Exception:
+        st.drop_checkpoint(c)
+        raise
+    st.save_canvas(c)
+    return {"canvas": c["id"], **res}
+
+
+def _add_stack_op(st: Store, c: dict, args: dict, frame_boxes: dict[str, list[float]]) -> dict:
+    from .components import estimate_stack_child
+    direction = str(args.get("direction", "column")).lower()
+    if direction not in ("column", "row"):
+        raise ValueError("add_stack direction must be 'column' or 'row'")
+    gap = float(args.get("gap", 12))
+    pad = float(args.get("padding", 0))
+    align = str(args.get("align", "start")).lower()
+    sx = float(args.get("x", 0)) + pad
+    sy = float(args.get("y", 0)) + pad
+    avail_w = (float(args["width"]) - pad * 2) if args.get("width") is not None else None
+    avail_h = (float(args["height"]) - pad * 2) if args.get("height") is not None else None
+    children = _maybe_json(args.get("children")) or []
+    if not isinstance(children, list) or not children:
+        raise ValueError("add_stack requires a non-empty 'children' list of op objects")
+    group = args.get("group")
+    layer = args.get("layer")
+
+    cur_x, cur_y = sx, sy
+    max_x, max_y = sx, sy
+    child_results: list[dict] = []
+    for raw_ch in children:
+        ch = dict(_maybe_json(raw_ch))
+        cop = ch.pop("op", None)
+        if not cop:
+            raise ValueError("every add_stack child must specify 'op'")
+        if group and "group" not in ch:
+            ch["group"] = group
+        if layer and "layer" not in ch:
+            ch["layer"] = layer
+        cw, ch_h, top_pad = estimate_stack_child({"op": cop, **ch}, avail_w if direction == "column" else None)
+        if cop in ("add_input", "add_dropdown", "add_slider", "add_toggle", "add_scroll", "add_button", "add_progress_bar"):
+            ch.setdefault("width", round(cw, 2))
+            ch.setdefault("height", round(ch_h, 2))
+        if direction == "column":
+            if (align == "stretch" or str(ch.get("width", "")).lower() in ("fill", "100%")) and avail_w is not None:
+                if cop != "add_toggle":
+                    cw = avail_w
+                    ch["width"] = round(avail_w, 2)
+            cx_pos = cur_x
+            if avail_w is not None:
+                if align == "center":
+                    cx_pos = cur_x + max(0.0, (avail_w - cw) * 0.5)
+                elif align == "end":
+                    cx_pos = cur_x + max(0.0, avail_w - cw)
+            cy_pos = cur_y + top_pad
+            if cop == "add_text" and align == "center" and avail_w is not None and "anchor" not in ch:
+                ch["x"] = round(cur_x + avail_w * 0.5, 2)
+                ch["anchor"] = "center"
+            else:
+                ch.setdefault("x", round(cx_pos, 2))
+            ch.setdefault("y", round(cy_pos, 2))
+            res = _exec_batch_op(st, c, cop, ch, frame_boxes)
+            child_results.append(res)
+            cur_y = cy_pos + ch_h + gap
+            max_x = max(max_x, cx_pos + cw)
+            max_y = max(max_y, cy_pos + ch_h)
+        else:
+            if (align == "stretch" or str(ch.get("height", "")).lower() in ("fill", "100%")) and avail_h is not None:
+                ch_h = avail_h
+                ch["height"] = round(avail_h, 2)
+            cy_pos = cur_y + top_pad
+            if avail_h is not None:
+                if align == "center":
+                    cy_pos = cur_y + max(0.0, (avail_h - ch_h) * 0.5)
+                elif align == "end":
+                    cy_pos = cur_y + max(0.0, avail_h - ch_h)
+            ch.setdefault("x", round(cur_x, 2))
+            ch.setdefault("y", round(cy_pos, 2))
+            res = _exec_batch_op(st, c, cop, ch, frame_boxes)
+            child_results.append(res)
+            cur_x += cw + gap
+            max_x = max(max_x, cur_x - gap)
+            max_y = max(max_y, cy_pos + ch_h)
+    return {
+        "direction": direction,
+        "count": len(child_results),
+        "results": child_results,
+        "bbox": [round(float(args.get("x", 0)), 2), round(float(args.get("y", 0)), 2),
+                 round(max_x - float(args.get("x", 0)) + pad, 2), round(max_y - float(args.get("y", 0)) + pad, 2)],
+    }
+
+
+@tool
+def add_stack(canvas: str, x: float = 0, y: float = 0, direction: str = "column", gap: float = 12,
+              padding: float = 0, width: float | None = None, height: float | None = None,
+              align: str = "start", children: list[dict] | None = None, in_box: str | None = None,
+              group: str | None = None, layer: str | None = None):
+    """Flow a list of child UI ops sequentially in a column or row with automatic spacing and label headroom.
+
+    Automatically adds top clearance for labelled widgets (add_input, add_dropdown, add_slider, add_progress_bar)
+    so stacked form fields never collide. Pass in_box="<frame_prefix>.inner_box" (or inside batch use "in")
+    to flow directly inside an add_frame safe area with zero manual x/y coordinate math!
+    """
+    st = store()
+    c = st.get(canvas)
+    st.checkpoint(c)
+    try:
+        args = dict(x=x, y=y, direction=direction, gap=gap, padding=padding, width=width, height=height,
+                    align=align, children=children, group=group, layer=layer)
+        if in_box:
+            from .components import apply_in_box, resolve_in_box
+            box = resolve_in_box(c, in_box, {})
+            args.setdefault("width", "fill")
+            apply_in_box("add_stack", args, box)
+        res = _add_stack_op(st, c, args, {})
+    except Exception:
+        st.drop_checkpoint(c)
+        raise
+    st.save_canvas(c)
+    return {"canvas": c["id"], **res}
 
 
 @tool
@@ -1880,17 +2172,146 @@ def add_frame(canvas: str, x: float, y: float, width: float, height: float, pres
     return {"canvas": c["id"], **res}
 
 
+def _exec_batch_op(st: Store, c: dict, op: str, op_args: dict, frame_boxes: dict[str, list[float]]) -> dict:
+    """Execute one operation inside batch() or add_stack() (caller owns undo checkpoint)."""
+    in_ref = op_args.pop("in", None) or op_args.pop("in_box", None)
+    if in_ref:
+        from .components import apply_in_box, resolve_in_box
+        box = resolve_in_box(c, str(in_ref), frame_boxes)
+        if op == "add_stack" and op_args.get("width") is None:
+            op_args["width"] = "fill"
+        apply_in_box(op, op_args, box)
+    if op in _BATCH_ADD:
+        etype = _BATCH_ADD[op]
+        if etype == "image" and op_args.get("path"):
+            op_args["path"] = str(Path(op_args["path"]).expanduser())
+        el, warnings = st.add_element(c, etype, _prepare(etype, op_args), checkpoint=False)
+        return _summary(st, c, el, warnings)
+    if op == "add_ticks":
+        return _ticks(c, op_args)
+    if op == "add_frame":
+        res = _add_frame_elements(st, c, op_args)
+        for bk in (op_args.get("id_prefix"), res.get("group"), res["ids"][0] if res.get("ids") else None):
+            if bk:
+                frame_boxes[str(bk)] = list(res["inner_box"])
+        return res
+    if op == "add_icon":
+        return _add_icon_op(st, c, op_args, checkpoint=False)
+    if op == "add_button":
+        return _add_button_op(st, c, op_args)
+    if op == "add_progress_bar":
+        return _add_progress_bar_op(st, c, op_args)
+    if op == "add_stack":
+        return _add_stack_op(st, c, op_args, frame_boxes)
+    if op == "create_layer":
+        layer = st.create_layer(c, op_args["name"], _layer_settings(
+            op_args.get("opacity"), op_args.get("blend"), op_args.get("clip"), op_args.get("visible"),
+            op_args.get("style")), op_args.get("position"), checkpoint=False)
+        return {"layer": layer["name"], "active": True}
+    if op == "update_layer":
+        target = st.get_layer(c, op_args["layer"])
+        changes = _layer_settings(op_args.get("opacity"), op_args.get("blend"), op_args.get("clip"),
+                                  op_args.get("visible"), op_args.get("style"))
+        if op_args.get("name"):
+            changes["name"] = op_args["name"]
+        updated = st.update_layer(c, target, changes, op_args.get("position"), op_args.get("activate"),
+                                  checkpoint=False)
+        return {"layer": updated["name"]}
+    if op == "delete_layer":
+        target = st.get_layer(c, op_args["layer"])
+        if "keep_elements" in op_args:
+            keep_el = bool(op_args["keep_elements"])
+        elif "delete_elements" in op_args:
+            keep_el = not bool(op_args["delete_elements"])
+        else:
+            keep_el = False
+        affected = st.delete_layer(c, target, keep_el, checkpoint=False)
+        return {"deleted_layer": target["name"], "elements_kept" if keep_el else "elements_deleted": affected}
+    if op == "set_layer":
+        targets = st.select(c, op_args.get("ids"), op_args.get("group"))
+        name = None if str(op_args["layer"]).strip().lower() == "base" else st.get_layer(c, op_args["layer"])["name"]
+        for el in targets:
+            if name:
+                el["layer"] = name
+            else:
+                el.pop("layer", None)
+        return {"layer": name or "base", "moved": [e["id"] for e in targets]}
+    if op == "create_animation":
+        key, anim, _ = st.create_animation(c, op_args["name"], op_args["duration"],
+                                           op_args.get("loop", False), op_args.get("fps", 30))
+        st._undo[c["id"]].pop()
+        return {"animation": key, "duration": anim["duration"], "loop": anim["loop"]}
+    if op == "set_keyframes":
+        return _set_keyframes(c, op_args, checkpoint=False)
+    if op == "update_element":
+        el = st.find(c, op_args["id"])
+        warnings = st.update_element(c, el, _prepare_update(el, op_args.get("props", {})), checkpoint=False)
+        return _summary(st, c, el, warnings)
+    if op == "delete_elements":
+        targets = st.select(c, op_args.get("ids"), op_args.get("group"))
+        return {"deleted": st.delete_elements(c, targets, checkpoint=False)}
+    if op == "move_elements":
+        targets = st.select(c, op_args.get("ids"), op_args.get("group"))
+        st.move_elements(c, targets, op_args.get("dx", 0), op_args.get("dy", 0), checkpoint=False)
+        return {"moved": [e["id"] for e in targets]}
+    if op == "reorder_element":
+        st.reorder(c, st.find(c, op_args["id"]), op_args["position"], checkpoint=False)
+        return {"reordered": op_args["id"]}
+    if op == "duplicate_element":
+        src = st.find(c, op_args["id"])
+        patch = _prepare_update(dict(src), op_args["props"]) if op_args.get("props") else None
+        made = st.duplicate_element(c, src, float(op_args.get("dx", 0)), float(op_args.get("dy", 0)),
+                                    op_args.get("new_id"), patch, count=op_args.get("count", 1),
+                                    rotate=op_args.get("rotate", 0), pivot=op_args.get("pivot"),
+                                    checkpoint=False)
+        if len(made) == 1:
+            return _summary(st, c, made[0][0], made[0][1])
+        return {"ids": [e["id"] for e, _ in made]}
+    if op == "add_instance":
+        st.get(op_args["source"])
+        op_args["source"] = slugify(op_args["source"])
+        el, warnings = st.add_element(c, "instance", _prepare("instance", op_args), checkpoint=False)
+        return _summary(st, c, el, warnings)
+    if op == "boolean_elements":
+        el, warnings = _boolean(c, op_args["ids"], op_args.get("operation", "union"),
+                                op_args.get("id"), op_args.get("style"), op_args.get("keep_originals", False))
+        return _summary(st, c, el, warnings)
+    if op == "add_svg":
+        return _svg_elements(c, op_args["svg"], op_args.get("x", 0), op_args.get("y", 0),
+                             op_args.get("width"), op_args.get("height"),
+                             op_args.get("color", "#ffffff"), op_args.get("group"),
+                             op_args.get("id_prefix"), op_args.get("layer"),
+                             op_args.get("detail", 1))
+    if op == "align_elements":
+        return align_elements(c["id"], **op_args)
+    if op == "arrange_elements":
+        return arrange_elements(c["id"], **op_args)
+    if op == "set_pin":
+        return set_pin(c["id"], **op_args)
+    if op == "set_state":
+        return set_state(c["id"], **op_args)
+    if op == "set_binding":
+        return set_binding(c["id"], **op_args)
+    if op == "set_interaction":
+        return set_interaction(c["id"], **op_args)
+    if op == "set_link":
+        return set_link(c["id"], **op_args)
+    raise ValueError(f"unknown op '{op}'")
+
+
 @tool
 def batch(canvas: str, operations: list[dict]):
     """Run many drawing, layout, state, binding and interaction operations in one atomic call.
 
     Each operation is {"op": "<tool name>", ...the same arguments that tool takes, without canvas}.
     Supported ops: add_rect, add_ellipse, add_line, add_polygon, add_path, add_arc, add_ticks, add_text,
-    add_image, add_instance, add_svg, add_frame, add_icon, add_input, add_scroll, add_slider, add_toggle,
-    add_dropdown, create_layer, update_layer, delete_layer, set_layer,
-    create_animation, set_keyframes, update_element, delete_elements, move_elements, reorder_element,
-    duplicate_element, boolean_elements (use "operation" key), align_elements, arrange_elements, set_pin,
-    set_state, set_binding, set_interaction, set_link.
+    add_image, add_instance, add_svg, add_frame, add_icon, add_button, add_progress_bar, add_stack,
+    add_input, add_scroll, add_slider, add_toggle, add_dropdown, create_layer, update_layer, delete_layer,
+    set_layer, create_animation, set_keyframes, update_element, delete_elements, move_elements,
+    reorder_element, duplicate_element, boolean_elements (use "operation" key), align_elements,
+    arrange_elements, set_pin, set_state, set_binding, set_interaction, set_link.
+    Container-relative placement: any add_* op accepts "in": "<frame_prefix>.inner_box" (or "<element_id>")
+    with relative x/y, "width": "fill" / "100%" / "50%", and "x": "center" — build frames & populate them in ONE batch!
     Add ops accept any extra element property directly (flip_x, scale, skew, fill_rule, visible...).
     Give elements explicit "id"s so later ops (clip, pin, state, binding, interaction) can refer to them.
     Atomic: if any op fails nothing is changed, and the error names the failing op index.
@@ -1902,121 +2323,14 @@ def batch(canvas: str, operations: list[dict]):
         raise ValueError("operations must be a non-empty list")
     st.checkpoint(c)
     results = []
+    frame_boxes: dict[str, list[float]] = {k: list(v) for k, v in (c.get("_boxes") or {}).items()}
     try:
         for index, raw in enumerate(operations):
             op_args = dict(_maybe_json(raw))
             op = op_args.pop("op", None)
             op_args.pop("canvas", None)
             try:
-                if op in _BATCH_ADD:
-                    etype = _BATCH_ADD[op]
-                    if etype == "image" and op_args.get("path"):
-                        op_args["path"] = str(Path(op_args["path"]).expanduser())
-                    el, warnings = st.add_element(c, etype, _prepare(etype, op_args), checkpoint=False)
-                    results.append(_summary(st, c, el, warnings))
-                elif op == "add_ticks":
-                    results.append(_ticks(c, op_args))
-                elif op == "add_frame":
-                    results.append(_add_frame_elements(st, c, op_args))
-                elif op == "add_icon":
-                    results.append(_add_icon_op(st, c, op_args, checkpoint=False))
-                elif op == "create_layer":
-                    layer = st.create_layer(c, op_args["name"], _layer_settings(
-                        op_args.get("opacity"), op_args.get("blend"), op_args.get("clip"), op_args.get("visible"),
-                        op_args.get("style")), op_args.get("position"), checkpoint=False)
-                    results.append({"layer": layer["name"], "active": True})
-                elif op == "update_layer":
-                    target = st.get_layer(c, op_args["layer"])
-                    changes = _layer_settings(op_args.get("opacity"), op_args.get("blend"), op_args.get("clip"),
-                                              op_args.get("visible"), op_args.get("style"))
-                    if op_args.get("name"):
-                        changes["name"] = op_args["name"]
-                    updated = st.update_layer(c, target, changes, op_args.get("position"), op_args.get("activate"),
-                                              checkpoint=False)
-                    results.append({"layer": updated["name"]})
-                elif op == "delete_layer":
-                    target = st.get_layer(c, op_args["layer"])
-                    if "keep_elements" in op_args:
-                        keep_el = bool(op_args["keep_elements"])
-                    elif "delete_elements" in op_args:
-                        keep_el = not bool(op_args["delete_elements"])
-                    else:
-                        keep_el = False
-                    affected = st.delete_layer(c, target, keep_el, checkpoint=False)
-                    results.append({"deleted_layer": target["name"],
-                                    "elements_kept" if keep_el else "elements_deleted": affected})
-                elif op == "set_layer":
-                    targets = st.select(c, op_args.get("ids"), op_args.get("group"))
-                    name = None if str(op_args["layer"]).strip().lower() == "base" else st.get_layer(c, op_args["layer"])["name"]
-                    for el in targets:
-                        if name:
-                            el["layer"] = name
-                        else:
-                            el.pop("layer", None)
-                    results.append({"layer": name or "base", "moved": [e["id"] for e in targets]})
-                elif op == "create_animation":
-                    key, anim, _ = st.create_animation(c, op_args["name"], op_args["duration"],
-                                                       op_args.get("loop", False), op_args.get("fps", 30))
-                    st._undo[c["id"]].pop()
-                    results.append({"animation": key, "duration": anim["duration"], "loop": anim["loop"]})
-                elif op == "set_keyframes":
-                    results.append(_set_keyframes(c, op_args, checkpoint=False))
-                elif op == "update_element":
-                    el = st.find(c, op_args["id"])
-                    warnings = st.update_element(c, el, _prepare_update(el, op_args.get("props", {})), checkpoint=False)
-                    results.append(_summary(st, c, el, warnings))
-                elif op == "delete_elements":
-                    targets = st.select(c, op_args.get("ids"), op_args.get("group"))
-                    results.append({"deleted": st.delete_elements(c, targets, checkpoint=False)})
-                elif op == "move_elements":
-                    targets = st.select(c, op_args.get("ids"), op_args.get("group"))
-                    st.move_elements(c, targets, op_args.get("dx", 0), op_args.get("dy", 0), checkpoint=False)
-                    results.append({"moved": [e["id"] for e in targets]})
-                elif op == "reorder_element":
-                    st.reorder(c, st.find(c, op_args["id"]), op_args["position"], checkpoint=False)
-                    results.append({"reordered": op_args["id"]})
-                elif op == "duplicate_element":
-                    src = st.find(c, op_args["id"])
-                    patch = _prepare_update(dict(src), op_args["props"]) if op_args.get("props") else None
-                    made = st.duplicate_element(c, src, float(op_args.get("dx", 0)), float(op_args.get("dy", 0)),
-                                                op_args.get("new_id"), patch, count=op_args.get("count", 1),
-                                                rotate=op_args.get("rotate", 0), pivot=op_args.get("pivot"),
-                                                checkpoint=False)
-                    if len(made) == 1:
-                        results.append(_summary(st, c, made[0][0], made[0][1]))
-                    else:
-                        results.append({"ids": [e["id"] for e, _ in made]})
-                elif op == "add_instance":
-                    st.get(op_args["source"])
-                    op_args["source"] = slugify(op_args["source"])
-                    el, warnings = st.add_element(c, "instance", _prepare("instance", op_args), checkpoint=False)
-                    results.append(_summary(st, c, el, warnings))
-                elif op == "boolean_elements":
-                    el, warnings = _boolean(c, op_args["ids"], op_args.get("operation", "union"),
-                                            op_args.get("id"), op_args.get("style"), op_args.get("keep_originals", False))
-                    results.append(_summary(st, c, el, warnings))
-                elif op == "add_svg":
-                    results.append(_svg_elements(c, op_args["svg"], op_args.get("x", 0), op_args.get("y", 0),
-                                                 op_args.get("width"), op_args.get("height"),
-                                                 op_args.get("color", "#ffffff"), op_args.get("group"),
-                                                 op_args.get("id_prefix"), op_args.get("layer"),
-                                                 op_args.get("detail", 1)))
-                elif op == "align_elements":
-                    results.append(align_elements(c["id"], **op_args))
-                elif op == "arrange_elements":
-                    results.append(arrange_elements(c["id"], **op_args))
-                elif op == "set_pin":
-                    results.append(set_pin(c["id"], **op_args))
-                elif op == "set_state":
-                    results.append(set_state(c["id"], **op_args))
-                elif op == "set_binding":
-                    results.append(set_binding(c["id"], **op_args))
-                elif op == "set_interaction":
-                    results.append(set_interaction(c["id"], **op_args))
-                elif op == "set_link":
-                    results.append(set_link(c["id"], **op_args))
-                else:
-                    raise ValueError(f"unknown op '{op}'")
+                results.append(_exec_batch_op(st, c, op, op_args, frame_boxes))
             except KeyError as exc:
                 raise ValueError(f"operation {index} ({op}): missing argument {exc}") from exc
             except (ValueError, TypeError) as exc:
@@ -3179,12 +3493,24 @@ def review_canvas(canvas: str, min_contrast: float = 4.5, min_text_size: float =
             has_base = i > 0 or any(e.get("layer") not in names for e in c["elements"])
             if not has_base:
                 add("layer", f"layer '{layer['name']}' clips to the layer below, but there is nothing below it")
+    bound_props = {
+        (b.get("target"), "opacity" if b.get("property") == "style.opacity" else b.get("property"))
+        for b in (c.get("bindings") or [])
+    }
     for name, anim in (c.get("animations") or {}).items():
         _, warns = anim_mod.apply_animation(c, anim, 0, st.theme.get("colors", {}))
         for w in warns:
             add("animation", f"animation '{name}': {w}")
         if not anim.get("tracks"):
             add("animation", f"animation '{name}' has no tracks", None, "info")
+        for tr in anim.get("tracks") or []:
+            t_id = tr.get("target")
+            t_prop = "opacity" if tr.get("property") == "style.opacity" else tr.get("property")
+            if (t_id, t_prop) in bound_props:
+                add("binding_animation_conflict",
+                    f"'{t_id}.{t_prop}' has both set_binding and animation '{name}' keyframes: "
+                    "set_binding overrides keyframes at render time — remove one or animate a different property",
+                    [str(t_id)])
     order = {"error": 0, "warn": 1, "info": 2}
     issues.sort(key=lambda i: order[i["severity"]])
     res_out: dict[str, Any] = {
@@ -4162,10 +4488,21 @@ def _register_mcp_dx() -> None:
     if hasattr(mcp, "resource"):
         @mcp.resource("uiforge://materials")
         def res_materials() -> str:
-            """All 39 built-in Cook-Torrance PBR material names plus any custom theme materials."""
-            from .materials import NAMES
+            """All 39 built-in Cook-Torrance PBR materials with finish, brightness & text_safe metadata plus custom theme materials."""
+            from .materials import NAMES, material_catalog
             custom = sorted((store().theme.get("materials") or {}).keys())
-            return json.dumps({"builtin": NAMES, "custom": custom}, indent=2)
+            return json.dumps({
+                "builtin": NAMES,
+                "custom": custom,
+                "catalog": material_catalog(),
+                "tip": "For crisp text behind HUD dials/labels, prefer text_safe=true materials or dark linear gradients; raise pbr.roughness/lower pbr.env to matte down glossy presets.",
+            }, indent=2)
+
+        @mcp.resource("uiforge://cheatsheet")
+        def res_cheatsheet() -> str:
+            """Single-call compact reference covering all core signatures, batch `in`/add_stack layout, composite widgets, perspective layers, bindings and exports."""
+            from .reference import CHEATSHEET
+            return CHEATSHEET
 
         @mcp.resource("uiforge://icons")
         def res_icons() -> str:
