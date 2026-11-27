@@ -127,10 +127,11 @@ TOOLSETS: dict[str, set[str] | None] = {
         "set_theme", "get_theme", "create_canvas", "list_canvases", "get_canvas", "update_canvas",
         "duplicate_canvas", "fit_canvas", "delete_canvas", "create_layer", "update_layer",
         "delete_layer", "set_layer", "batch", "add_frame", "add_icon", "add_button", "add_progress_bar",
-        "add_stack", "add_input", "add_scroll", "add_slider", "add_toggle", "add_dropdown",
+        "add_stack", "add_grid", "add_split", "add_tabs", "add_stat_card",
+        "add_input", "add_scroll", "add_slider", "add_toggle", "add_dropdown",
         "update_element", "delete_elements", "move_elements", "reorder_element", "align_elements",
         "arrange_elements", "undo", "redo", "canvas_version", "preview", "live_preview", "open_studio",
-        "review_canvas", "export_png", "export_svg", "guide", "make_palette", "import_screenshot",
+        "review_canvas", "qa_screen", "export_png", "export_svg", "guide", "make_palette", "import_screenshot",
         "list_fonts", "measure_text", "set_pin", "set_state", "set_binding", "set_interaction",
         "find_elements", "restyle",
     },
@@ -138,15 +139,16 @@ TOOLSETS: dict[str, set[str] | None] = {
         "set_theme", "get_theme", "create_canvas", "list_canvases", "get_canvas", "update_canvas",
         "duplicate_canvas", "fit_canvas", "delete_canvas", "create_layer", "update_layer",
         "delete_layer", "set_layer", "batch", "add_frame", "add_icon", "add_button", "add_progress_bar",
-        "add_stack", "add_input", "add_scroll", "add_slider", "add_toggle", "add_dropdown",
+        "add_stack", "add_grid", "add_split", "add_gauge", "add_slot", "add_tabs", "add_stat_card",
+        "add_input", "add_scroll", "add_slider", "add_toggle", "add_dropdown",
         "add_instance", "add_arc", "add_ticks", "add_path", "add_svg", "add_image",
         "boolean_elements", "path_ops", "scatter", "update_element", "delete_elements", "move_elements",
         "reorder_element", "align_elements", "arrange_elements", "undo", "redo", "canvas_version",
         "create_animation", "set_keyframes", "delete_keyframes", "get_animations", "delete_animation",
         "preview_animation", "export_animation", "preview", "contact_sheet", "live_preview",
-        "open_studio", "review_canvas", "preview_resolutions", "preview_nine_slice", "export_png",
+        "open_studio", "review_canvas", "qa_screen", "preview_resolutions", "preview_nine_slice", "export_png",
         "export_svg", "export_layers", "export_psd", "export_asset", "export_atlas", "export_pbr_maps",
-        "export_screen", "export_bitmap_font", "export_theme", "write_engine_helpers", "set_pin",
+        "export_screen", "export_project", "export_bitmap_font", "export_theme", "write_engine_helpers", "set_pin",
         "set_state", "delete_state", "set_strings", "get_strings", "set_binding", "set_interaction",
         "guide", "make_palette", "make_variations", "restyle", "find_elements", "import_screenshot",
         "list_fonts", "measure_text",
@@ -155,11 +157,12 @@ TOOLSETS: dict[str, set[str] | None] = {
         "set_theme", "get_theme", "create_canvas", "list_canvases", "get_canvas", "update_canvas",
         "duplicate_canvas", "fit_canvas", "delete_canvas", "create_layer", "update_layer",
         "delete_layer", "set_layer", "batch", "add_frame", "add_icon", "add_button", "add_progress_bar",
-        "add_stack", "add_input", "add_scroll", "add_slider", "add_toggle", "add_dropdown",
+        "add_stack", "add_grid", "add_split", "add_tabs", "add_stat_card",
+        "add_input", "add_scroll", "add_slider", "add_toggle", "add_dropdown",
         "add_instance", "add_svg", "add_image", "update_element", "delete_elements", "move_elements",
         "reorder_element", "align_elements", "arrange_elements", "undo", "redo", "canvas_version",
-        "preview", "live_preview", "open_studio", "review_canvas", "preview_resolutions", "export_png",
-        "export_svg", "export_layers", "export_psd", "export_screen", "export_spec", "export_theme",
+        "preview", "live_preview", "open_studio", "review_canvas", "qa_screen", "preview_resolutions", "export_png",
+        "export_svg", "export_layers", "export_psd", "export_screen", "export_project", "export_spec", "export_theme",
         "set_pin", "set_state", "delete_state", "set_strings", "get_strings", "set_binding",
         "set_interaction", "guide", "make_palette", "make_variations", "restyle", "find_elements",
         "import_screenshot", "list_fonts", "measure_text",
@@ -168,13 +171,14 @@ TOOLSETS: dict[str, set[str] | None] = {
         "set_theme", "get_theme", "create_canvas", "list_canvases", "get_canvas", "update_canvas",
         "duplicate_canvas", "fit_canvas", "delete_canvas", "create_layer", "update_layer",
         "delete_layer", "set_layer", "batch", "add_frame", "add_icon", "add_button", "add_progress_bar",
-        "add_stack", "add_input", "add_scroll", "add_slider", "add_toggle", "add_dropdown",
+        "add_stack", "add_grid", "add_split", "add_tabs", "add_stat_card", "add_slot",
+        "add_input", "add_scroll", "add_slider", "add_toggle", "add_dropdown",
         "add_instance", "add_svg", "add_image", "update_element", "delete_elements", "move_elements",
         "reorder_element", "align_elements", "arrange_elements", "undo", "redo", "canvas_version",
         "create_animation", "set_keyframes", "delete_keyframes", "get_animations", "delete_animation",
         "preview_animation", "export_animation", "preview", "live_preview", "open_studio",
-        "review_canvas", "preview_resolutions", "export_png", "export_svg", "export_web",
-        "export_react", "export_pdf", "export_prototype", "export_spec", "export_theme", "set_link",
+        "review_canvas", "qa_screen", "preview_resolutions", "export_png", "export_svg", "export_web",
+        "export_react", "export_project", "export_pdf", "export_prototype", "export_spec", "export_theme", "set_link",
         "set_pin", "set_state", "delete_state", "set_strings", "get_strings", "set_binding",
         "set_interaction", "guide", "make_palette", "make_variations", "restyle", "find_elements",
         "import_screenshot", "list_fonts", "measure_text",
@@ -539,12 +543,15 @@ def _scale_suffix(scale: float) -> str:
 
 @tool
 def create_canvas(name: str, width: int | None = None, height: int | None = None,
-                  background: str | dict | None = None, preset: str | None = None):
+                  background: str | dict | None = None, preset: str | None = None,
+                  preview_background: str | dict | None = None):
     """Create a new canvas (one canvas = one asset or one screen mockup).
 
     Size the canvas to the asset: e.g. 64x64 icon, 320x96 button, 256x256 panel, 1920x1080 screen.
     Leave room for shadows/glows (they are cut off at the canvas edge), or draw roomy and fit_canvas later.
-    background: omit for transparent (normal for assets); a color or gradient object for mockups.
+    background: omit for transparent (normal for assets/HUDs); a color or gradient object for mockups.
+    preview_background: optional mockup backdrop shown in preview() & export_web() while keeping `background`
+      transparent for game-engine PNG/screen exports and preview(background="game")!
     preset: a screen / device size that also records its safe area (notch, home bar, TV overscan) for
       preview(guides=["safe"]): 1080p, 1440p, 4k, 720p, ultrawide, ultrawide-1440, tv-1080p, steam-deck,
       switch, iphone, iphone-landscape, iphone-se, ipad, ipad-landscape, android, android-landscape,
@@ -562,10 +569,16 @@ def create_canvas(name: str, width: int | None = None, height: int | None = None
         raise ValueError("give width and height, or a preset")
     st = store()
     canvas = st.create_canvas(name, width, height, _maybe_json(background))
+    changed = False
+    if preview_background is not None:
+        canvas["preview_background"] = _maybe_json(preview_background)
+        changed = True
     if preset:
         canvas["device"] = str(preset).lower()
         if any(safe):
             canvas["safe_area"] = list(safe)
+        changed = True
+    if changed:
         st.save_canvas(canvas)
     out = {"canvas": canvas["id"], "width": canvas["width"], "height": canvas["height"],
            "workspace": str(st.workspace)}
@@ -646,6 +659,7 @@ def _layer_list(c: dict) -> list[dict]:
 @tool
 def update_canvas(canvas: str, name: str | None = None, width: int | None = None, height: int | None = None,
                   background: str | dict | None = None, clear_background: bool = False,
+                  preview_background: str | dict | None = None,
                   safe_area: list[float] | None = None, vars: dict | None = None, colors: dict | None = None,
                   language: str | None = None, pixel_art: bool | dict | None = None, mode: str | None = None,
                   focus_order: list[str] | None = None, environment: dict | None = None,
@@ -694,6 +708,12 @@ def update_canvas(canvas: str, name: str | None = None, width: int | None = None
     elif background is not None:
         changes["background"] = _maybe_json(background)
     st.update_canvas(c, **changes)
+    if preview_background is not None:
+        pb = _maybe_json(preview_background)
+        if pb in ("", False, "none"):
+            c.pop("preview_background", None)
+        else:
+            c["preview_background"] = pb
     safe_area, vars, colors, pixel_art = (_maybe_json(v) for v in (safe_area, vars, colors, pixel_art))
     if safe_area is not None:
         if not isinstance(safe_area, list) or len(safe_area) != 4:
@@ -1869,7 +1889,7 @@ def _add_button_op(st: Store, c: dict, args: dict) -> dict:
         radius=args.get("radius"), accent=args.get("accent"),
         font=args.get("font"), size=args.get("size"),
         states=args.get("states", "auto"), style_preset=sp, quality=q,
-        theme_colors=st.theme.get("colors", {}),
+        theme_colors=st.theme.get("colors", {}), theme=st.theme,
         id=args.get("id"), group=args.get("group"), layer=args.get("layer"),
     )
     ids: list[str] = []
@@ -1923,6 +1943,7 @@ def _add_button_op(st: Store, c: dict, args: dict) -> dict:
 
 def _add_progress_bar_op(st: Store, c: dict, args: dict) -> dict:
     from .components import progress_bar_operations
+    sp = str(c.get("style_preset") or st.theme.get("style_preset") or "scifi")
     built = progress_bar_operations(
         args["x"], args["y"], args.get("width", 240), args.get("height", 16),
         value=args.get("value", 75.0), max_value=args.get("max_value", 100.0),
@@ -1933,9 +1954,9 @@ def _add_progress_bar_op(st: Store, c: dict, args: dict) -> dict:
         low_threshold=float(args.get("low_threshold", 0.3)),
         bind_value=args.get("bind_value"), bind_max=args.get("bind_max"),
         corner=args.get("corner", "round"), radius=args.get("radius"),
-        font=args.get("font", "Rajdhani"),
+        font=args.get("font"), style_preset=sp,
         id=args.get("id"), group=args.get("group"), layer=args.get("layer"),
-        theme_colors=st.theme.get("colors", {}),
+        theme_colors=st.theme.get("colors", {}), theme=st.theme,
     )
     ids: list[str] = []
     warnings: list[str] = []
@@ -2024,6 +2045,306 @@ def add_progress_bar(canvas: str, x: float, y: float, width: float = 240, height
     return {"canvas": c["id"], **res}
 
 
+def _add_gauge_op(st: Store, c: dict, args: dict) -> dict:
+    from .components import gauge_operations
+    sp = str(c.get("style_preset") or st.theme.get("style_preset") or "scifi")
+    cx = args["cx"] if "cx" in args else (float(args.get("x", 0)) + float(args.get("radius", 90)))
+    cy = args["cy"] if "cy" in args else (float(args.get("y", 0)) + float(args.get("radius", 90)))
+    built = gauge_operations(
+        cx, cy, radius=float(args.get("radius", 90.0)),
+        value=float(args.get("value", 65.0)), min_value=float(args.get("min_value", 0.0)),
+        max_value=float(args.get("max_value", 100.0)),
+        start_angle=args.get("start_angle"), end_angle=args.get("end_angle"),
+        style=args.get("style", "radial"), unit=args.get("unit", ""),
+        label=args.get("label"), redline=float(args.get("redline", 0.8)),
+        ticks=int(args.get("ticks", 8)), minor_per_major=int(args.get("minor_per_major", 4)),
+        color=args.get("color"), redline_color=args.get("redline_color"),
+        bind_value=args.get("bind_value"), style_preset=sp, theme=st.theme,
+        id=args.get("id"), group=args.get("group"), layer=args.get("layer"),
+    )
+    ids: list[str] = []
+    warnings: list[str] = []
+    # Emit face/track/redline first, then ticks, then value arc/needle/hub/text
+    pre_specs = [s_ for s_ in built["specs"] if s_["id"].endswith(("_face", "_track", "_redline"))]
+    post_specs = [s_ for s_ in built["specs"] if s_ not in pre_specs]
+    for raw in pre_specs:
+        item = dict(raw)
+        etype = item.pop("type")
+        el, w = st.add_element(c, etype, _prepare(etype, item), checkpoint=False)
+        ids.append(el["id"])
+        warnings.extend(w)
+    if built.get("ticks_op"):
+        tres = _ticks(c, built["ticks_op"])
+        ids.extend(tres.get("created") or [])
+    for raw in post_specs:
+        item = dict(raw)
+        etype = item.pop("type")
+        el, w = st.add_element(c, etype, _prepare(etype, item), checkpoint=False)
+        ids.append(el["id"])
+        warnings.extend(w)
+    if built["data_defaults"]:
+        data_map = c.setdefault("data", {})
+        for k, v in built["data_defaults"].items():
+            data_map.setdefault(k, v)
+    if built["bindings"]:
+        binds = c.setdefault("bindings", [])
+        for b in built["bindings"]:
+            binds[:] = [x for x in binds if not (x.get("target") == b["target"] and x.get("property") == b["property"])]
+            binds.append(b)
+    out: dict[str, Any] = {
+        "group": built["group"], "arc_id": built["arc_id"], "needle_id": built["needle_id"],
+        "ids": ids, "bbox": built["bbox"],
+    }
+    if warnings:
+        out["warnings"] = sorted(set(warnings))
+    return out
+
+
+def _add_slot_op(st: Store, c: dict, args: dict) -> dict:
+    import copy
+    from .components import slot_operations
+    sp = str(c.get("style_preset") or st.theme.get("style_preset") or "scifi")
+    built = slot_operations(
+        args["x"], args["y"], width=float(args.get("width", 180.0)), height=float(args.get("height", 74.0)),
+        icon=args.get("icon"), label=args.get("label", "Ability"), sublabel=args.get("sublabel"),
+        keycap=args.get("keycap"), badge=args.get("badge"), rarity=args.get("rarity", "common"),
+        selected=bool(args.get("selected", False)), cooldown=float(args.get("cooldown", 0.0)),
+        bind_cooldown=args.get("bind_cooldown"), layout=args.get("layout", "horizontal"),
+        states=args.get("states", "auto"), click_toggle=bool(args.get("click_toggle", True)),
+        style_preset=sp, theme=st.theme, id=args.get("id"), group=args.get("group"), layer=args.get("layer"),
+    )
+    ids: list[str] = []
+    warnings: list[str] = []
+    created_by_id: dict[str, dict] = {}
+    for raw in built["specs"]:
+        item = dict(raw)
+        etype = item.pop("type")
+        el, w = st.add_element(c, etype, _prepare(etype, item), checkpoint=False)
+        ids.append(el["id"])
+        created_by_id[el["id"]] = el
+        warnings.extend(w)
+    if built["states"]:
+        states_map = c.setdefault("states", {})
+        for st_name, tgt_id, props in built["states"]:
+            if tgt_id in created_by_id:
+                patch = _prepare_update(copy.deepcopy(created_by_id[tgt_id]), props)
+                states_map.setdefault(slugify(st_name, "state"), {}).setdefault(tgt_id, {}).update(patch)
+    if built["interactions"]:
+        ix_list = c.setdefault("interactions", [])
+        for r in built["interactions"]:
+            ix_list.append(r)
+    if built["data_defaults"]:
+        data_map = c.setdefault("data", {})
+        for k, v in built["data_defaults"].items():
+            data_map.setdefault(k, v)
+    if built["bindings"]:
+        binds = c.setdefault("bindings", [])
+        for b in built["bindings"]:
+            binds[:] = [x for x in binds if not (x.get("target") == b["target"] and x.get("property") == b["property"])]
+            binds.append(b)
+    out: dict[str, Any] = {"group": built["group"], "body_id": built["body_id"], "ids": ids, "bbox": built["bbox"]}
+    if warnings:
+        out["warnings"] = sorted(set(warnings))
+    return out
+
+
+def _add_tabs_op(st: Store, c: dict, args: dict) -> dict:
+    from .components import tabs_operations
+    sp = str(c.get("style_preset") or st.theme.get("style_preset") or "scifi")
+    q = str(c.get("quality") or st.theme.get("quality") or "advanced")
+    built = tabs_operations(
+        args["x"], args["y"], _maybe_json(args["items"]),
+        width=args.get("width"), height=float(args.get("height", 42.0)),
+        active=int(args.get("active", 0)), gap=float(args.get("gap", 10.0)),
+        variant=args.get("variant", "cut"), style_preset=sp, quality=q, theme=st.theme,
+        id=args.get("id"), layer=args.get("layer"),
+    )
+    tab_results = [_add_button_op(st, c, bargs) for bargs in built["button_calls"]]
+    extra_ids = []
+    for raw in built["extra_specs"]:
+        item = dict(raw)
+        etype = item.pop("type")
+        el, _ = st.add_element(c, etype, _prepare(etype, item), checkpoint=False)
+        extra_ids.append(el["id"])
+    return {
+        "count": len(tab_results),
+        "tabs": [r["group"] for r in tab_results],
+        "ids": [eid for r in tab_results for eid in r["ids"]] + extra_ids,
+        "bbox": built["bbox"],
+    }
+
+
+def _add_stat_card_op(st: Store, c: dict, args: dict) -> dict:
+    from .components import stat_card_operations
+    sp = str(c.get("style_preset") or st.theme.get("style_preset") or "scifi")
+    built = stat_card_operations(
+        args["x"], args["y"], width=args.get("width"), height=args.get("height"),
+        label=args.get("label", "METRIC"), value=str(args.get("value", "100")),
+        subvalue=args.get("subvalue"), icon=args.get("icon"), accent=args.get("accent"),
+        badge=args.get("badge"), compact=bool(args.get("compact", False)),
+        style_preset=sp, theme=st.theme, id=args.get("id"), group=args.get("group"), layer=args.get("layer"),
+    )
+    ids: list[str] = []
+    warnings: list[str] = []
+    for raw in built["specs"]:
+        item = dict(raw)
+        etype = item.pop("type")
+        el, w = st.add_element(c, etype, _prepare(etype, item), checkpoint=False)
+        ids.append(el["id"])
+        warnings.extend(w)
+    out: dict[str, Any] = {"group": built["group"], "body_id": built["body_id"], "ids": ids, "bbox": built["bbox"]}
+    if warnings:
+        out["warnings"] = sorted(set(warnings))
+    return out
+
+
+def _add_grid_op(st: Store, c: dict, args: dict, frame_boxes: dict[str, list[float]]) -> dict:
+    from .components import estimate_stack_child
+    cols = max(1, int(args.get("cols", 2)))
+    gap = float(args.get("gap", 16))
+    col_gap = float(args.get("col_gap") if args.get("col_gap") is not None else gap)
+    row_gap = float(args.get("row_gap") if args.get("row_gap") is not None else gap)
+    pad = float(args.get("padding", 0))
+    sx = float(args.get("x", 0)) + pad
+    sy = float(args.get("y", 0)) + pad
+    avail_w = float(args.get("width") or 400) - pad * 2
+    avail_h = (float(args["height"]) - pad * 2) if args.get("height") is not None else None
+    children = _maybe_json(args.get("children")) or []
+    if not isinstance(children, list) or not children:
+        raise ValueError("add_grid requires a non-empty 'children' list")
+    layer = args.get("layer")
+    group = args.get("group")
+    cell_w = max(16.0, (avail_w - col_gap * max(0, cols - 1)) / cols)
+
+    # Group children into rows respecting optional col_span
+    rows_data: list[list[tuple[int, int, str, dict, float, float, float]]] = []
+    cur_row: list[tuple[int, int, str, dict, float, float, float]] = []
+    col_cursor = 0
+    for idx, raw_ch in enumerate(children):
+        ch = dict(_maybe_json(raw_ch))
+        cop = ch.pop("op", None)
+        if not cop:
+            raise ValueError("every add_grid child must specify 'op'")
+        span = max(1, min(cols, int(ch.pop("col_span", 1) or 1)))
+        if col_cursor + span > cols and cur_row:
+            rows_data.append(cur_row)
+            cur_row = []
+            col_cursor = 0
+        span_w = round(cell_w * span + col_gap * (span - 1), 2)
+        cw, ch_h, top_pad = estimate_stack_child({"op": cop, **ch}, span_w)
+        cur_row.append((idx, col_cursor, cop, ch, span_w, ch_h, top_pad))
+        col_cursor += span
+        if col_cursor >= cols:
+            rows_data.append(cur_row)
+            cur_row = []
+            col_cursor = 0
+    if cur_row:
+        rows_data.append(cur_row)
+
+    fixed_row_h = None
+    if avail_h is not None and args.get("equal_rows", False) and rows_data:
+        fixed_row_h = max(24.0, (avail_h - row_gap * max(0, len(rows_data) - 1)) / len(rows_data))
+
+    cur_y = sy
+    child_results: list[dict] = []
+    for row_items in rows_data:
+        row_top = max(it[6] for it in row_items)
+        row_h = fixed_row_h if fixed_row_h is not None else max(it[5] for it in row_items)
+        for idx, col_i, cop, ch, span_w, ch_h, top_pad in row_items:
+            if cop in ("add_button", "add_progress_bar", "add_slot", "add_stat_card", "add_gauge"):
+                if "id" not in ch and group:
+                    ch["id"] = f"{group}_{cop[4:]}_{idx}"
+            elif group and "group" not in ch:
+                ch["group"] = group
+            if layer and "layer" not in ch:
+                ch["layer"] = layer
+            cx_pos = round(sx + col_i * (cell_w + col_gap), 2)
+            cy_pos = round(cur_y + row_top, 2)
+            if cop == "add_gauge":
+                rad = min(span_w, row_h) * 0.45 if "radius" not in ch else float(ch["radius"])
+                ch.setdefault("cx", round(cx_pos + span_w * 0.5, 2))
+                ch.setdefault("cy", round(cy_pos + row_h * 0.5, 2))
+                ch.setdefault("radius", round(rad, 1))
+            else:
+                ch.setdefault("x", cx_pos)
+                ch.setdefault("y", cy_pos)
+                if cop != "add_toggle" and cop != "add_text":
+                    ch.setdefault("width", span_w)
+                if fixed_row_h is not None and cop not in ("add_text", "add_toggle", "add_slider", "add_progress_bar"):
+                    ch.setdefault("height", round(max(24.0, fixed_row_h - row_top), 2))
+            child_results.append(_exec_batch_op(st, c, cop, ch, frame_boxes))
+        cur_y += row_top + row_h + row_gap
+    total_h = round(max(0.0, cur_y - row_gap - float(args.get("y", 0)) + pad), 2)
+    return {
+        "cols": cols, "rows": len(rows_data), "count": len(child_results),
+        "results": child_results,
+        "bbox": [round(float(args.get("x", 0)), 2), round(float(args.get("y", 0)), 2),
+                 round(float(args.get("width") or 400), 2), total_h],
+    }
+
+
+def _add_split_op(st: Store, c: dict, args: dict, frame_boxes: dict[str, list[float]]) -> dict:
+    from .components import resolve_split_boxes
+    direction = str(args.get("direction", "row")).lower()
+    sizes = _maybe_json(args.get("sizes")) or ["1fr", "1fr"]
+    gap = float(args.get("gap", 20))
+    pad = float(args.get("padding", 0))
+    x = float(args.get("x", 0))
+    y = float(args.get("y", 0))
+    width = float(args.get("width") or c["width"])
+    height = float(args.get("height") or c["height"])
+    boxes = resolve_split_boxes(x, y, width, height, direction=direction, sizes=sizes, gap=gap, padding=pad)
+    base = slugify(args.get("id"), "split") if args.get("id") else "split"
+    names = _maybe_json(args.get("names")) or [f"{base}_{i}" for i in range(len(boxes))]
+    named_boxes: dict[str, list[float]] = {}
+    persisted = c.setdefault("_boxes", {})
+    for i, bx in enumerate(boxes):
+        nm = str(names[i]) if i < len(names) else f"{base}_{i}"
+        named_boxes[nm] = bx
+        frame_boxes[nm] = list(bx)
+        persisted[nm] = list(bx)
+    region_results: dict[str, list[dict]] = {}
+    children_spec = _maybe_json(args.get("children"))
+    layer = args.get("layer")
+    if isinstance(children_spec, list):
+        for i, ops_in_region in enumerate(children_spec):
+            if i >= len(boxes) or not ops_in_region:
+                continue
+            nm = str(names[i]) if i < len(names) else f"{base}_{i}"
+            ops_list = ops_in_region if isinstance(ops_in_region, list) else [ops_in_region]
+            out_r = []
+            for raw_op in ops_list:
+                ch = dict(_maybe_json(raw_op))
+                cop = ch.pop("op", None)
+                if not cop:
+                    raise ValueError(f"split region '{nm}' child missing 'op'")
+                ch.setdefault("in", nm)
+                if layer and "layer" not in ch:
+                    ch["layer"] = layer
+                out_r.append(_exec_batch_op(st, c, cop, ch, frame_boxes))
+            region_results[nm] = out_r
+    elif isinstance(children_spec, dict):
+        for nm, ops_in_region in children_spec.items():
+            if nm not in named_boxes or not ops_in_region:
+                continue
+            ops_list = ops_in_region if isinstance(ops_in_region, list) else [ops_in_region]
+            out_r = []
+            for raw_op in ops_list:
+                ch = dict(_maybe_json(raw_op))
+                cop = ch.pop("op", None)
+                if not cop:
+                    raise ValueError(f"split region '{nm}' child missing 'op'")
+                ch.setdefault("in", nm)
+                if layer and "layer" not in ch:
+                    ch["layer"] = layer
+                out_r.append(_exec_batch_op(st, c, cop, ch, frame_boxes))
+            region_results[nm] = out_r
+    out: dict[str, Any] = {"direction": direction, "boxes": named_boxes, "bbox": [x, y, width, height]}
+    if region_results:
+        out["regions"] = {k: len(v) for k, v in region_results.items()}
+    return out
+
+
 def _add_stack_op(st: Store, c: dict, args: dict, frame_boxes: dict[str, list[float]]) -> dict:
     from .components import estimate_stack_child
     direction = str(args.get("direction", "column")).lower()
@@ -2032,6 +2353,7 @@ def _add_stack_op(st: Store, c: dict, args: dict, frame_boxes: dict[str, list[fl
     gap = float(args.get("gap", 12))
     pad = float(args.get("padding", 0))
     align = str(args.get("align", "start")).lower()
+    justify = str(args.get("justify", "start")).lower()
     sx = float(args.get("x", 0)) + pad
     sy = float(args.get("y", 0)) + pad
     avail_w = (float(args["width"]) - pad * 2) if args.get("width") is not None else None
@@ -2042,30 +2364,93 @@ def _add_stack_op(st: Store, c: dict, args: dict, frame_boxes: dict[str, list[fl
     group = args.get("group")
     layer = args.get("layer")
 
-    cur_x, cur_y = sx, sy
-    max_x, max_y = sx, sy
-    child_results: list[dict] = []
+    # Pre-measure children to resolve flex / height:"fill" / width:"fill" / spacer & justify!
+    measured: list[dict[str, Any]] = []
     for idx, raw_ch in enumerate(children):
         ch = dict(_maybe_json(raw_ch))
         cop = ch.pop("op", None)
         if not cop:
             raise ValueError("every add_stack child must specify 'op'")
-        # Never share a stack group across composite interactive widgets (buttons/bars),
+        flex_w = float(ch.pop("flex", 0) or 0)
+        if cop == "spacer" and flex_w <= 0:
+            flex_w = 1.0
+        if direction == "column" and str(ch.get("height", "")).strip().lower() in ("fill", "100%"):
+            ch.pop("height", None)
+            flex_w = max(flex_w, 1.0)
+        elif direction == "row" and str(ch.get("width", "")).strip().lower() in ("fill", "100%"):
+            ch.pop("width", None)
+            flex_w = max(flex_w, 1.0)
+        cw, ch_h, top_pad = estimate_stack_child({"op": cop, **ch}, avail_w if direction == "column" else None)
+        measured.append({"idx": idx, "op": cop, "ch": ch, "w": cw, "h": ch_h, "top_pad": top_pad, "flex": flex_w})
+
+    n = len(measured)
+    total_gap = gap * max(0, n - 1)
+    total_flex = sum(m["flex"] for m in measured)
+    avail_main = avail_h if direction == "column" else avail_w
+    if avail_main is not None and total_flex > 0:
+        fixed_main = sum(
+            ((m["h"] + m["top_pad"]) if direction == "column" else m["w"])
+            for m in measured if m["flex"] <= 0
+        )
+        flex_headroom = sum(m["top_pad"] for m in measured if m["flex"] > 0) if direction == "column" else 0.0
+        rem = max(0.0, avail_main - fixed_main - flex_headroom - total_gap)
+        for m in measured:
+            if m["flex"] > 0:
+                share = max(0.0 if m["op"] == "spacer" else 24.0, rem * (m["flex"] / total_flex))
+                if direction == "column":
+                    m["h"] = round(share, 2)
+                    if m["op"] != "spacer":
+                        m["ch"]["height"] = m["h"]
+                else:
+                    m["w"] = round(share, 2)
+                    if m["op"] != "spacer":
+                        m["ch"]["width"] = m["w"]
+
+    # Justify offset & effective gap along main axis
+    eff_gap = gap
+    lead_offset = 0.0
+    if avail_main is not None and total_flex <= 0:
+        used_main = sum(((m["h"] + m["top_pad"]) if direction == "column" else m["w"]) for m in measured) + total_gap
+        extra = max(0.0, avail_main - used_main)
+        if justify == "center":
+            lead_offset = extra * 0.5
+        elif justify == "end":
+            lead_offset = extra
+        elif justify == "space-between" and n > 1:
+            eff_gap = gap + extra / (n - 1)
+        elif justify == "space-around" and n > 0:
+            step = extra / n
+            lead_offset = step * 0.5
+            eff_gap = gap + step
+
+    cur_x = sx + (lead_offset if direction == "row" else 0.0)
+    cur_y = sy + (lead_offset if direction == "column" else 0.0)
+    max_x, max_y = sx, sy
+    child_results: list[dict] = []
+    for m in measured:
+        idx, cop, ch, cw, ch_h, top_pad = m["idx"], m["op"], m["ch"], m["w"], m["h"], m["top_pad"]
+        if cop == "spacer":
+            if direction == "column":
+                cur_y += ch_h + eff_gap
+            else:
+                cur_x += cw + eff_gap
+            continue
+        # Never share a stack group across composite interactive widgets (buttons/bars/slots/cards/gauges),
         # otherwise every stacked button's click interaction would fire simultaneously on group:<stack>.
-        if cop in ("add_button", "add_progress_bar"):
+        if cop in ("add_button", "add_progress_bar", "add_slot", "add_stat_card", "add_gauge"):
             if "id" not in ch and group:
                 ch["id"] = f"{group}_{cop[4:]}_{idx}"
         elif group and "group" not in ch:
             ch["group"] = group
         if layer and "layer" not in ch:
             ch["layer"] = layer
-        cw, ch_h, top_pad = estimate_stack_child({"op": cop, **ch}, avail_w if direction == "column" else None)
-        if cop in ("add_input", "add_dropdown", "add_slider", "add_toggle", "add_scroll", "add_button", "add_progress_bar"):
+        if cop in ("add_input", "add_dropdown", "add_slider", "add_toggle", "add_scroll",
+                   "add_button", "add_progress_bar", "add_slot", "add_stat_card"):
             ch.setdefault("width", round(cw, 2))
             ch.setdefault("height", round(ch_h, 2))
         if direction == "column":
             if (align == "stretch" or str(ch.get("width", "")).lower() in ("fill", "100%")) and avail_w is not None:
-                if cop != "add_toggle":
+                if cop not in ("add_toggle", "add_gauge"):
                     cw = avail_w
                     ch["width"] = round(avail_w, 2)
             cx_pos = cur_x
@@ -2075,33 +2460,42 @@ def _add_stack_op(st: Store, c: dict, args: dict, frame_boxes: dict[str, list[fl
                 elif align == "end":
                     cx_pos = cur_x + max(0.0, avail_w - cw)
             cy_pos = cur_y + top_pad
-            if cop == "add_text" and align == "center" and avail_w is not None and "anchor" not in ch:
+            if cop == "add_gauge":
+                ch.setdefault("cx", round(cx_pos + cw * 0.5, 2))
+                ch.setdefault("cy", round(cy_pos + ch_h * 0.5, 2))
+            elif cop == "add_text" and align == "center" and avail_w is not None and "anchor" not in ch:
                 ch["x"] = round(cur_x + avail_w * 0.5, 2)
                 ch["anchor"] = "center"
             else:
                 ch.setdefault("x", round(cx_pos, 2))
-            ch.setdefault("y", round(cy_pos, 2))
+            if cop != "add_gauge":
+                ch.setdefault("y", round(cy_pos, 2))
             res = _exec_batch_op(st, c, cop, ch, frame_boxes)
             child_results.append(res)
-            cur_y = cy_pos + ch_h + gap
+            cur_y = cy_pos + ch_h + eff_gap
             max_x = max(max_x, cx_pos + cw)
             max_y = max(max_y, cy_pos + ch_h)
         else:
             if (align == "stretch" or str(ch.get("height", "")).lower() in ("fill", "100%")) and avail_h is not None:
-                ch_h = avail_h
-                ch["height"] = round(avail_h, 2)
+                if cop != "add_gauge":
+                    ch_h = avail_h
+                    ch["height"] = round(avail_h, 2)
             cy_pos = cur_y + top_pad
             if avail_h is not None:
                 if align == "center":
                     cy_pos = cur_y + max(0.0, (avail_h - ch_h) * 0.5)
                 elif align == "end":
                     cy_pos = cur_y + max(0.0, avail_h - ch_h)
-            ch.setdefault("x", round(cur_x, 2))
-            ch.setdefault("y", round(cy_pos, 2))
+            if cop == "add_gauge":
+                ch.setdefault("cx", round(cur_x + cw * 0.5, 2))
+                ch.setdefault("cy", round(cy_pos + ch_h * 0.5, 2))
+            else:
+                ch.setdefault("x", round(cur_x, 2))
+                ch.setdefault("y", round(cy_pos, 2))
             res = _exec_batch_op(st, c, cop, ch, frame_boxes)
             child_results.append(res)
-            cur_x += cw + gap
-            max_x = max(max_x, cur_x - gap)
+            cur_x += cw + eff_gap
+            max_x = max(max_x, cur_x - eff_gap)
             max_y = max(max_y, cy_pos + ch_h)
     return {
         "direction": direction,
@@ -2113,26 +2507,193 @@ def _add_stack_op(st: Store, c: dict, args: dict, frame_boxes: dict[str, list[fl
 
 
 @tool
+def add_gauge(canvas: str, cx: float, cy: float, radius: float = 90.0, value: float = 65.0,
+              min_value: float = 0.0, max_value: float = 100.0, start_angle: float | None = None,
+              end_angle: float | None = None, style: str = "radial", unit: str = "", label: str | None = None,
+              redline: float = 0.8, ticks: int = 8, minor_per_major: int = 4, color: str | None = None,
+              redline_color: str | None = None, bind_value: str | None = None,
+              id: str | None = None, group: str | None = None, layer: str | None = None):
+    """Build a complete AAA game tachometer / velocity / thermal dial gauge in ONE call (beveled face +
+    track + redline + numbered ticks + conic value arc + needle + spun metal hub + live bindings).
+
+    style: "radial" (270° classic), "semi" (180° arc), or "segmented" (dashed LED blocks).
+    bind_value: variable name (e.g. "speed") — automatically binds BOTH value arc end_angle & needle rotation!
+    """
+    st = store()
+    c = st.get(canvas)
+    st.checkpoint(c)
+    try:
+        res = _add_gauge_op(st, c, dict(
+            cx=cx, cy=cy, radius=radius, value=value, min_value=min_value, max_value=max_value,
+            start_angle=start_angle, end_angle=end_angle, style=style, unit=unit, label=label,
+            redline=redline, ticks=ticks, minor_per_major=minor_per_major, color=color,
+            redline_color=redline_color, bind_value=bind_value, id=id, group=group, layer=layer,
+        ))
+    except Exception:
+        st.drop_checkpoint(c)
+        raise
+    st.save_canvas(c)
+    return {"canvas": c["id"], **res}
+
+
+@tool
+def add_slot(canvas: str, x: float, y: float, width: float = 180.0, height: float = 74.0,
+             icon: str | None = None, label: str = "Ability", sublabel: str | None = None,
+             keycap: str | None = None, badge: str | None = None, rarity: str = "common",
+             selected: bool = False, cooldown: float = 0.0, bind_cooldown: str | None = None,
+             layout: str = "horizontal", states: str | bool = "auto", click_toggle: bool = True,
+             id: str | None = None, group: str | None = None, layer: str | None = None):
+    """Build an AAA game inventory / ability / equipment hardpoint slot in ONE call (rarity border & glow +
+    icon + label/sublabel + keycap/badge + optional live cooldown overlay + hover/selected/focused states).
+
+    rarity: "common" | "uncommon" | "rare" | "epic" | "legendary" | "exotic".
+    layout: "horizontal" (hotbar/hardpoint card) or "square" (inventory grid tile).
+    """
+    st = store()
+    c = st.get(canvas)
+    st.checkpoint(c)
+    try:
+        res = _add_slot_op(st, c, dict(
+            x=x, y=y, width=width, height=height, icon=icon, label=label, sublabel=sublabel,
+            keycap=keycap, badge=badge, rarity=rarity, selected=selected, cooldown=cooldown,
+            bind_cooldown=bind_cooldown, layout=layout, states=states, click_toggle=click_toggle,
+            id=id, group=group, layer=layer,
+        ))
+    except Exception:
+        st.drop_checkpoint(c)
+        raise
+    st.save_canvas(c)
+    return {"canvas": c["id"], **res}
+
+
+@tool
+def add_tabs(canvas: str, x: float, y: float, items: list[dict | str], width: float | None = None,
+             height: float = 42.0, active: int = 0, gap: float = 10.0, variant: str = "cut",
+             id: str | None = None, layer: str | None = None):
+    """Build a row of themed navigation tabs in ONE call with active styling and isolated per-tab screen links.
+
+    items: list of strings or {"label": "Hangar", "icon": "wrench", "link": "loadout"} dicts.
+    variant: "cut" | "pill" | "underline".
+    """
+    st = store()
+    c = st.get(canvas)
+    st.checkpoint(c)
+    try:
+        res = _add_tabs_op(st, c, dict(
+            x=x, y=y, items=items, width=width, height=height, active=active, gap=gap,
+            variant=variant, id=id, layer=layer,
+        ))
+    except Exception:
+        st.drop_checkpoint(c)
+        raise
+    st.save_canvas(c)
+    return {"canvas": c["id"], **res}
+
+
+@tool
+def add_stat_card(canvas: str, x: float, y: float, label: str = "METRIC", value: str = "100",
+                  subvalue: str | None = None, icon: str | None = None, accent: str | None = None,
+                  badge: str | None = None, width: float | None = None, height: float | None = None,
+                  compact: bool = False, id: str | None = None, group: str | None = None, layer: str | None = None):
+    """Build a telemetry KPI stat card or an auto-sized hug badge pill (compact=true) in ONE call."""
+    st = store()
+    c = st.get(canvas)
+    st.checkpoint(c)
+    try:
+        res = _add_stat_card_op(st, c, dict(
+            x=x, y=y, label=label, value=value, subvalue=subvalue, icon=icon, accent=accent,
+            badge=badge, width=width, height=height, compact=compact, id=id, group=group, layer=layer,
+        ))
+    except Exception:
+        st.drop_checkpoint(c)
+        raise
+    st.save_canvas(c)
+    return {"canvas": c["id"], **res}
+
+
+@tool
+def add_grid(canvas: str, x: float = 0, y: float = 0, width: float = 400, height: float | None = None,
+             cols: int = 2, gap: float = 16, row_gap: float | None = None, col_gap: float | None = None,
+             padding: float = 0, equal_rows: bool = False, children: list[dict] | None = None,
+             in_box: str | None = None, group: str | None = None, layer: str | None = None):
+    """Arrange child UI ops in a 2D responsive grid (supporting col_span and widget label headroom) with zero pixel math!"""
+    st = store()
+    c = st.get(canvas)
+    st.checkpoint(c)
+    try:
+        args = dict(x=x, y=y, width=width, height=height, cols=cols, gap=gap, row_gap=row_gap,
+                    col_gap=col_gap, padding=padding, equal_rows=equal_rows, children=children,
+                    group=group, layer=layer)
+        if in_box:
+            from .components import apply_in_box, resolve_in_box
+            box = resolve_in_box(c, in_box, {})
+            args["width"] = "fill"
+            apply_in_box("add_grid", args, box)
+        res = _add_grid_op(st, c, args, {})
+    except Exception:
+        st.drop_checkpoint(c)
+        raise
+    st.save_canvas(c)
+    return {"canvas": c["id"], **res}
+
+
+@tool
+def add_split(canvas: str, x: float = 0, y: float = 0, width: float | None = None, height: float | None = None,
+              direction: str = "row", sizes: list[str | float] | None = None, gap: float = 20, padding: float = 0,
+              names: list[str] | None = None, children: list | dict | None = None, in_box: str | None = None,
+              id: str | None = None, layer: str | None = None):
+    """Divide a screen or frame into proportional named layout regions supporting px, '%' and 'fr' tracks
+    (e.g. sizes=['27%', '1fr', '27%'], names=['armory', 'stage', 'tuning']).
+
+    Registers every region box so later ops can target `in: "<region_name>"`, OR pass `children` directly
+    (list of op lists per region, or {region_name: [ops...]}) to build multi-column screens in ONE call!
+    """
+    st = store()
+    c = st.get(canvas)
+    st.checkpoint(c)
+    try:
+        args = dict(x=x, y=y, width=width, height=height, direction=direction, sizes=sizes, gap=gap,
+                    padding=padding, names=names, children=children, id=id, layer=layer)
+        if in_box:
+            from .components import apply_in_box, resolve_in_box
+            box = resolve_in_box(c, in_box, {})
+            args["width"] = "fill"
+            args["height"] = "fill"
+            apply_in_box("add_split", args, box)
+        res = _add_split_op(st, c, args, {})
+    except Exception:
+        st.drop_checkpoint(c)
+        raise
+    st.save_canvas(c)
+    return {"canvas": c["id"], **res}
+
+
+@tool
 def add_stack(canvas: str, x: float = 0, y: float = 0, direction: str = "column", gap: float = 12,
               padding: float = 0, width: float | None = None, height: float | None = None,
-              align: str = "start", children: list[dict] | None = None, in_box: str | None = None,
-              group: str | None = None, layer: str | None = None):
-    """Flow a list of child UI ops sequentially in a column or row with automatic spacing and label headroom.
+              align: str = "start", justify: str = "start", children: list[dict] | None = None,
+              in_box: str | None = None, group: str | None = None, layer: str | None = None):
+    """Flow child UI ops sequentially in a column or row with automatic spacing, Flex fill, spacer & label headroom.
 
-    Automatically adds top clearance for labelled widgets (add_input, add_dropdown, add_slider, add_progress_bar)
-    so stacked form fields never collide. Pass in_box="<frame_prefix>.inner_box" (or inside batch use "in")
-    to flow directly inside an add_frame safe area with zero manual x/y coordinate math!
+    Supports:
+    - justify: "start" | "center" | "end" | "space-between" | "space-around"
+    - flex / height:"fill" (in column) or width:"fill" (in row) — e.g. add_scroll filling remaining frame height!
+    - {"op": "spacer"} child to push trailing buttons to the far edge
+    - in_box="<frame_prefix>.inner_box" (or "in" inside batch) auto-fills both width and height!
     """
     st = store()
     c = st.get(canvas)
     st.checkpoint(c)
     try:
         args = dict(x=x, y=y, direction=direction, gap=gap, padding=padding, width=width, height=height,
-                    align=align, children=children, group=group, layer=layer)
+                    align=align, justify=justify, children=children, group=group, layer=layer)
         if in_box:
             from .components import apply_in_box, resolve_in_box
             box = resolve_in_box(c, in_box, {})
-            args.setdefault("width", "fill")
+            if args.get("width") is None:
+                args["width"] = "fill"
+            if args.get("height") is None:
+                args["height"] = "fill"
             apply_in_box("add_stack", args, box)
         res = _add_stack_op(st, c, args, {})
     except Exception:
@@ -2183,8 +2744,10 @@ def _exec_batch_op(st: Store, c: dict, op: str, op_args: dict, frame_boxes: dict
     if in_ref:
         from .components import apply_in_box, resolve_in_box
         box = resolve_in_box(c, str(in_ref), frame_boxes)
-        if op == "add_stack" and op_args.get("width") is None:
+        if op in ("add_stack", "add_grid", "add_split") and op_args.get("width") is None:
             op_args["width"] = "fill"
+        if op in ("add_stack", "add_split") and op_args.get("height") is None:
+            op_args["height"] = "fill"
         apply_in_box(op, op_args, box)
     if op in _BATCH_ADD:
         etype = _BATCH_ADD[op]
@@ -2206,6 +2769,18 @@ def _exec_batch_op(st: Store, c: dict, op: str, op_args: dict, frame_boxes: dict
         return _add_button_op(st, c, op_args)
     if op == "add_progress_bar":
         return _add_progress_bar_op(st, c, op_args)
+    if op == "add_gauge":
+        return _add_gauge_op(st, c, op_args)
+    if op == "add_slot":
+        return _add_slot_op(st, c, op_args)
+    if op == "add_tabs":
+        return _add_tabs_op(st, c, op_args)
+    if op == "add_stat_card":
+        return _add_stat_card_op(st, c, op_args)
+    if op == "add_grid":
+        return _add_grid_op(st, c, op_args, frame_boxes)
+    if op == "add_split":
+        return _add_split_op(st, c, op_args, frame_boxes)
     if op == "add_stack":
         return _add_stack_op(st, c, op_args, frame_boxes)
     if op == "create_layer":
@@ -2305,21 +2880,21 @@ def _exec_batch_op(st: Store, c: dict, op: str, op_args: dict, frame_boxes: dict
 
 
 @tool
-def batch(canvas: str, operations: list[dict]):
+def batch(canvas: str, operations: list[dict], compact: bool | None = None):
     """Run many drawing, layout, state, binding and interaction operations in one atomic call.
 
     Each operation is {"op": "<tool name>", ...the same arguments that tool takes, without canvas}.
     Supported ops: add_rect, add_ellipse, add_line, add_polygon, add_path, add_arc, add_ticks, add_text,
-    add_image, add_instance, add_svg, add_frame, add_icon, add_button, add_progress_bar, add_stack,
-    add_input, add_scroll, add_slider, add_toggle, add_dropdown, create_layer, update_layer, delete_layer,
-    set_layer, create_animation, set_keyframes, update_element, delete_elements, move_elements,
-    reorder_element, duplicate_element, boolean_elements (use "operation" key), align_elements,
-    arrange_elements, set_pin, set_state, set_binding, set_interaction, set_link.
-    Container-relative placement: any add_* op accepts "in": "<frame_prefix>.inner_box" (or "<element_id>")
-    with relative x/y, "width": "fill" / "100%" / "50%", and "x": "center" — build frames & populate them in ONE batch!
-    Add ops accept any extra element property directly (flip_x, scale, skew, fill_rule, visible...).
-    Give elements explicit "id"s so later ops (clip, pin, state, binding, interaction) can refer to them.
-    Atomic: if any op fails nothing is changed, and the error names the failing op index.
+    add_image, add_instance, add_svg, add_frame, add_icon, add_button, add_progress_bar, add_gauge,
+    add_slot, add_tabs, add_stat_card, add_stack, add_grid, add_split, add_input, add_scroll, add_slider,
+    add_toggle, add_dropdown, create_layer, update_layer, delete_layer, set_layer, create_animation,
+    set_keyframes, update_element, delete_elements, move_elements, reorder_element, duplicate_element,
+    boolean_elements (use "operation" key), align_elements, arrange_elements, set_pin, set_state,
+    set_binding, set_interaction, set_link.
+    Container-relative placement: any add_* op accepts "in": "<frame_prefix>.inner_box" (or split region name)
+    with relative x/y, "width": "fill" / "100%" / "50%", and "x": "center".
+    compact: when true (or auto for >15 ops), returns a lightweight summary (frames, splits, warnings, op_count)
+      so large screens do not bloat context windows while keeping key boxes and warnings immediately readable.
     """
     st = store()
     c = st.get(canvas)
@@ -2329,13 +2904,27 @@ def batch(canvas: str, operations: list[dict]):
     st.checkpoint(c)
     results = []
     frame_boxes: dict[str, list[float]] = {k: list(v) for k, v in (c.get("_boxes") or {}).items()}
+    new_frames: dict[str, list[float]] = {}
+    new_splits: dict[str, list[float]] = {}
+    all_warnings: list[str] = []
     try:
         for index, raw in enumerate(operations):
             op_args = dict(_maybe_json(raw))
             op = op_args.pop("op", None)
             op_args.pop("canvas", None)
             try:
-                results.append(_exec_batch_op(st, c, op, op_args, frame_boxes))
+                res = _exec_batch_op(st, c, op, op_args, frame_boxes)
+                results.append(res)
+                if isinstance(res, dict):
+                    if op == "add_frame" and res.get("inner_box"):
+                        fk = str(op_args.get("id_prefix") or res.get("group") or f"frame_{index}")
+                        new_frames[fk] = list(res["inner_box"])
+                    elif op == "add_split" and res.get("boxes"):
+                        new_splits.update(res["boxes"])
+                    for w in res.get("warnings") or []:
+                        all_warnings.append(str(w))
+                    if res.get("note"):
+                        all_warnings.append(f"{res.get('id', op)}: {res['note']}")
             except KeyError as exc:
                 raise ValueError(f"operation {index} ({op}): missing argument {exc}") from exc
             except (ValueError, TypeError) as exc:
@@ -2345,7 +2934,42 @@ def batch(canvas: str, operations: list[dict]):
         st.save_canvas(c)
         raise
     st.save_canvas(c)
-    return {"canvas": c["id"], "results": results, "element_count": len(c["elements"])}
+    use_compact = bool(compact) if compact is not None else (len(operations) > 15)
+    if use_compact:
+        slim = []
+        for r_item in results:
+            if not isinstance(r_item, dict):
+                slim.append(r_item)
+            elif "id" in r_item:
+                entry = {"id": r_item["id"], "type": r_item.get("type")}
+                if r_item.get("note"):
+                    entry["note"] = r_item["note"]
+                slim.append(entry)
+            elif "inner_box" in r_item:
+                slim.append({"group": r_item.get("group"), "inner_box": r_item["inner_box"]})
+            elif "boxes" in r_item:
+                slim.append({"boxes": r_item["boxes"]})
+            elif "count" in r_item and "bbox" in r_item:
+                slim.append({"count": r_item["count"], "bbox": r_item["bbox"]})
+            else:
+                slim.append({k: v for k, v in r_item.items() if k not in ("results", "interactions", "links")})
+        out: dict[str, Any] = {
+            "canvas": c["id"], "compact": True, "op_count": len(operations),
+            "element_count": len(c["elements"]), "results": slim,
+        }
+        if new_frames:
+            out["frames"] = new_frames
+        if new_splits:
+            out["splits"] = new_splits
+        if all_warnings:
+            out["warnings"] = sorted(set(all_warnings))[:20]
+        return out
+    out_full: dict[str, Any] = {"canvas": c["id"], "results": results, "element_count": len(c["elements"])}
+    if new_frames:
+        out_full["frames"] = new_frames
+    if new_splits:
+        out_full["splits"] = new_splits
+    return out_full
 
 
 @tool
@@ -3131,6 +3755,8 @@ def preview(canvas: str, background: str = "checker", max_size: int = 1024, show
             scale = 2048 / max(rw, rh)
     else:
         scale = min(4.0, max_size / max(rw, rh))
+    if c.get("background") is None and c.get("preview_background") is not None and background == "checker":
+        c = dict(c, background=c["preview_background"])
     r = st.renderer(c, scale, state=state, language=language)
     solo = None
     if layers:
@@ -3333,7 +3959,7 @@ def review_canvas(canvas: str, min_contrast: float = 4.5, min_text_size: float =
         style = el.get("style")
         if isinstance(style, dict) and float(style.get("opacity", 1) or 0) <= 0.01 and "opacity" in style:
             add("transparent", "element has opacity 0", [eid], "info")
-        if el["type"] == "rect" and not el.get("rotation"):
+        if el["type"] == "rect" and not el.get("rotation") and not el.get("_decor"):
             vals = [float(el.get(k, 0)) for k in ("x", "y", "width", "height")]
             if any(abs(v - round(v)) > 1e-6 for v in vals):
                 add("subpixel", "rectangle is not on whole pixels, so its edges render soft "
@@ -3585,6 +4211,76 @@ def _hex(rgba) -> str:
 
 
 @tool
+def qa_screen(canvas: str, test_data: dict | None = None, simulate: str = "deuteranopia",
+              check_pseudo_long: bool = True, min_contrast: float = 4.5, background: str = "checker"):
+    """One-call comprehensive visual & automated QA pack for any UI screen!
+
+    In ONE call runs:
+    1. Full review_canvas audit (WCAG AA/AAA contrast, text size, overflow, safe area, binding/animation conflicts).
+    2. Optional pseudo-long (100% longer text) overflow stress check.
+    3. Composite diagnostic sheet PNG showing: Normal | Extreme test_data (if given) | Colorblind simulation | Pseudo-Long.
+    Replaces 4-6 separate preview + review calls with a single compact report and image!
+    """
+    from . import binding as _bnd
+    from .viewing import simulate as _sim
+    st = store()
+    c = st.get(canvas)
+    rev = review_canvas(canvas, min_contrast=min_contrast)
+    pseudo_issues: list[dict] = []
+    if check_pseudo_long:
+        rev_pl = review_canvas(canvas, min_contrast=min_contrast, language="pseudo-long")
+        pseudo_issues = [i for i in rev_pl.get("issues", []) if i.get("check") == "overflow"]
+
+    tile_w = 560
+    scale = min(1.0, tile_w / max(1, c["width"]))
+    tw = max(120, int(round(c["width"] * scale)))
+    th = max(80, int(round(c["height"] * scale)))
+
+    def _tile(c_obj: dict, title: str, *, lang: str | None = None, sim_kind: str | None = None) -> tuple[str, PILImage.Image]:
+        c_use = dict(c_obj, background=c_obj["preview_background"]) if (
+            c_obj.get("background") is None and c_obj.get("preview_background") is not None and background == "checker"
+        ) else c_obj
+        img = st.renderer(c_use, scale, language=lang).render()
+        view = PILImage.alpha_composite(_backdrop_any(background, img.size, c_use, scale, (0.0, 0.0)), img)
+        if sim_kind:
+            view = _sim(view, sim_kind)
+        return title, view.convert("RGB")
+
+    tiles: list[tuple[str, PILImage.Image]] = [_tile(c, "NORMAL")]
+    parsed_td = _maybe_json(test_data)
+    if isinstance(parsed_td, dict) and parsed_td:
+        tiles.append(_tile(_bnd.apply_bindings(c, parsed_td), "TEST DATA"))
+    if simulate and str(simulate).lower() != "none":
+        tiles.append(_tile(c, f"SIM: {str(simulate).upper()}", sim_kind=str(simulate).lower()))
+    if check_pseudo_long:
+        tiles.append(_tile(c, "PSEUDO-LONG (+100%)", lang="pseudo-long"))
+
+    cols = 2 if len(tiles) > 1 else 1
+    rows = (len(tiles) + cols - 1) // cols
+    pad, hdr = 14, 24
+    sheet = PILImage.new("RGB", (cols * (tw + pad) + pad, rows * (th + hdr + pad) + pad), (10, 14, 22))
+    draw = ImageDraw.Draw(sheet)
+    font = _label_font(13)
+    for i, (label_t, tile_img) in enumerate(tiles):
+        col_i, row_i = i % cols, i // cols
+        tx = pad + col_i * (tw + pad)
+        ty = pad + row_i * (th + hdr + pad)
+        draw.text((tx, ty + 4), label_t, fill=(226, 232, 240), font=font)
+        sheet.paste(tile_img.resize((tw, th), PILImage.Resampling.LANCZOS), (tx, ty + hdr))
+
+    warns = [i for i in rev.get("issues", []) if i.get("severity") in ("warn", "error")]
+    summary = {
+        "canvas": c["id"],
+        "ok": bool(rev.get("ok")) and not pseudo_issues,
+        "wcag": rev.get("wcag"),
+        "warnings": warns,
+        "pseudo_long_overflows": pseudo_issues,
+        "panels": [t[0] for t in tiles],
+    }
+    return [Image(data=_png_bytes(sheet), format="png"), json.dumps(summary, ensure_ascii=False)]
+
+
+@tool
 def inspect_pixels(canvas: str, points: list[list[float]], scale: float = 1, include_background: bool = True):
     """Read exact rendered colours at canvas points [[x, y], ...] (canvas units). Returns RGBA hex per point,
     and the WCAG contrast ratio between the first two points (e.g. a text pixel and the panel behind it).
@@ -3735,20 +4431,14 @@ def export_svg(canvas: str, path: str | None = None, include_background: bool = 
 
 @tool
 def export_web(canvases: list[str] | str, out_dir: str | None = None, layout: str = "fit",
-               language: str | None = None, include_background: bool = True, image_scale: float = 2):
+               language: str | None = None, include_background: bool = True, image_scale: float = 2,
+               single_file: bool = False, shared_state: bool = True):
     """Export canvases as a working website: one HTML page per canvas (the first is index.html), with
     styles.css, app.js and an assets folder - open index.html in a browser or upload the folder.
 
-    Rects and ellipses become CSS boxes (gradients, borders, shadows, blur, backdrop-filter), text stays
-    real, selectable text with its fonts copied in, other shapes become inline SVG, and only effects the
-    web cannot draw the same way become pictures. Theme colours stay CSS variables (set
-    <html data-theme="light"> to switch a mode). Interactivity: set_link targets become page links
-    (mode "overlay" opens a page as a dialog, "url" an external link); "hover" / "pressed" / "focused"
-    states become CSS; move / rotate / scale / fade animations become CSS keyframes (they autoplay);
-    elements with the same id animate between pages (smart animate via View Transitions);
-    canvas focus_order sets keyboard order; an element's "fixed": true keeps it in place while scrolling.
-    layout: "fit" scales each page to the window like a prototype; "responsive" uses the elements' pins
-    (set_pin) as CSS anchors so the page adapts to any window size and scrolls when taller.
+    single_file: true bundles ALL screens, CSS, JS, fonts and images into ONE self-contained shareable index.html!
+    shared_state: true (default) syncs reactive data variables across screen navigations via sessionStorage.
+    layout: "fit" scales each page to the window like a prototype; "responsive" uses pins (set_pin) as CSS anchors.
     """
     from . import webexport
     st = store()
@@ -3761,9 +4451,10 @@ def export_web(canvases: list[str] | str, out_dir: str | None = None, layout: st
     for c in pages:
         st.require_glyphs(c, language)
     folder = _out_dir(out_dir, f"web/{pages[0]['id']}")
-    report = webexport.build(st, pages, folder, layout, language, include_background, image_scale)
+    report = webexport.build(st, pages, folder, layout, language, include_background, image_scale,
+                             single_file=bool(single_file), shared_state=bool(shared_state))
     result: dict = {"folder": str(folder), "open": str(folder / "index.html"), "pages": report["pages"],
-                    "embedded_as_image": report["picture"]}
+                    "embedded_as_image": report["picture"], "single_file": bool(single_file)}
     if report["notes"]:
         result["notes"] = report["notes"]
     return result
@@ -3772,13 +4463,14 @@ def export_web(canvases: list[str] | str, out_dir: str | None = None, layout: st
 @tool
 def export_react(canvases: list[str] | str, out_dir: str | None = None, language: str | None = None,
                  include_background: bool = True, image_scale: float = 2, css: str = "css",
-                 typescript: bool = False):
+                 typescript: bool = False, scaffold: bool = False):
     """Export canvases as React components (JSX or TypeScript TSX + CSS or Tailwind utilities) for React / Next.js / Vite:
     one <Name>.jsx/.tsx (and <Name>.css) per canvas, uiforge-runtime.js and an assets folder.
     Supports live data bindings (pass data={{hp: 40}} prop), onNavigate(canvasId, mode), onSfx(name),
     keyboard + gamepad focus navigation, hover / pressed CSS, keyframe animations and set_interaction rules.
     css: "css" (default stylesheet per component) or "tailwind" (Tailwind utility classes on elements).
-    typescript: true emits typed .tsx components with <Name>Props interfaces and index.ts."""
+    typescript: true emits typed .tsx components with <Name>Props interfaces and index.ts.
+    scaffold: true also generates a runnable Vite project (package.json, vite.config, index.html, src/App.tsx)."""
     from . import webexport
     st = store()
     names = [canvases] if isinstance(canvases, str) and not canvases.strip().startswith("[") else (_maybe_json(canvases) or [])
@@ -3792,11 +4484,13 @@ def export_react(canvases: list[str] | str, out_dir: str | None = None, language
         st.require_glyphs(c, language)
     folder = _out_dir(out_dir, f"react/{pages[0]['id']}")
     report = webexport.build_react(st, pages, folder, language, include_background, image_scale,
-                                   css_mode=css_mode, typescript=bool(typescript))
+                                   css_mode=css_mode, typescript=bool(typescript), scaffold=bool(scaffold))
     stem = Path(report["components"][0]).stem
     result: dict = {"folder": str(folder), "components": report["components"],
                     "embedded_as_image": report["picture"], "css": css_mode, "typescript": bool(typescript),
                     "usage": f"import {stem} from './{folder.name}/{stem}';"}
+    if report.get("scaffold_files"):
+        result["scaffold_files"] = report["scaffold_files"]
     if report["notes"]:
         result["notes"] = report["notes"]
     return result

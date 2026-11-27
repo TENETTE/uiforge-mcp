@@ -226,63 +226,66 @@ Relative paths go to the workspace exports folder; absolute paths are used as gi
 }
 
 CHEATSHEET = """\
-# uiforge-mcp Compact Cheatsheet (Read Once Instead of 25 Tool Schemas)
+# uiforge-mcp Compact Cheatsheet (Read Once Instead of 30 Tool Schemas)
 
 ## 1. Core Workflow
 1. `set_theme(style_preset=..., quality=..., colors={...}, styles={...}, numbers={...})`
    - `style_preset`: kids | cartoon | stylized | minimal | web_saas | scifi | dark_fantasy | realistic | photorealistic
    - `quality`: simple | standard | advanced | aaa
-2. `create_canvas(name, width, height, background=..., safe_area=[l,t,r,b])`
-3. Build whole screens atomically with `batch(canvas, operations=[...])`
-4. Inspect with `preview(canvas)` + `review_canvas(canvas)` -> fix all warnings
-5. Export with `export_web`, `export_react`, `export_screen`, `export_asset`, `export_pbr_maps`, `export_svg`, `export_animation`
+   - All composite widgets automatically inherit active theme fonts & colors and guarantee WCAG >= 4.5:1!
+2. `create_canvas(name, width, height, background=..., preview_background=..., preset=...)`
+   - HUD tip: omit `background` (transparent for engine export & `preview(background="game")`) and pass `preview_background` for mockup/web backdrop!
+3. Build whole screens atomically with `batch(canvas, operations=[...])` (auto-compact summary for >15 ops returning top-level `frames`, `splits`, `warnings`).
+4. Verify in ONE call with `qa_screen(canvas, test_data={...})` (WCAG + pseudo-long + colorblind + test_data composite sheet!) or `preview` + `review_canvas`.
+5. Export with `export_project` (multi-screen Godot/Unity/Web/React + router), `export_web(single_file=True)`, `export_react(scaffold=True)`, `export_screen`, `export_pbr_maps`, `export_animation`.
 
-## 2. Exact Primitive & Composite Signatures (usable standalone OR as `{"op": "..."}` in `batch`)
+## 2. Primitives & High-Level Game UI Composites (standalone OR `{"op": "..."}` in `batch`)
 - `add_rect`: `x, y, width, height, radius=0, corner="round"|"cut", smoothing=0..1, fill, stroke, style, clip, id, group, layer`
 - `add_ellipse`: `cx, cy, rx, ry=rx, fill, stroke, style, id, group, layer`
-- `add_line`: `points=[[x1,y1],[x2,y2],...], width=2, color, dash, start_cap, end_cap, id, group, layer`  *(uses `points`, NOT x1/y1)*
+- `add_line`: `points=[[x1,y1],[x2,y2],...], width=2, color, dash, start_cap, end_cap` *(uses `points`, NOT x1/y1)*
 - `add_polygon`: `cx, cy, radius, sides` OR `points=[[x,y],...], fill, stroke, style, rotation, origin=[ox,oy]`
 - `add_arc`: `cx, cy, radius, start_angle, end_angle, thickness=6, color, dash, cap="butt"|"round"` *(0°=3 o'clock, CW; gauges 135->405)*
-- `add_ticks`: `cx, cy, radius, start_angle, end_angle, count, major_every=0, length=8, major_length, labels=[...]`
-  *(For 360° closed ring pass divisions directly, e.g. `count=48, major_every=6`; `49` auto-collapses the duplicate 360° end tick.)*
+- `add_ticks`: `cx, cy, radius, start_angle, end_angle, count, major_every=0, length=8, major_length, labels=[...]` *(360° closed ring: `count=48, major_every=6`)*
 - `add_path`: `d="M ...", x=0, y=0, scale=1, fill, stroke, style`
-- `add_text`: `text, x, y, size=24, font="Inter", weight=400..900, anchor="top-left"|"center"|"middle-left"|"middle-right"|"bottom-left"|"bottom-right", align, color, max_width, fit_width, max_lines, letter_spacing, case, features, lang`
-  *(Note: `JetBrains Mono` is already tabular monospace — no `features:["tnum"]` needed.)*
-- `add_icon`: `name, x, y, size=28, color="#f8fafc", stroke_width=2, filled=None, style` *(stores true absolute x/y; `update_element` moves directly! See `uiforge://icons`)*
-- `add_frame`: `x, y, width, height, preset="auto"|rpg_gold|royal_ornate|fantasy_parchment|scifi_hud|cyber_tech|glass_card|medieval_iron|luxury_minimal|cartoon_thick, title, accent, material, id_prefix, group, layer` -> returns `inner_box: [ix, iy, iw, ih]`
-- `add_button`: `x, y, width, height, label, icon=None, keycap=None, variant="primary"|"secondary"|"ghost"|"danger"|"gold", corner=None, radius=None, accent=None, link=None, sfx="ui_click", states="auto", id, group, layer`
-  *(One-call AAA button: styled body + centered icon/label + optional keycap + hover/pressed/focused/disabled states + click link/SFX!)*
-- `add_progress_bar`: `x, y, width, height, value=75, max_value=100, label=None, show_value=True, color=None, track_color=None, low_color="#fb6b84", low_threshold=0.3, bind_value=None, bind_max=None, corner="round"|"cut", id, group, layer`
-  *(One-call track + clipped gradient fill + label + live numeric readout + auto `set_binding` for width & low-threshold danger color!)*
+- `add_text`: `text, x, y, size=24, font="Inter", weight=400..900, anchor, align, color, max_width, fit_width, max_lines, letter_spacing, case, features, lang`
+- `add_icon`: `name, x, y, size=28, color="#f8fafc", stroke_width=2, filled=None, style` *(stores true absolute x/y; see `uiforge://icons`)*
+- `add_frame`: `x, y, width, height, preset="auto"|rpg_gold|royal_ornate|fantasy_parchment|scifi_hud|cyber_tech|glass_card|medieval_iron|luxury_minimal|cartoon_thick, title, accent, material, id_prefix` -> `inner_box`
+- `add_button`: `x, y, width, height, label, icon, keycap, variant="primary"|"secondary"|"ghost"|"danger"|"gold", corner, link, sfx="ui_click", states="auto", id` *(auto WCAG >= 4.8:1 & 12px high-contrast keycaps; isolated per-button group inside stacks)*
+- `add_progress_bar`: `x, y, width, height, value=75, max_value=100, label, show_value=True, color, low_color, low_threshold=0.3, bind_value, bind_max, corner, id`
+- `add_gauge`: `cx, cy, radius=90, value=65, min_value=0, max_value=100, style="radial"|"semi"|"segmented", unit="", label, redline=0.8, ticks=8, bind_value, id` *(one-call AAA dial + ticks + conic arc + needle + spun metal hub + live bindings!)*
+- `add_slot`: `x, y, width=180, height=74, icon, label, sublabel, keycap, badge, rarity="common"|"uncommon"|"rare"|"epic"|"legendary"|"exotic", selected=False, cooldown=0, bind_cooldown, layout="horizontal"|"square", click_toggle=True, id`
+- `add_tabs`: `x, y, items=[{"label","icon","link"}|str], width, height=42, active=0, gap=10, variant="cut"|"pill"|"underline", id`
+- `add_stat_card`: `x, y, label, value, subvalue, icon, accent, badge, width, height, compact=False, id` *(`compact=True` builds an auto-width hug pill!)*
 
 ## 3. Native Interactive Widgets (Web/React, Godot, Unity, Unreal UMG, Roblox, WPF/Avalonia/WinUI, Qt QML, ImGui)
-- `add_input`: `x, y, width=240, height=42, placeholder, value, input_type="text"|"password"|"number"|"email"|"search", label, bind, max_length`
+- `add_input`: `x, y, width=240, height=42, placeholder, value, input_type, label, bind, max_length`
 - `add_dropdown`: `x, y, width=220, height=40, options=[...], selected=0|"str", label, bind`
 - `add_slider`: `x, y, width=220, height=28, min=0, max=100, value=50, step=1, label, show_value=True, fill_color, bind`
 - `add_toggle`: `x, y, width=52, height=28, checked=False, variant="switch"|"checkbox", label, on_color, off_color, bind`
-- `add_scroll`: `x, y, width=280, height=220, items=[{"title","subtitle","badge"}|str], direction="vertical"|"horizontal"|"both", item_height=38, gap=8`
-- **Label geometry:** `input`, `dropdown`, `slider` draw `label` ~22px **ABOVE `y`**; `toggle` draws `label` at `x + width + 10` to the **RIGHT**.
+- `add_scroll`: `x, y, width=280, height=220, items=[{"title","subtitle","badge"}|str], direction, item_height=38, gap=8`
+- **Label geometry:** `input`, `dropdown`, `slider` draw `label` ~22px **ABOVE `y`**; `toggle` draws `label` to the **RIGHT**.
 
-## 4. Zero-Math Batch Layout (`in` + `add_stack`)
-- Inside `batch`, any `add_*` op accepts `"in": "<frame_prefix>.inner_box"` (or `"<element_id>"`):
-  - `x`/`y` become relative to that container's top-left; `"width": "fill"` / `"100%"` fills remaining width; `"x": "center"` centers horizontally!
-- `add_stack`: `x, y, direction="column"|"row", gap=12, padding=0, width=None, align="start"|"center"|"end"|"stretch", in=None, children=[{"op":"add_input",...}, ...]`
-  *(Automatically accounts for 22px label headroom above stacked `input`/`dropdown`/`slider`/`progress_bar` widgets!)*
+## 4. Zero-Math Flex, Grid & Split Layout (`in`, `add_stack`, `add_grid`, `add_split`)
+- Any `add_*` op in `batch` accepts `"in": "<frame>.inner_box"` (or a split region name!) with relative `x`/`y`, `"width": "fill"|"50%"`, `"x": "center"`.
+- `add_split`: `x, y, width, height, direction="row"|"column", sizes=["27%", "1fr", "27%"], gap=20, names=["left","center","right"], children=[...]|{name:[...]}` *(divides screens with zero pixel math & registers named boxes!)*
+- `add_grid`: `x, y, width, height, cols=2, gap=16, equal_rows=False, in_box, children=[{"op":"add_slot", "col_span":1, ...}]`
+- `add_stack`: `x, y, direction="column"|"row", gap=12, width, height, align="start"|"center"|"end"|"stretch", justify="start"|"center"|"end"|"space-between"|"space-around", in_box, children=[...]`
+  - Supports `"height": "fill"` / `"flex": 1` (e.g. `add_scroll` fills remaining frame height!) and `{"op": "spacer"}` to push trailing controls to the far edge!
 
-## 5. Layers, 3D Perspective, States, Bindings & Animation
-- `create_layer(canvas, name, opacity=1, blend="normal", clip=False, style={...})`:
-  - 3D HUD: `style={"perspective": {"rotate_y": 20, "rotate_x": -6, "visor_curve": 0}}`
-  - **`visor_curve: 0` (flat 3D tilt)** exports as live CSS `transform: perspective(...) rotateY(...)` keeping ALL web/React bindings & widgets interactive!
-  - **`visor_curve > 0` (cylindrical barrel warp)** rasterizes the layer on web -> keep interactive widgets/live bindings on a normal layer.
-- `set_state(canvas, state="hover"|"pressed"|"focused"|"disabled"|"selected", id, props)`
-- `set_binding(canvas, data={...}, target, property, expr)` *(Precedence: `set_binding` overrides `set_keyframes` on the same `(target, property)`; `review_canvas` warns on conflicts!)*
-- `set_interaction(canvas, id, trigger="load"|"hover"|"leave"|"press"|"release"|"click"|"key:Tab"|"end:<anim>", action="play"|"stop"|"set_state"|"clear_state"|"toggle_state"|"navigate"|"overlay"|"back"|"url", ...)`
+## 5. Layers, 3D Perspective, Bindings, Interactions & Shared State
+- `create_layer(..., style={"perspective": {"rotate_y": 20, "rotate_x": -6, "visor_curve": 0}})`: `visor_curve: 0` exports as live CSS 3D keeping all bindings/widgets live; `review_canvas` accurately projects 3D text WCAG contrast!
+- `set_binding(canvas, data={...}, target, property, expr)`:
+  - Expression helpers: `min`, `max`, `abs`, `round`, `floor`, `ceil`, `sqrt`, `clamp`, `mix`, `lerp`, `where`, `int`, `float`, `str`, `pct`, `format_num(n, dec=0)`, `concat(a, b, ...)`, `upper(s)`, `lower(s)`.
+  - `$token` and `#rrggbb@alpha` literals in `expr` auto-resolve to valid CSS/rgba (Web/React) and 8-digit hex (Godot `Color.html`).
+- `set_interaction(canvas, id, trigger, action, ...)`:
+  - Actions: `play`, `stop`, `set_state`, `clear_state`, `toggle_state` (element-scoped on element triggers!), `set_data` (`data={...}`), `reset_data`, `navigate`, `overlay`, `back`, `url`.
+  - `remove=True` cleanly deletes matching rules without requiring `target`/`state`.
 - Read `uiforge://materials` before picking PBR backgrounds (`text_safe: true` vs glossy `obsidian`/`chrome`).
 
-## 6. Exports
-- `export_web(canvases, out_dir, layout="fit"|"responsive")` -> HTML + CSS + `app.js`
-- `export_react(canvases, out_dir, css="css"|"tailwind", typescript=True)` -> `.tsx` + `.d.ts` + runtime
-- `export_screen(canvas, engine="godot"|"unity"|"unity-ugui"|"unreal"|"roblox"|"wpf"|"avalonia"|"winui"|"qt-qml"|"imgui", out_dir)`
-- `export_pbr_maps(canvas, out_dir, normal_format="opengl"|"directx", pack_orm=True)`
-- `export_animation(canvas, animation="all"|<name>, format="dotlottie"|"lottie"|"spritesheet"|"gif"|"webp"|"mp4", out_dir)`
+## 6. QA & Exports
+- `qa_screen(canvas, test_data={...}, simulate="deuteranopia", check_pseudo_long=True)` -> 1-call full visual + WCAG + pseudo-long QA sheet!
+- `export_project(canvases, engine="godot"|"unity"|"unreal"|"roblox"|"web"|"react", out_dir, single_file=False, scaffold=False)` -> multi-screen project with shared `fonts/`, `tokens/` & router (`UIManager.gd` / `UiScreenRouter.cs` / `App.tsx`)!
+- `export_web(canvases, out_dir, layout="fit"|"responsive", single_file=False, shared_state=True)` -> pure CSS gradients, live clipped bars & conic arcs, shared `sessionStorage` state, or 1 self-contained HTML file!
+- `export_react(canvases, out_dir, css="css"|"tailwind", typescript=True, scaffold=False)` -> `.tsx` + `.d.ts` + optional runnable Vite starter!
+- `export_screen`, `export_pbr_maps`, `export_spec`, `export_svg`, `export_animation(format="dotlottie"|"lottie"|"gif"|"mp4"|"json")`.
 """

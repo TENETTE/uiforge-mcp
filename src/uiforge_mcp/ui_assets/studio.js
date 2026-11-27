@@ -776,8 +776,15 @@
       { label: "New Blank Canvas", cat: "Action", run: () => openModal("modal-new") },
       { label: "Add AAA Button (icon + keycap + auto states)", cat: "Create", run: () => document.querySelector('[data-create="button"]').click() },
       { label: "Add Progress Bar (auto binding + low threshold)", cat: "Create", run: () => document.querySelector('[data-create="progress_bar"]').click() },
+      { label: "Add AAA Dial Gauge (ticks + conic arc + needle)", cat: "Create", run: () => document.querySelector('[data-create="gauge"]').click() },
+      { label: "Add Game Ability / Equipment Slot", cat: "Create", run: () => document.querySelector('[data-create="slot"]').click() },
+      { label: "Add Navigation Tabs Bar", cat: "Create", run: () => document.querySelector('[data-create="tabs"]').click() },
+      { label: "Add Telemetry KPI Stat Card", cat: "Create", run: () => document.querySelector('[data-create="stat_card"]').click() },
       { label: "Add Auto-Headroom Form Stack", cat: "Create", run: () => document.querySelector('[data-create="stack"]').click() },
+      { label: "Add 2×2 Responsive Grid", cat: "Create", run: () => document.querySelector('[data-create="grid"]').click() },
+      { label: "Add 3-Column Proportional Split", cat: "Create", run: () => document.querySelector('[data-create="split"]').click() },
       { label: "Add 360° Dial Ticks", cat: "Create", run: () => document.querySelector('[data-create="ticks"]').click() },
+      { label: "Run 1-Click Full QA Sheet (WCAG + Colorblind + Pseudo-Long)", cat: "Audit", run: () => $("btn-run-qa").click() },
       { label: "Open Engine Cheatsheet", cat: "Help", run: () => openCheatsheet() },
       { label: "Export & Engine Delivery", cat: "Action", run: () => $("btn-export").click() },
       { label: "Run WCAG & Layout Audit", cat: "Action", run: () => runAudit() },
@@ -975,6 +982,10 @@
       const defs = {
         button: ["add_button", { canvas: state.canvasId, x: cx - 105, y: cy - 24, width: 210, height: 48, label: "Deploy Action", icon: "play", keycap: "E", variant: "primary" }],
         progress_bar: ["add_progress_bar", { canvas: state.canvasId, x: cx - 140, y: cy - 8, width: 280, height: 16, value: 78, max_value: 100, label: "Energy Core", bind_value: "energy", bind_max: "max_energy" }],
+        gauge: ["add_gauge", { canvas: state.canvasId, cx, cy, radius: 92, value: 68, max_value: 100, unit: "M/S", label: "VELOCITY", bind_value: "speed" }],
+        slot: ["add_slot", { canvas: state.canvasId, x: cx - 95, y: cy - 37, width: 190, height: 74, icon: "bolt", label: "Overburn", sublabel: "READY", keycap: "1", rarity: "legendary" }],
+        tabs: ["add_tabs", { canvas: state.canvasId, x: cx - 210, y: Math.max(24, cy - 21), width: 420, height: 42, active: 0, items: [{ label: "Combat HUD", icon: "crosshair" }, { label: "Loadout", icon: "sliders" }, { label: "Config", icon: "settings" }] }],
+        stat_card: ["add_stat_card", { canvas: state.canvasId, x: cx - 130, y: cy - 38, width: 260, height: 76, label: "CORE THERMAL", value: "418 C", subvalue: "98.4%", icon: "flame", badge: "OK" }],
         stack: ["add_stack", Object.assign(
           { canvas: state.canvasId, direction: "column", gap: 14, align: "stretch", width: 280, children: [
             { op: "add_input", label: "Callsign", value: "VANGUARD-01" },
@@ -983,6 +994,20 @@
           ] },
           firstBox ? { in_box: firstBox, x: 12, y: 12 } : { x: cx - 140, y: cy - 90 }
         )],
+        grid: ["add_grid", Object.assign(
+          { canvas: state.canvasId, cols: 2, gap: 14, width: 390, children: [
+            { op: "add_slot", label: "Rail Cannon", sublabel: "DMG 184", icon: "crosshair", rarity: "legendary", keycap: "1" },
+            { op: "add_slot", label: "Ion Shield", sublabel: "CAP +40%", icon: "shield", rarity: "rare", keycap: "2" },
+            { op: "add_slot", label: "EMP Flare", sublabel: "3.2S CD", icon: "bolt", rarity: "epic", keycap: "3" },
+            { op: "add_slot", label: "Solar Salvo", sublabel: "ARMED", icon: "flame", rarity: "exotic", keycap: "4" },
+          ] },
+          firstBox ? { in_box: firstBox, x: 10, y: 10 } : { x: cx - 195, y: cy - 82 }
+        )],
+        split: ["add_split", { canvas: state.canvasId, x: 24, y: 24, width: Math.max(300, c.width - 48), height: Math.max(200, c.height - 48), direction: "row", sizes: ["28%", "1fr", "28%"], gap: 16, names: ["col_left", "col_center", "col_right"], children: [
+          [{ op: "add_frame", preset: "scifi_hud", title: "LEFT WING", x: 0, y: 0, width: "fill", height: "fill" }],
+          [{ op: "add_frame", preset: "scifi_hud", title: "MAIN STAGE", x: 0, y: 0, width: "fill", height: "fill" }],
+          [{ op: "add_frame", preset: "glass_card", title: "TUNING", x: 0, y: 0, width: "fill", height: "fill" }],
+        ] }],
         ticks: ["add_ticks", { canvas: state.canvasId, cx, cy, radius: 92, start_angle: 0, end_angle: 360, count: 48, major_every: 6, color: "#94a3b8@0.55", major_color: "#e89b3c", labels: ["E", "SE", "S", "SW", "W", "NW", "N", "NE"] }],
         rect: ["add_rect", { canvas: state.canvasId, x: cx - 100, y: cy - 40, width: 200, height: 80, radius: 10, fill: "#1e293b", stroke: { color: "#e89b3c", width: 1.5 } }],
         ellipse: ["add_ellipse", { canvas: state.canvasId, cx, cy, rx: 46, ry: 46, style: { material: "gold" } }],
@@ -1587,6 +1612,26 @@
     });
   }
   $("btn-audit").onclick = $("btn-run-audit").onclick = runAudit;
+  if ($("btn-run-qa")) $("btn-run-qa").onclick = async () => {
+    if (!state.canvasId) return toast("Create a canvas first", "err");
+    document.querySelector('.rtab[data-right="audit"]').click();
+    toast("Running Full QA Sheet (WCAG + Colorblind + Pseudo-Long)…", "info");
+    const res = await apiOp("qa_screen", { canvas: state.canvasId });
+    const imgObj = Array.isArray(res) ? res[0] : null;
+    const meta = Array.isArray(res) ? (typeof res[1] === "string" ? JSON.parse(res[1]) : res[1]) : res;
+    if (imgObj && imgObj.image_data_uri && $("qa-sheet-img")) {
+      $("qa-sheet-img").src = imgObj.image_data_uri;
+      $("qa-sheet-img").hidden = false;
+    }
+    const box = $("audit-results");
+    if (meta && box) {
+      let html = `<div class="audit-card ${meta.ok ? "pass" : "warn"}"><strong>Full QA:</strong> ${meta.ok ? "ALL CHECKS PASSED" : "NEEDS ATTENTION"} · Panels: ${(meta.panels || []).join(" | ")}</div>`;
+      if (meta.wcag) html += `<div class="audit-card ${meta.wcag.aa_pass ? "pass" : "warn"}"><strong>WCAG:</strong> min ${meta.wcag.min_ratio}:1 (${meta.wcag.aa_pass ? "AA PASS" : "BELOW AA"})</div>`;
+      if ((meta.pseudo_long_overflows || []).length) html += `<div class="audit-card warn"><strong>Pseudo-Long (+100%):</strong> ${meta.pseudo_long_overflows.length} overflow(s)</div>`;
+      for (const w of (meta.warnings || [])) html += `<div class="audit-card ${w.severity || "warn"}"><strong>[${w.check}]</strong> ${w.message}</div>`;
+      box.innerHTML = html;
+    }
+  };
   $("btn-save-ver").onclick = async () => {
     if (!state.canvasId) return;
     const res = await apiOp("canvas_version", { canvas: state.canvasId, action: "save" });
@@ -1636,7 +1681,10 @@
         res = await apiOp("export_animation", { canvas: state.canvasId, animation: animArg, format: target });
       }
       else if (target === "web") res = await apiOp("export_web", { canvases: [state.canvasId] });
+      else if (target === "web-single") res = await apiOp("export_web", { canvases: (state.boot.canvases || []).map((c) => c.id), single_file: true });
       else if (target === "react") res = await apiOp("export_react", { canvases: [state.canvasId], typescript: true, css: "tailwind" });
+      else if (target === "react-vite") res = await apiOp("export_react", { canvases: (state.boot.canvases || []).map((c) => c.id), typescript: true, css: "tailwind", scaffold: true });
+      else if (target === "project-godot") res = await apiOp("export_project", { canvases: (state.boot.canvases || []).map((c) => c.id), engine: "godot" });
       else res = await apiOp("export_screen", { canvas: state.canvasId, engine: target });
 
       $("export-output").hidden = false;
@@ -1648,6 +1696,9 @@
       $("exp-out-dir").textContent = relOut;
       const filePaths = [];
       if (res.file) filePaths.push(res.file);
+      if (res.router) filePaths.push(res.router);
+      if (res.tokens) filePaths.push(res.tokens);
+      if (Array.isArray(res.scaffold_files)) for (const sf of res.scaffold_files) filePaths.push(`${folder}/${sf}`);
       if (Array.isArray(res.files)) {
         for (const f of res.files) filePaths.push(typeof f === "string" ? (folder ? `${folder}/${f}` : f) : f.file);
       } else if (res.files && typeof res.files === "object") {

@@ -26,7 +26,7 @@ def _colors_in(value: Any, out: list[str]) -> None:
 def design_lint(r, canvas: dict, theme: dict) -> list[tuple[str, str, list[str] | None]]:
     found: list[tuple[str, str, list[str] | None]] = []
     W, H = float(canvas["width"]), float(canvas["height"])
-    elements = [e for e in canvas["elements"] if e.get("visible", True)]
+    elements = [e for e in canvas["elements"] if e.get("visible", True) and not e.get("_decor")]
 
     edges: dict[str, list[tuple[float, str]]] = {"x": [], "y": []}
     for el in elements:

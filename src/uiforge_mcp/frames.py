@@ -158,7 +158,10 @@ def frame_operations(x: float, y: float, width: float, height: float, preset: st
     ops: list[dict[str, Any]] = []
 
     def add(etype: str, suffix: str, **props) -> None:
-        ops.append({"type": etype, "id": f"{pfx}_{suffix}", **base, **props})
+        item = {"type": etype, "id": f"{pfx}_{suffix}", **base, **props}
+        if etype != "text":
+            item["_decor"] = True
+        ops.append(item)
 
     def add_rivet(suffix: str, rx: float, ry: float, rad: float, mat_name: str = "steel") -> None:
         add("ellipse", f"{suffix}_sock", cx=rx, cy=ry, rx=rad + 1.4, ry=rad + 1.4,

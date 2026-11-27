@@ -98,7 +98,13 @@
           <div class="chip-grid" id="primitive-grid">
             <button class="chip" data-create="button">AAA Button</button>
             <button class="chip" data-create="progress_bar">Progress Bar</button>
+            <button class="chip" data-create="gauge">Dial Gauge</button>
+            <button class="chip" data-create="slot">Ability Slot</button>
+            <button class="chip" data-create="tabs">Nav Tabs</button>
+            <button class="chip" data-create="stat_card">Stat Card</button>
             <button class="chip" data-create="stack">Form Stack</button>
+            <button class="chip" data-create="grid">2×2 Grid</button>
+            <button class="chip" data-create="split">3-Col Split</button>
             <button class="chip" data-create="ticks">360° Dial Ticks</button>
             <button class="chip" data-create="rect">Panel</button>
             <button class="chip" data-create="ellipse">Circle</button>
@@ -142,7 +148,7 @@
               <span class="badge" id="ops-count">0</span>
             </div>
           </div>
-          <input type="search" id="ops-search" class="inp" placeholder="Search all 100 operations…" aria-label="Search core operations" />
+          <input type="search" id="ops-search" class="inp" placeholder="Search all 108 operations…" aria-label="Search core operations" />
           <div id="ops-list" class="stack-list ops-scroll"></div>
           <div class="runner-box">
             <div class="sec-head"><span>Direct Runner</span><span class="mono" id="runner-op-name">batch</span></div>
@@ -418,8 +424,12 @@
         <section class="panel" id="right-audit" role="tabpanel">
           <div class="sec-head">
             <span>WCAG &amp; Layout Audit</span>
-            <button class="mini-btn" id="btn-run-audit">Run Check</button>
+            <div class="row-inline">
+              <button class="mini-btn" id="btn-run-qa" title="1-click Full QA Sheet: WCAG + Colorblind + Pseudo-Long">Full QA</button>
+              <button class="mini-btn" id="btn-run-audit">Run Check</button>
+            </div>
           </div>
+          <img id="qa-sheet-img" class="diff-img" alt="Full QA diagnostic sheet" hidden />
           <div id="audit-results" class="stack-list"><div class="empty-note">Run audit to verify WCAG contrast, clipping, sub-pixels, safe areas, and alignment.</div></div>
 
           <div class="sec-head sec-gap">
@@ -510,6 +520,7 @@
             <button class="exp-card" data-exp="unity"><strong>Unity UI Toolkit</strong><span>.uxml + .uss + Controller.cs</span></button>
             <button class="exp-card" data-exp="unity-ugui"><strong>Unity uGUI</strong><span>C# Canvas / RectTransform builder</span></button>
             <button class="exp-card" data-exp="godot"><strong>Godot 4</strong><span>.tscn + _controller.gd + widgets</span></button>
+            <button class="exp-card" data-exp="project-godot"><strong>Godot Multi-Screen</strong><span>All canvases + UIManager.gd</span></button>
             <button class="exp-card" data-exp="roblox"><strong>Roblox Studio</strong><span>ScreenGui .client.luau</span></button>
           </div>
           <div class="exp-col">
@@ -520,7 +531,9 @@
             <button class="exp-card" data-exp="qt-qml"><strong>C++ Qt 6 QML</strong><span>.qml with native controls</span></button>
             <button class="exp-card" data-exp="imgui"><strong>C++ Dear ImGui</strong><span>Self-contained _ui.hpp</span></button>
             <button class="exp-card" data-exp="web"><strong>Interactive HTML/CSS</strong><span>Live bindings &amp; Gamepad API</span></button>
+            <button class="exp-card" data-exp="web-single"><strong>Single-File HTML</strong><span>1 shareable self-contained page</span></button>
             <button class="exp-card" data-exp="react"><strong>React TSX (Tailwind)</strong><span>TypeScript 5 + React 19</span></button>
+            <button class="exp-card" data-exp="react-vite"><strong>React Vite Starter</strong><span>Runnable package.json + App.tsx</span></button>
           </div>
         </div>
         <div id="export-output" class="export-output" hidden>

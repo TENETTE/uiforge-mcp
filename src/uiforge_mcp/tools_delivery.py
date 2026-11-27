@@ -24,12 +24,13 @@ from .server import (Image, _gradient_blocks, _label_font, _maybe_json, _out_dir
 from .store import slugify
 
 __all__ = ["preview_nine_slice", "export_spec", "export_theme", "set_link", "set_interaction", "set_binding",
-           "live_preview", "export_prototype", "export_screen"]
+           "live_preview", "export_prototype", "export_screen", "export_project"]
 
 _STUDIO = None
 
 _TRIGGERS = ("load", "hover", "leave", "press", "release", "click")
-_ACTIONS = ("play", "stop", "set_state", "clear_state", "toggle_state", "navigate", "overlay", "back", "url")
+_ACTIONS = ("play", "stop", "set_state", "clear_state", "toggle_state", "navigate", "overlay", "back", "url",
+            "set_data", "reset_data")
 
 
 
@@ -414,7 +415,7 @@ def set_link(canvas: str, id: str, target: str | None, mode: str = "navigate"):
 @tool
 def set_interaction(canvas: str, id: str, trigger: str, action: str, animation: str | None = None,
                     state: str | None = None, target: str | None = None, delay: float = 0,
-                    sfx: str | None = None, remove: bool = False):
+                    sfx: str | None = None, data: dict | None = None, remove: bool = False):
     """A state machine for the canvas: when `trigger` happens on `id`, do `action`. Rules run in
     export_web and export_react, are listed in export_animation(format="json"), and generate controller
     scripts in export_screen (Unity, Godot, Roblox).
@@ -424,9 +425,10 @@ def set_interaction(canvas: str, id: str, trigger: str, action: str, animation: 
       "key:ArrowDown"), or "end:<animation>" (when that animation finishes - chain animations).
     action: "play" / "stop" an animation (it no longer autoplays once a rule plays it; restarts on each
       play), "set_state" / "clear_state" / "toggle_state" a canvas state (set_state looks: selected, open,
-      muted, tab=2...), "navigate" / "overlay" to another canvas, "back", or "url" (target = https link).
-    delay: seconds before the action. sfx: optional sound / haptic event id (e.g. "ui_click", "ui_hover")
-      emitted to onSfx in web / React and to audio signals in generated engine controllers.
+      muted, tab=2...), "set_data" (merges `data` dict into canvas reactive variables), "reset_data"
+      (restores initial canvas defaults), "navigate" / "overlay" to another canvas, "back", or "url".
+    delay: seconds before the action. sfx: optional sound / haptic event id (e.g. "ui_click", "ui_hover").
+    data: dict of variable updates when action="set_data", e.g. {"volume": 80, "selected_weapon": "Railgun"}.
     remove=true deletes the rule with this id + trigger + action."""
     st = store()
     c = st.get(canvas)
@@ -481,6 +483,11 @@ def set_interaction(canvas: str, id: str, trigger: str, action: str, animation: 
         if not target or not re.match(r"^(https?://|mailto:)", str(target)):
             raise ValueError("action url needs target starting with https://, http:// or mailto:")
         rule["target"] = str(target)
+    elif action == "set_data":
+        parsed_data = _maybe_json(data)
+        if not isinstance(parsed_data, dict) or not parsed_data:
+            raise ValueError('action "set_data" needs data={...} dictionary of variable updates')
+        rule["data"] = parsed_data
     if delay:
         rule["delay"] = max(0.0, float(delay))
     if sfx:
@@ -1273,6 +1280,7 @@ def _write_godot_controller(c: dict, nodes: list, folder: Path, name: str, color
         "signal sfx_requested(event_name: String)",
         "signal state_changed(state_name: String, active: bool)", "",
         f"var data: Dictionary = {json.dumps(data, ensure_ascii=False)}",
+        f"var _defaults: Dictionary = {json.dumps(data, ensure_ascii=False)}",
         "var _states: Dictionary = {}", "",
         "func _ready() -> void:",
     ]
@@ -1399,6 +1407,21 @@ def _write_godot_controller(c: dict, nodes: list, folder: Path, name: str, color
         '\telif act == "toggle_state":',
         '\t\tvar on := not _states.get(rule["state"], false)',
         '\t\t_states[rule["state"]] = on; state_changed.emit(rule["state"], on)',
+        '\telif act == "set_data" and rule.has("data") and rule["data"] is Dictionary:',
+        '\t\tset_data(rule["data"])',
+        '\telif act == "reset_data":',
+        '\t\tdata = _defaults.duplicate(true); set_data(data)',
+        "",
+        "func _fmt_num(val: float, decimals: int = 0) -> String:",
+        '\tvar raw := ("%." + str(maxi(0, decimals)) + "f") % val',
+        '\tvar parts := raw.split(".")',
+        '\tvar sign_s := "-" if parts[0].begins_with("-") else ""',
+        '\tvar digits := parts[0].lstrip("-")',
+        '\tvar out_s := ""',
+        '\tfor i in range(digits.length()):',
+        '\t\tif i > 0 and (digits.length() - i) % 3 == 0: out_s += ","',
+        '\t\tout_s += digits[i]',
+        '\treturn sign_s + out_s + (("." + parts[1]) if parts.size() > 1 else "")',
     ]
     out = folder / f"{name}_controller.gd"
     out.write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -2112,3 +2135,128 @@ def export_pbr_maps(canvas: str, out_dir: str | None = None, name: str | None = 
     return {"folder": str(folder), "engine": eng, "normal_format": nfmt,
             "size": [maps["albedo"].width, maps["albedo"].height],
             "files": files, "manifest": mfile, "extras": extras}
+
+
+@tool
+def export_project(canvases: list[str] | str, engine: str = "godot", out_dir: str | None = None,
+                   name: str = "ui_project", scale: float = 1, single_file: bool = False,
+                   scaffold: bool = False, language: str | None = None,
+                   godot_res_path: str = "res://ui/generated"):
+    """Export multiple connected UI screens as one cohesive multi-screen project with shared tokens,
+    deduplicated fonts, and an auto-generated screen router / UIManager!
+
+    engine: "godot" | "unity" | "unity-ugui" | "unreal" | "roblox" | "web" | "react" | "wpf" | "avalonia" | "winui" | "qt-qml" | "imgui".
+    - For "godot": writes screens/<id>/ + shared tokens/ui_theme.gd + ready UIManager.gd screen router!
+    - For "unity": writes screens/<id>/ + shared tokens/ui_theme.uss + UiScreenRouter.cs!
+    - For "web": multi-page or single-file (single_file=true) shareable HTML prototype with shared state!
+    - For "react": full TypeScript React components + optional runnable Vite starter (scaffold=true)!
+    """
+    from . import server as _srv
+    st = store()
+    raw_names = [canvases] if isinstance(canvases, str) and not canvases.strip().startswith("[") else (_maybe_json(canvases) or [])
+    if not raw_names:
+        raise ValueError("canvases must list at least one canvas id")
+    c_list = [st.get(cid) for cid in raw_names]
+    eng = str(engine or "godot").lower()
+    base = slugify(name, "ui_project")
+    root = _out_dir(out_dir, f"projects/{base}")
+    tokens_dir = root / "tokens"
+    tokens_dir.mkdir(parents=True, exist_ok=True)
+    tok_fmt = {"godot": "gdscript", "unity": "uss", "unity-ugui": "csharp", "roblox": "luau"}.get(eng, "css")
+    tok_ext = {"gdscript": ".gd", "uss": ".uss", "csharp": ".cs", "luau": ".luau", "css": ".css"}[tok_fmt]
+    export_theme(tok_fmt, path=str(tokens_dir / f"ui_theme{tok_ext}"))
+
+    if eng == "web":
+        wres = _srv.export_web([c["id"] for c in c_list], out_dir=str(root / "web"),
+                               language=language, single_file=bool(single_file), shared_state=True)
+        return {"folder": str(root), "engine": "web", "screens": [c["id"] for c in c_list],
+                "web": wres, "tokens": str(tokens_dir / f"ui_theme{tok_ext}")}
+    if eng == "react":
+        rres = _srv.export_react([c["id"] for c in c_list], out_dir=str(root / "react"),
+                                 language=language, css="tailwind", typescript=True, scaffold=bool(scaffold))
+        return {"folder": str(root), "engine": "react", "screens": [c["id"] for c in c_list],
+                "react": rres, "tokens": str(tokens_dir / f"ui_theme{tok_ext}")}
+
+    screens_dir = root / "screens"
+    fonts_dir = root / "fonts"
+    fonts_dir.mkdir(parents=True, exist_ok=True)
+    exported_screens: dict[str, dict] = {}
+    shared_fonts: set[str] = set()
+    for c in c_list:
+        sid = slugify(c["id"], "screen")
+        s_folder = screens_dir / sid
+        res = export_screen(
+            c["id"], engine=eng, out_dir=str(s_folder), name=sid, scale=scale,
+            language=language, godot_res_path=f"{godot_res_path.rstrip('/')}/screens/{sid}",
+        )
+        # Deduplicate copied fonts into shared root/fonts/
+        for fname in res.get("fonts_copied") or []:
+            src_f = s_folder / fname
+            dst_f = fonts_dir / fname
+            if src_f.is_file() and not dst_f.exists():
+                shutil.copyfile(src_f, dst_f)
+            shared_fonts.add(fname)
+        exported_screens[c["id"]] = res
+
+    router_file: str | None = None
+    if eng == "godot":
+        res_base = godot_res_path.rstrip("/")
+        entries = ",\n".join(
+            f'\t"{c["id"]}": "{res_base}/screens/{slugify(c["id"], "screen")}/{slugify(c["id"], "screen")}.tscn"'
+            for c in c_list
+        )
+        first_id = c_list[0]["id"]
+        mgr = (
+            f"# UIManager.gd - generated by uiforge-mcp multi-screen project export\n"
+            f"extends CanvasLayer\n\n"
+            f"signal sfx_requested(sfx_name: String)\n\n"
+            f"const SCREENS := {{\n{entries}\n}}\n\n"
+            f"var shared_data: Dictionary = {{}}\n"
+            f"var _stack: Array[String] = []\n"
+            f"var _active: Node = null\n\n"
+            f'func _ready() -> void:\n\tnavigate("{first_id}")\n\n'
+            f"func navigate(screen_id: String, mode: String = \"navigate\") -> void:\n"
+            f'\tif screen_id == "back" or mode == "back":\n'
+            f"\t\tif _stack.size() > 1:\n\t\t\t_stack.pop_back()\n\t\t\t_mount(_stack[-1])\n\t\treturn\n"
+            f"\tif not SCREENS.has(screen_id):\n\t\tpush_warning(\"Unknown screen: \" + screen_id)\n\t\treturn\n"
+            f"\t_stack.append(screen_id)\n\t_mount(screen_id)\n\n"
+            f"func _mount(screen_id: String) -> void:\n"
+            f"\tif _active:\n\t\t_active.queue_free()\n"
+            f"\tvar scene: PackedScene = load(SCREENS[screen_id])\n"
+            f"\tif scene == null: return\n"
+            f"\t_active = scene.instantiate()\n\tadd_child(_active)\n"
+            f'\tif _active.has_signal("navigate_requested"): _active.navigate_requested.connect(navigate)\n'
+            f'\tif _active.has_signal("sfx_requested"): _active.sfx_requested.connect(func(s): sfx_requested.emit(s))\n'
+            f'\tif _active.has_method("set_data") and not shared_data.is_empty(): _active.set_data(shared_data)\n'
+        )
+        rpath = root / "UIManager.gd"
+        rpath.write_text(mgr, encoding="utf-8")
+        router_file = str(rpath)
+    elif eng in ("unity", "unity-ugui"):
+        names_arr = ", ".join(f'"{c["id"]}"' for c in c_list)
+        cs = (
+            "// UiScreenRouter.cs - generated by uiforge-mcp multi-screen project export\n"
+            "using System.Collections.Generic;\nusing UnityEngine;\n\n"
+            "public class UiScreenRouter : MonoBehaviour\n{\n"
+            f"    public static readonly string[] ScreenIds = new[] {{ {names_arr} }};\n"
+            "    private readonly Stack<string> _history = new();\n"
+            "    public string CurrentScreen => _history.Count > 0 ? _history.Peek() : ScreenIds[0];\n"
+            "    public void Navigate(string target, string mode = \"navigate\") {\n"
+            "        if (target == \"back\" || mode == \"back\") { if (_history.Count > 1) _history.Pop(); return; }\n"
+            "        _history.Push(target);\n"
+            "    }\n"
+            "}\n"
+        )
+        rpath = root / "UiScreenRouter.cs"
+        rpath.write_text(cs, encoding="utf-8")
+        router_file = str(rpath)
+
+    return {
+        "folder": str(root),
+        "engine": eng,
+        "screens": [c["id"] for c in c_list],
+        "shared_fonts": sorted(shared_fonts),
+        "tokens": str(tokens_dir / f"ui_theme{tok_ext}"),
+        "router": router_file,
+        "details": {k: {"folder": v["folder"], "files": v["files"]} for k, v in exported_screens.items()},
+    }

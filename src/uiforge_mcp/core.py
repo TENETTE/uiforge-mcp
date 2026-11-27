@@ -228,7 +228,8 @@ def list_operations() -> list[dict[str, Any]]:
         "layers": ("create_layer", "update_layer", "delete_layer", "set_layer"),
         "shapes": ("add_rect", "add_ellipse", "add_line", "add_polygon", "add_path", "add_arc",
                    "add_ticks", "add_text", "add_image", "add_instance", "add_svg", "add_frame", "add_icon"),
-        "widgets": ("add_button", "add_progress_bar", "add_stack",
+        "widgets": ("add_button", "add_progress_bar", "add_stack", "add_grid", "add_split",
+                    "add_gauge", "add_slot", "add_tabs", "add_stat_card",
                     "add_input", "add_scroll", "add_slider", "add_toggle", "add_dropdown"),
         "edit": ("update_element", "delete_elements", "duplicate_element", "move_elements",
                  "reorder_element", "align_elements", "arrange_elements", "boolean_elements",
@@ -240,11 +241,11 @@ def list_operations() -> list[dict[str, Any]]:
         "animation": ("create_animation", "set_keyframes", "delete_keyframes", "get_animations",
                       "delete_animation", "preview_animation", "export_animation"),
         "inspect": ("preview", "preview_resolutions", "preview_nine_slice", "contact_sheet",
-                    "review_canvas", "inspect_pixels", "view_image", "guide"),
+                    "review_canvas", "qa_screen", "inspect_pixels", "view_image", "guide"),
         "export": ("export_png", "export_svg", "export_pdf", "export_web", "export_react",
                    "export_asset", "export_pbr_maps", "export_layers", "export_psd", "export_atlas",
                    "export_bitmap_font", "export_spec", "export_theme", "export_prototype",
-                   "export_screen", "write_engine_helpers"),
+                   "export_screen", "export_project", "write_engine_helpers"),
     }
     by_cat = {op: cat for cat, ops in cats.items() for op in ops}
     out = []

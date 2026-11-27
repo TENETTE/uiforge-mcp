@@ -69,6 +69,19 @@ class _SafeOps(ast.NodeTransformer):
         return node
 
 
+def _format_num(val: Any, decimals: Any = 0) -> str:
+    d = max(0, min(6, int(decimals)))
+    n = float(val)
+    return f"{n:,.{d}f}" if d > 0 else f"{round(n):,}"
+
+
+def _concat(*args: Any) -> str:
+    out = "".join(str(a) for a in args)
+    if len(out) > MAX_STR_LEN:
+        raise ValueError(f"concat result exceeds safety limit ({MAX_STR_LEN} chars)")
+    return out
+
+
 FUNCS: dict[str, Any] = {
     "min": min,
     "max": max,
@@ -85,6 +98,10 @@ FUNCS: dict[str, Any] = {
     "float": float,
     "str": str,
     "pct": lambda v, hi=100.0: f"{round(100.0 * float(v) / max(1e-9, float(hi)))}%",
+    "format_num": _format_num,
+    "concat": _concat,
+    "upper": lambda s: str(s).upper(),
+    "lower": lambda s: str(s).lower(),
 }
 
 
@@ -267,6 +284,15 @@ def js_expr(expr: str, theme_colors: dict | None = None) -> str:
             if fn == "pct":
                 hi = a[1] if len(a) > 1 else "100"
                 return f"(Math.round(100*Number({a[0]})/Math.max(1e-9,Number({hi})))+'%')"
+            if fn == "format_num":
+                dec = a[1] if len(a) > 1 else "0"
+                return f"Number({a[0]}).toLocaleString('en-US',{{minimumFractionDigits:Math.max(0,Math.trunc({dec})),maximumFractionDigits:Math.max(0,Math.trunc({dec}))}})"
+            if fn == "concat":
+                return f"[{','.join(a)}].map(String).join('')"
+            if fn == "upper":
+                return f"String({a[0]}).toUpperCase()"
+            if fn == "lower":
+                return f"String({a[0]}).toLowerCase()"
         raise ValueError(f"cannot translate binding expr: {expr}")
 
     return emit(tree.body)
@@ -342,6 +368,15 @@ def gdscript_expr(expr: str, theme_colors: dict | None = None) -> str:
             if fn == "pct":
                 hi = a[1] if len(a) > 1 else "100.0"
                 return f'(str(int(round(100.0 * float({a[0]}) / max(1e-9, float({hi}))))) + "%")'
+            if fn == "format_num":
+                dec = a[1] if len(a) > 1 else "0"
+                return f"_fmt_num(float({a[0]}), int({dec}))"
+            if fn == "concat":
+                return "(" + " + ".join(f"str({x})" for x in a) + ")" if a else '""'
+            if fn == "upper":
+                return f"str({a[0]}).to_upper()"
+            if fn == "lower":
+                return f"str({a[0]}).to_lower()"
         raise ValueError(f"cannot translate binding expr to GDScript: {expr}")
 
     return emit(tree.body)

@@ -911,7 +911,7 @@ def _keyframes(ctx: _Ctx, canvas: dict, name: str, anim: dict, ids: set[str],
 
 
 def build(store, canvases: list[dict], out: Path, layout: str, language: str | None, include_background: bool,
-          image_scale: float) -> dict:
+          image_scale: float, single_file: bool = False, shared_state: bool = True) -> dict:
     out.mkdir(parents=True, exist_ok=True)
     pages = {c["id"]: ("index.html" if i == 0 else f"{_ident(c['id'])}.html") for i, c in enumerate(canvases)}
     theme = store.theme
@@ -1141,7 +1141,7 @@ def build(store, canvases: list[dict], out: Path, layout: str, language: str | N
                     by_decl.setdefault(decl, []).append(sel)
                 for decl, sels in by_decl.items():
                     page_css.append(f"{','.join(sels)}{{animation:{decl}}}")
-        bg = c.get("background") if include_background else None
+        bg = (c.get("background") if not _is_none(c.get("background")) else c.get("preview_background")) if include_background else None
         bg_css = ""
         if bg and not _is_none(bg):
             if isinstance(bg, str) and not bg.lower().endswith((".png", ".jpg", ".jpeg", ".webp")):
@@ -1161,7 +1161,7 @@ def build(store, canvases: list[dict], out: Path, layout: str, language: str | N
             f"@font-face{{font-family:'{fam}';src:url(assets/fonts/{file});font-weight:{'100 900' if var else w};font-display:swap}}"
             for fam, (file, w, var) in ctx.fonts.items())
         all_fonts.update(ctx.fonts)
-        cfg = _ix_config(c, ix, pages, ctx.colors)
+        cfg = _ix_config(c, ix, pages, ctx.colors, shared_state=bool(shared_state))
         has_runtime = bool(ix or c.get("focus_order") or c.get("bindings") or c.get("data"))
         ix_script = ("<script>window.UIFORGE_IX=" + json.dumps(cfg, ensure_ascii=False).replace("</", "<\\/")
                      + "</script>") if has_runtime else ""
@@ -1181,8 +1181,83 @@ def build(store, canvases: list[dict], out: Path, layout: str, language: str | N
         report["picture"] += [f"{c['id']}:{i}" for i in ctx.raster]
         report["notes"] |= ctx.notes
     css_rules.append(_BASE_CSS)
-    (out / "styles.css").write_text("\n".join(css_rules) + "\n", encoding="utf-8")
-    (out / "app.js").write_text(_APP_JS, encoding="utf-8")
+    base_css_text = "\n".join(css_rules) + "\n"
+    if single_file:
+        import base64
+        # Build one self-contained shareable index.html with all pages, inlined CSS, JS & base64 assets
+        def _inline_assets(text: str) -> str:
+            def _rep(m: re.Match) -> str:
+                rel = m.group(1)
+                fp = out / rel
+                if not fp.is_file():
+                    return m.group(0)
+                ext = fp.suffix.lower()
+                mime = {
+                    ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+                    ".webp": "image/webp", ".ttf": "font/ttf", ".otf": "font/otf", ".woff2": "font/woff2",
+                }.get(ext, "application/octet-stream")
+                b64 = base64.b64encode(fp.read_bytes()).decode("ascii")
+                return m.group(0).replace(rel, f"data:{mime};base64,{b64}")
+            text = re.sub(r'url\((assets/[^)]+)\)', _rep, text)
+            text = re.sub(r'src="(assets/[^"]+)"', _rep, text)
+            return text
+
+        page_css_all = []
+        page_divs = []
+        page_ix = {}
+        page_map = {}
+        for idx_p, c in enumerate(canvases):
+            cid = c["id"]
+            p = report["parts"][cid]
+            cls = f"sf-page-{_ident(cid)}"
+            page_map[p["file"]] = cid
+            page_map[cid] = cid
+            page_css_all.append(_inline_assets(p["fonts_css"]) + f".{cls}{{{p['size']};{_inline_assets(p['bg_css'])}}}" + _inline_assets(p["page_css"]))
+            vis = "" if idx_p == 0 else "display:none;"
+            page_divs.append(
+                f'<main class="page {cls}" data-screen="{html.escape(cid)}" data-w="{_n(p["W"])}" data-h="{_n(p["H"])}" '
+                f'style="{vis}">{_inline_assets(p["body"])}</main>'
+            )
+            page_ix[cid] = p["ix"]
+        sf_js = (
+            "(function(){\n"
+            + RUNTIME_JS
+            + "\nconst PAGES=" + json.dumps(page_ix, ensure_ascii=False).replace("</", "<\\/") + ";"
+            + "\nconst MAP=" + json.dumps(page_map, ensure_ascii=False).replace("</", "<\\/") + ";"
+            + "\nlet stack=[" + json.dumps(canvases[0]["id"]) + "];"
+            + "\nconst nodes=Array.from(document.querySelectorAll('main.page[data-screen]'));"
+            + "\nfunction fit(){if(!document.body.classList.contains('fit'))return;"
+              "const p=nodes.find(n=>n.style.display!=='none');if(!p)return;"
+              "const s=Math.min(innerWidth/(+p.dataset.w||1),innerHeight/(+p.dataset.h||1));"
+              "p.style.transform='scale('+s+')';}"
+            + "\nfunction show(id){const tgt=MAP[id]||id;nodes.forEach(n=>{n.style.display=(n.dataset.screen===tgt?'':'none');});"
+              "const cur=nodes.find(n=>n.dataset.screen===tgt);if(cur&&PAGES[tgt])uiforgeApplyData(cur,PAGES[tgt],{});fit();}"
+            + "\nfunction go(href,mode,to){if(href==='#back'||mode==='back'){if(stack.length>1)stack.pop();show(stack[stack.length-1]);return;}"
+              "if(mode==='url'){window.open(href,'_blank','noopener');return;}"
+              "const tgt=MAP[to]||MAP[href]||to||href;if(PAGES[tgt]){stack.push(tgt);show(tgt);}}"
+            + "\nnodes.forEach(n=>{const id=n.dataset.screen;uiforgeAttach(n,PAGES[id],go);});"
+            + "\nwindow.uiforgeSetData=patch=>{nodes.forEach(n=>{const id=n.dataset.screen;uiforgeApplyData(n,PAGES[id],patch);});};"
+            + "\naddEventListener('resize',fit);fit();\n})();"
+        )
+        sf_doc = (
+            f'<!doctype html>\n<html lang="{html.escape(language or "en")}"><head><meta charset="utf-8">'
+            f'<meta name="viewport" content="width=device-width,initial-scale=1">'
+            f'<link rel="icon" href="data:,">'
+            f'<title>{html.escape(str(canvases[0].get("name") or canvases[0]["id"]))}</title>'
+            f'<style>{base_css_text}{"".join(page_css_all)}</style></head>'
+            f'<body class="{layout}">{"".join(page_divs)}<script>{sf_js}</script></body></html>\n'
+        )
+        # Clean up multi-file artifacts & keep single index.html
+        for pf in list(report["pages"]):
+            if pf != "index.html":
+                (out / pf).unlink(missing_ok=True)
+        shutil.rmtree(out / "assets", ignore_errors=True)
+        (out / "index.html").write_text(sf_doc, encoding="utf-8")
+        report["pages"] = ["index.html"]
+        report["single_file"] = True
+    else:
+        (out / "styles.css").write_text(base_css_text, encoding="utf-8")
+        (out / "app.js").write_text(_APP_JS, encoding="utf-8")
     report["notes"] = sorted(report["notes"])
     return report
 
@@ -1202,7 +1277,8 @@ def _ix_attrs(key: str, ix_ids: set, clickable: set, existing: str, tab: int) ->
     return attr
 
 
-def _ix_config(c: dict, ix: list, pages: dict, theme_colors: dict | None = None) -> dict:
+def _ix_config(c: dict, ix: list, pages: dict, theme_colors: dict | None = None,
+               shared_state: bool = True) -> dict:
     """The page's interaction rules, focus order, and data bindings for the runtime (uiforgeAttach)."""
     from . import binding
     rules = []
@@ -1240,8 +1316,10 @@ def _ix_config(c: dict, ix: list, pages: dict, theme_colors: dict | None = None)
         for st_name, overrides in (c.get("states") or {}).items()
     }
     focus = [_ident(eid) for eid in (c.get("focus_order") or [])]
-    return {"rules": rules, "anims": anims, "focus": focus, "data": dict(c.get("data") or {}),
-            "bindings": binds, "templates": text_tpls, "stateTargets": state_targets}
+    init_data = dict(c.get("data") or {})
+    return {"rules": rules, "anims": anims, "focus": focus, "data": init_data, "defaults": dict(init_data),
+            "bindings": binds, "templates": text_tpls, "stateTargets": state_targets,
+            "sharedState": bool(shared_state)}
 
 
 def _link_attrs(target: Any, pages: dict, tab: int) -> str:
@@ -1286,9 +1364,24 @@ body.fit .page{transform-origin:center center}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 """
 
-RUNTIME_JS = """function uiforgeApplyData(root, cfg, patch) {
+RUNTIME_JS = """function _ufReadShared(cfg) {
+  if (!cfg || cfg.sharedState === false) return {};
+  try { return JSON.parse(sessionStorage.getItem('uiforge_shared_state') || '{}') || {}; } catch (e) { return {}; }
+}
+function _ufWriteShared(cfg, patch) {
+  if (!cfg || cfg.sharedState === false || !patch) return;
+  try {
+    var cur = _ufReadShared(cfg);
+    Object.assign(cur, patch);
+    sessionStorage.setItem('uiforge_shared_state', JSON.stringify(cur));
+  } catch (e) {}
+}
+function uiforgeApplyData(root, cfg, patch) {
   cfg = cfg || {};
-  var d = Object.assign({}, cfg.data || {}, patch || {});
+  var shared = _ufReadShared(cfg);
+  var d = Object.assign({}, cfg.data || {}, shared, patch || {});
+  cfg.data = d;
+  if (patch && Object.keys(patch).length) _ufWriteShared(cfg, patch);
   var tpls = cfg.templates || {};
   Object.keys(tpls).forEach(function (id) {
     var el = root.querySelector('#' + id);
@@ -1375,6 +1468,12 @@ function uiforgeAttach(root, cfg, go, onSfx) {
       else if (a === 'set_state') stateHost(r, srcEl).classList.add('s-' + r.stateKey);
       else if (a === 'clear_state') stateHost(r, srcEl).classList.remove('s-' + r.stateKey);
       else if (a === 'toggle_state') stateHost(r, srcEl).classList.toggle('s-' + r.stateKey);
+      else if (a === 'set_data' && r.data) { uiforgeApplyData(root, cfg, r.data); }
+      else if (a === 'reset_data') {
+        try { sessionStorage.removeItem('uiforge_shared_state'); } catch (e) {}
+        cfg.data = Object.assign({}, cfg.defaults || {});
+        uiforgeApplyData(root, cfg, cfg.data);
+      }
       else go(r.href, a, r.to);
     };
     if (r.delay) timers.push(setTimeout(run, r.delay * 1000)); else run();
@@ -1651,12 +1750,16 @@ def to_jsx(body: str, tailwind: bool = False) -> tuple[str, dict, list[str]]:
 
 
 def build_react(store, canvases: list[dict], out: Path, language: str | None, include_background: bool,
-                image_scale: float, css_mode: str = "css", typescript: bool = False) -> dict:
-    report = build(store, canvases, out, "fit", language, include_background, image_scale)
+                image_scale: float, css_mode: str = "css", typescript: bool = False,
+                scaffold: bool = False) -> dict:
+    comp_dir = (out / "src") if scaffold else out
+    comp_dir.mkdir(parents=True, exist_ok=True)
+    report = build(store, canvases, comp_dir, "fit", language, include_background, image_scale)
     tailwind = css_mode == "tailwind"
     ext = "tsx" if typescript else "jsx"
     used: set[str] = set()
     components = []
+    comp_map: list[tuple[str, str]] = []
     for c in canvases:
         part = report["parts"][c["id"]]
         name = re.sub(r"[^0-9a-zA-Z]+", " ", str(c["id"])).title().replace(" ", "") or "Screen"
@@ -1665,9 +1768,10 @@ def build_react(store, canvases: list[dict], out: Path, language: str | None, in
         while name in used:
             name += "X"
         used.add(name)
+        comp_map.append((c["id"], name))
         cls = f"page-{_ident(c['id'])}"
-        (out / f"{name}.css").write_text(part["fonts_css"] + f".{cls}{{{part['size']};{part['bg_css']}}}"
-                                         + part["page_css"] + "\n", encoding="utf-8")
+        (comp_dir / f"{name}.css").write_text(part["fonts_css"] + f".{cls}{{{part['size']};{part['bg_css']}}}"
+                                              + part["page_css"] + "\n", encoding="utf-8")
         jsx, images, svgs = to_jsx(part["body"], tailwind=tailwind)
         lines = ["import { useEffect, useRef } from 'react';", "import './styles.css';", f"import './{name}.css';",
                  "import { uiforgeAttach, uiforgeApplyData } from './uiforge-runtime.js';"]
@@ -1702,25 +1806,27 @@ def build_react(store, canvases: list[dict], out: Path, language: str | None, in
                   "    </main>",
                   "  );",
                   "}", ""]
-        (out / f"{name}.{ext}").write_text("\n".join(lines), encoding="utf-8")
-        (out / part["file"]).unlink(missing_ok=True)
+        (comp_dir / f"{name}.{ext}").write_text("\n".join(lines), encoding="utf-8")
+        (comp_dir / part["file"]).unlink(missing_ok=True)
         components.append(f"{name}.{ext}")
-    (out / "app.js").unlink(missing_ok=True)
-    css = (out / "styles.css").read_text(encoding="utf-8")
+    (comp_dir / "app.js").unlink(missing_ok=True)
+    css = (comp_dir / "styles.css").read_text(encoding="utf-8")
     css = "\n".join(line for line in css.splitlines() if not line.startswith(("html,body", "body.fit", "@view-transition")))
-    (out / "styles.css").write_text(css + "\n", encoding="utf-8")
+    (comp_dir / "styles.css").write_text(css + "\n", encoding="utf-8")
     runtime_esm = RUNTIME_JS.replace("function uiforgeApplyData", "export function uiforgeApplyData").replace(
         "function uiforgeAttach", "export function uiforgeAttach")
-    (out / "uiforge-runtime.js").write_text(runtime_esm, encoding="utf-8")
+    (comp_dir / "uiforge-runtime.js").write_text(runtime_esm, encoding="utf-8")
     if typescript:
-        (out / "uiforge-runtime.d.ts").write_text(
+        (comp_dir / "uiforge-runtime.d.ts").write_text(
             "export interface UIForgeRuntimeConfig {\n"
             "  rules?: Array<Record<string, any>>;\n"
             "  anims?: Record<string, { duration: number; loop: boolean }>;\n"
             "  focus?: string[];\n"
             "  data?: Record<string, any>;\n"
+            "  defaults?: Record<string, any>;\n"
             "  bindings?: Array<{ id: string; prop: string; js: string }>;\n"
             "  templates?: Record<string, string>;\n"
+            "  sharedState?: boolean;\n"
             "}\n"
             "export function uiforgeApplyData(\n"
             "  root: HTMLElement | null,\n"
@@ -1735,7 +1841,7 @@ def build_react(store, canvases: list[dict], out: Path, language: str | None, in
             "): () => void;\n",
             encoding="utf-8",
         )
-        (out / "uiforge-assets.d.ts").write_text(
+        (comp_dir / "uiforge-assets.d.ts").write_text(
             "declare module '*.css';\n"
             "declare module '*.png' { const src: string; export default src; }\n"
             "declare module '*.webp' { const src: string; export default src; }\n"
@@ -1745,7 +1851,73 @@ def build_react(store, canvases: list[dict], out: Path, language: str | None, in
             encoding="utf-8",
         )
     idx_ext = "ts" if typescript else "js"
-    (out / f"index.{idx_ext}").write_text(
+    (comp_dir / f"index.{idx_ext}").write_text(
         "".join(f"export {{ default as {Path(cmp).stem} }} from './{Path(cmp).stem}';\n" for cmp in components),
         encoding="utf-8")
-    return {"components": components, "picture": report["picture"], "notes": report["notes"]}
+    scaffold_files: list[str] = []
+    if scaffold:
+        pkg_name = re.sub(r"[^a-z0-9-]+", "-", str(canvases[0]["id"]).lower()).strip("-") or "uiforge-app"
+        pkg = {
+            "name": pkg_name,
+            "private": True,
+            "version": "0.1.0",
+            "type": "module",
+            "scripts": {"dev": "vite", "build": "vite build", "preview": "vite preview"},
+            "dependencies": {"react": "^19.0.0", "react-dom": "^19.0.0"},
+            "devDependencies": {
+                "@vitejs/plugin-react": "^4.3.0",
+                "vite": "^6.0.0",
+                **({"typescript": "^5.7.0", "@types/react": "^19.0.0", "@types/react-dom": "^19.0.0"} if typescript else {}),
+            },
+        }
+        (out / "package.json").write_text(json.dumps(pkg, indent=2) + "\n", encoding="utf-8")
+        (out / f"vite.config.{'ts' if typescript else 'js'}").write_text(
+            "import { defineConfig } from 'vite';\nimport react from '@vitejs/plugin-react';\n\n"
+            "export default defineConfig({ plugins: [react()] });\n",
+            encoding="utf-8",
+        )
+        if typescript:
+            (out / "tsconfig.json").write_text(json.dumps({
+                "compilerOptions": {
+                    "target": "ES2022", "module": "ESNext", "moduleResolution": "bundler",
+                    "jsx": "react-jsx", "strict": True, "noEmit": True, "skipLibCheck": True,
+                },
+                "include": ["src"],
+            }, indent=2) + "\n", encoding="utf-8")
+        (out / "index.html").write_text(
+            f'<!doctype html>\n<html lang="{html.escape(language or "en")}"><head><meta charset="utf-8">'
+            f'<meta name="viewport" content="width=device-width,initial-scale=1">'
+            f'<title>{html.escape(str(canvases[0].get("name") or canvases[0]["id"]))}</title></head>'
+            f'<body style="margin:0;background:#070b14;display:grid;place-items:center;min-height:100vh">'
+            f'<div id="root"></div><script type="module" src="/src/main.{ext}"></script></body></html>\n',
+            encoding="utf-8",
+        )
+        imports = "\n".join(f"import {cname} from './{cname}';" for _, cname in comp_map)
+        cases = "\n".join(f"    case {json.dumps(cid)}: return <{cname} onNavigate={{onNavigate}} />;" for cid, cname in comp_map)
+        app_code = (
+            f"import {{ useState }} from 'react';\n{imports}\n\n"
+            f"export default function App() {{\n"
+            f"  const [stack, setStack] = useState{('<string[]>' if typescript else '')}([{json.dumps(comp_map[0][0])}]);\n"
+            f"  const current = stack[stack.length - 1];\n"
+            f"  const onNavigate = ({'target: string, mode: string' if typescript else 'target, mode'}) => {{\n"
+            f"    if (target === '#back' || target === 'back' || mode === 'back') {{\n"
+            f"      setStack(s => s.length > 1 ? s.slice(0, -1) : s); return;\n"
+            f"    }}\n"
+            f"    setStack(s => [...s, target]);\n"
+            f"  }};\n"
+            f"  switch (current) {{\n{cases}\n    default: return <{comp_map[0][1]} onNavigate={{onNavigate}} />;\n  }}\n"
+            f"}}\n"
+        )
+        (comp_dir / f"App.{ext}").write_text(app_code, encoding="utf-8")
+        (comp_dir / f"main.{ext}").write_text(
+            "import { StrictMode } from 'react';\nimport { createRoot } from 'react-dom/client';\n"
+            "import App from './App';\n\n"
+            f"createRoot(document.getElementById('root'){'!' if typescript else ''}).render(<StrictMode><App /></StrictMode>);\n",
+            encoding="utf-8",
+        )
+        scaffold_files = ["package.json", f"vite.config.{'ts' if typescript else 'js'}", "index.html",
+                          f"src/App.{ext}", f"src/main.{ext}"]
+    out_rep = {"components": components, "picture": report["picture"], "notes": report["notes"]}
+    if scaffold_files:
+        out_rep["scaffold_files"] = scaffold_files
+    return out_rep
