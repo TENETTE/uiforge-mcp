@@ -249,7 +249,7 @@ def progress_bar_operations(
     base = slugify(id, "bar") if id else "bar"
     grp = group or base
     tc = theme_colors or {}
-    col = color or tc.get("accent") or "#22d3ee"
+    col = color or tc.get("primary") or tc.get("accent") or "#22d3ee"
     col_hi = _mix_hex(col, "#ffffff", 0.25, tc)
     eff_corner = str(corner or "round").lower()
     eff_rad = round(float(radius)) if radius is not None else (min(6, ih // 2) if eff_corner == "cut" else round(ih * 0.5))

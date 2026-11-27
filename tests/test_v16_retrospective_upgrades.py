@@ -88,6 +88,8 @@ def test_add_button_and_progress_bar_single_call_composites(ws, tmp_path):
                              low_threshold=0.3, id="hp")
     assert bar["track_id"] == "hp_track" and bar["fill_id"] == "hp_fill"
     c = s.store().get("hud_comp")
+    hp_fill = next(e for e in c["elements"] if e["id"] == "hp_fill")
+    assert hp_fill["style"]["fill"]["stops"][0][1] == "#22d3ee"  # scifi primary cyan, not danger/accent red
     assert c["data"]["hp"] == 82 and c["data"]["max_hp"] == 100
     assert any(b["target"] == "hp_fill" and b["property"] == "width" for b in c["bindings"])
     assert any(b["target"] == "hp_fill" and b["property"] == "style.fill" for b in c["bindings"])
