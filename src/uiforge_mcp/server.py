@@ -840,7 +840,8 @@ def create_layer(canvas: str, name: str, opacity: float = 1, blend: str = "norma
       clipped layer - soft dark ellipses for shading, light streaks for gloss - and nothing spills outside
       the base shape. Several clipped layers in a row all clip to the same base.
     style: effects applied to the merged content of the layer as one shape - shadow, glow, stroke (one
-      outline around a whole icon + text group), light (emboss), inner_shadow, blur, adjust, mask.
+      outline around a whole icon + text group), light (emboss), inner_shadow, blur, adjust, mask, and
+      perspective ({"rotate_y": 24, "rotate_x": -8, "visor_curve": 0.18} for 3D diegetic / curved-visor HUDs).
       Use it instead of repeating an effect on every element.
     position: "top" (default), "bottom", "above:<layer>", "below:<layer>" or an index (0 = lowest).
     """
@@ -856,7 +857,8 @@ def update_layer(canvas: str, layer: str, name: str | None = None, opacity: floa
                  blend: str | None = None, clip: bool | None = None, visible: bool | None = None,
                  style: dict | str | None = None, position: str | None = None, activate: bool | None = None):
     """Change a layer: rename, opacity, blend mode, clip, show / hide, restack (position), or its style
-    (merged key by key into the current style; set a key to null to remove that effect).
+    (merged key by key into the current style — including shadow, glow, stroke, blur, adjust, mask, and
+    perspective {"rotate_y", "rotate_x", "visor_curve"}; set a key to null to remove that effect).
     activate=true makes it the layer new elements go to. Hiding a layer is a quick way to compare a
     design with and without a shading pass."""
     st = store()
@@ -1884,7 +1886,8 @@ def batch(canvas: str, operations: list[dict]):
 
     Each operation is {"op": "<tool name>", ...the same arguments that tool takes, without canvas}.
     Supported ops: add_rect, add_ellipse, add_line, add_polygon, add_path, add_arc, add_ticks, add_text,
-    add_image, add_instance, add_svg, add_frame, add_input, add_scroll, create_layer, update_layer, delete_layer, set_layer,
+    add_image, add_instance, add_svg, add_frame, add_icon, add_input, add_scroll, add_slider, add_toggle,
+    add_dropdown, create_layer, update_layer, delete_layer, set_layer,
     create_animation, set_keyframes, update_element, delete_elements, move_elements, reorder_element,
     duplicate_element, boolean_elements (use "operation" key), align_elements, arrange_elements, set_pin,
     set_state, set_binding, set_interaction, set_link.
@@ -1933,8 +1936,15 @@ def batch(canvas: str, operations: list[dict]):
                     results.append({"layer": updated["name"]})
                 elif op == "delete_layer":
                     target = st.get_layer(c, op_args["layer"])
-                    st.delete_layer(c, target, bool(op_args.get("delete_elements", False)), checkpoint=False)
-                    results.append({"deleted_layer": target["name"]})
+                    if "keep_elements" in op_args:
+                        keep_el = bool(op_args["keep_elements"])
+                    elif "delete_elements" in op_args:
+                        keep_el = not bool(op_args["delete_elements"])
+                    else:
+                        keep_el = False
+                    affected = st.delete_layer(c, target, keep_el, checkpoint=False)
+                    results.append({"deleted_layer": target["name"],
+                                    "elements_kept" if keep_el else "elements_deleted": affected})
                 elif op == "set_layer":
                     targets = st.select(c, op_args.get("ids"), op_args.get("group"))
                     name = None if str(op_args["layer"]).strip().lower() == "base" else st.get_layer(c, op_args["layer"])["name"]

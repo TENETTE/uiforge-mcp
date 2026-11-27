@@ -865,9 +865,9 @@ class TextLayout:
         if self.features and self.path:
             missing = shaping.unsupported_features(self.path, self.features)
             if missing:
+                hint = " (for small caps without one: case 'upper' at a smaller size)" if "smcp" in missing else ""
                 self.warnings.append(f"{el.get('id')}: font '{self.family or 'Inter'}' has no OpenType "
-                                     f"{', '.join(missing)} - pick a font that has it (for small caps without one: "
-                                     "case 'upper' at a smaller size)")
+                                     f"{', '.join(missing)} - pick a font that has it{hint}")
 
         self._load()
         if fit_width:

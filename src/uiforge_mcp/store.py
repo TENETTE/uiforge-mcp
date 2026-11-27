@@ -804,9 +804,10 @@ class Store:
         self.save_canvas(canvas)
         return layer
 
-    def delete_layer(self, canvas: dict, layer: dict, keep_elements: bool) -> list[str]:
-        self.checkpoint(canvas)
-        layer = self.get_layer(canvas, layer["name"])
+    def delete_layer(self, canvas: dict, layer: dict, keep_elements: bool, *, checkpoint: bool = True) -> list[str]:
+        if checkpoint:
+            self.checkpoint(canvas)
+            layer = self.get_layer(canvas, layer["name"])
         name = layer["name"]
         affected = [e["id"] for e in canvas["elements"] if e.get("layer") == name]
         if keep_elements:

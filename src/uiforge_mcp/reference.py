@@ -112,10 +112,11 @@ taper, width_profile and wiggle. Fills also take {"type": "diamond", ...}.
     "layers": """\
 Layers (create_layer): a canvas is a stack of layers, bottom to top; new elements go to the active layer.
 A layer has its own opacity, blend mode and style - layer styles (shadow, glow, stroke, light, blur, adjust,
-mask...) apply to everything on the layer as one merged shape. clip=true confines a layer to the pixels of
-the layer below: that is how you paint shading and highlights freely on top of a base shape (dark soft
-shapes on a multiply layer, light ones on a screen or overlay layer). export_layers / export_psd give the
-stack back as separate images or an editable PSD.
+mask, perspective...) apply to everything on the layer as one merged shape. style.perspective
+({"rotate_y": 24, "rotate_x": -8, "visor_curve": 0.18}) renders 3D diegetic panels and curved-visor HUDs.
+clip=true confines a layer to the pixels of the layer below: that is how you paint shading and highlights
+freely on top of a base shape (dark soft shapes on a multiply layer, light ones on a screen or overlay layer).
+export_layers / export_psd give the stack back as separate images or an editable PSD.
 """,
     "geometry": """\
 Angles (add_arc, add_ticks, conic): degrees, 0 = 3 o'clock, clockwise. A classic gauge sweeps 135 -> 405.
@@ -197,16 +198,19 @@ Which export to use:
   export_animation  sprite sheet, frames, GIF / APNG / WebP, Lottie JSON, dotLottie v2 (.lottie with
                  manifest version "2", a/<id>.json animations & s/<id>.json interactive State Machine;
                  pass animation="all" to bundle all animations), MP4 / WebM video, or engine tween JSON.
-  export_screen  a whole screen with native text, Input and Scroll widgets:
+  export_screen  a whole screen with native text and interactive widgets (Input, Scroll, Slider, Toggle, Dropdown):
                  Game engines: "godot" (.tscn + _controller.gd), "roblox" (LocalScript), "unity" (UXML + USS
-                 + Controller.cs), "unity-ugui" (C# Canvas/InputField/ScrollRect builder).
+                 + Controller.cs), "unity-ugui" (C# Canvas/InputField/ScrollRect builder), "unreal" (UE 5.5-5.8
+                 UMG WidgetBlueprint Python builder script).
                  C# / .NET & C++ desktop: "wpf" (.xaml + .xaml.cs + ViewModel), "avalonia" (.axaml), "winui"
                  (WinUI 3 .xaml), "qt-qml" (C++ Qt 6 .qml), "imgui" (C++17 Dear ImGui _ui.hpp).
   add_frame      parametric AAA frame builder (9 presets: rpg_gold, royal_ornate, fantasy_parchment,
                  scifi_hud, cyber_tech, glass_card, medieval_iron, luxury_minimal, cartoon_thick) returning
                  editable vector ids + safe inner_box.
-  add_input / add_scroll  first-class native text input & scrollable list widgets rendered on canvas and
-                 exported natively to Web/React, Godot, Unity, Roblox, WPF, Avalonia, WinUI, Qt QML & ImGui.
+  add_icon       100+ pure-MIT built-in vector icons (HUD, RPG, controls, status, social, UI); see uiforge://icons.
+  add_input / add_scroll / add_slider / add_toggle / add_dropdown
+                 first-class native interactive widgets rendered on canvas and exported natively to Web/React,
+                 Godot, Unity, Unreal UMG, Roblox, WPF, Avalonia, WinUI, Qt QML & ImGui.
   import_screenshot  OpenCV screenshot analyzer reconstructing an editable canvas + theme palette tokens.
   set_theme(quality=..., style_preset=..., environment=...):
                  quality: "simple" | "standard" | "advanced" | "aaa" (modulates SS, PBR shading, noise & frame detail).

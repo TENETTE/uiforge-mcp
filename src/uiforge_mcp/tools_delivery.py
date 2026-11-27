@@ -807,9 +807,22 @@ def _write_godot(c: dict, nodes: list, folder: Path, res: str, name: str, colors
                          *anchors, "mouse_filter = 2", f'texture = ExtResource("{tex}")', "expand_mode = 1", ""]
         elif node["kind"] == "input":
             el = node["el"]
+            nid = _ident_node(node["id"])
+            if el.get("label"):
+                ex, ey = float(el.get("x", x0)), float(el.get("y", y0))
+                ew = max(16.0, float(el.get("width", x1 - x0)))
+                lal, lar, lol, lorr = _anchor_axis(pin.get("x", "left"), ex + 2, ex + ew, W)
+                lat, lab, lot, lob = _anchor_axis(pin.get("y", "top"), max(0.0, ey - 22), max(4.0, ey - 4), H)
+                l_anchors = [f"anchor_left = {lal:.4f}", f"anchor_top = {lat:.4f}", f"anchor_right = {lar:.4f}",
+                             f"anchor_bottom = {lab:.4f}", f"offset_left = {lol:.2f}", f"offset_top = {lot:.2f}",
+                             f"offset_right = {lorr:.2f}", f"offset_bottom = {lob:.2f}"]
+                body += [f'[node name="{nid}_Label" type="Label" parent="."]', "layout_mode = 1", *l_anchors,
+                         f'text = {json.dumps(str(el["label"]), ensure_ascii=False)}',
+                         f"theme_override_font_sizes/font_size = {max(11, int(round(float(el.get('size', 15)) * 0.8)))}",
+                         "theme_override_colors/font_color = Color(0.7961, 0.8353, 0.8824, 1.0000)", ""]
             from .widgets import widget_colors_summary
             wc = widget_colors_summary(el, colors)
-            props = [f'[node name="{_ident_node(node["id"])}" type="LineEdit" parent="."]', "layout_mode = 1", *anchors,
+            props = [f'[node name="{nid}" type="LineEdit" parent="."]', "layout_mode = 1", *anchors,
                      f'placeholder_text = {json.dumps(str(el.get("placeholder") or ""), ensure_ascii=False)}',
                      f'text = {json.dumps(str(el.get("value") or ""), ensure_ascii=False)}',
                      f"theme_override_colors/font_color = {_godot_color(wc['text'])}",
@@ -840,7 +853,20 @@ def _write_godot(c: dict, nodes: list, folder: Path, res: str, name: str, colors
                          f"theme_override_font_sizes/font_size = {int(round(float(el.get('size', 13))))}", ""]
         elif node["kind"] == "slider":
             el = node["el"]
-            body += [f'[node name="{_ident_node(node["id"])}" type="HSlider" parent="."]', "layout_mode = 1", *anchors,
+            nid = _ident_node(node["id"])
+            if el.get("label"):
+                ex, ey = float(el.get("x", x0)), float(el.get("y", y0))
+                ew = max(16.0, float(el.get("width", x1 - x0)))
+                lal, lar, lol, lorr = _anchor_axis(pin.get("x", "left"), ex + 2, ex + ew, W)
+                lat, lab, lot, lob = _anchor_axis(pin.get("y", "top"), max(0.0, ey - 22), max(4.0, ey - 4), H)
+                l_anchors = [f"anchor_left = {lal:.4f}", f"anchor_top = {lat:.4f}", f"anchor_right = {lar:.4f}",
+                             f"anchor_bottom = {lab:.4f}", f"offset_left = {lol:.2f}", f"offset_top = {lot:.2f}",
+                             f"offset_right = {lorr:.2f}", f"offset_bottom = {lob:.2f}"]
+                body += [f'[node name="{nid}_Label" type="Label" parent="."]', "layout_mode = 1", *l_anchors,
+                         f'text = {json.dumps(str(el["label"]), ensure_ascii=False)}',
+                         f"theme_override_font_sizes/font_size = {max(11, int(round(float(el.get('size', 13)))))}",
+                         "theme_override_colors/font_color = Color(0.7961, 0.8353, 0.8824, 1.0000)", ""]
+            body += [f'[node name="{nid}" type="HSlider" parent="."]', "layout_mode = 1", *anchors,
                      f"min_value = {float(el.get('min', 0.0)):g}",
                      f"max_value = {float(el.get('max', 100.0)):g}",
                      f"step = {float(el.get('step', 1.0)):g}",
@@ -853,10 +879,23 @@ def _write_godot(c: dict, nodes: list, folder: Path, res: str, name: str, colors
                      f"button_pressed = {'true' if el.get('checked') else 'false'}", ""]
         elif node["kind"] == "dropdown":
             el = node["el"]
+            nid = _ident_node(node["id"])
+            if el.get("label"):
+                ex, ey = float(el.get("x", x0)), float(el.get("y", y0))
+                ew = max(16.0, float(el.get("width", x1 - x0)))
+                lal, lar, lol, lorr = _anchor_axis(pin.get("x", "left"), ex + 2, ex + ew, W)
+                lat, lab, lot, lob = _anchor_axis(pin.get("y", "top"), max(0.0, ey - 22), max(4.0, ey - 4), H)
+                l_anchors = [f"anchor_left = {lal:.4f}", f"anchor_top = {lat:.4f}", f"anchor_right = {lar:.4f}",
+                             f"anchor_bottom = {lab:.4f}", f"offset_left = {lol:.2f}", f"offset_top = {lot:.2f}",
+                             f"offset_right = {lorr:.2f}", f"offset_bottom = {lob:.2f}"]
+                body += [f'[node name="{nid}_Label" type="Label" parent="."]', "layout_mode = 1", *l_anchors,
+                         f'text = {json.dumps(str(el["label"]), ensure_ascii=False)}',
+                         f"theme_override_font_sizes/font_size = {max(11, int(round(float(el.get('size', 14)) * 0.85)))}",
+                         "theme_override_colors/font_color = Color(0.7961, 0.8353, 0.8824, 1.0000)", ""]
             opts = [str(o) for o in (el.get("options") or [])]
             sel = el.get("selected", 0)
             idx = opts.index(sel) if (isinstance(sel, str) and sel in opts) else int(sel or 0)
-            props = [f'[node name="{_ident_node(node["id"])}" type="OptionButton" parent="."]', "layout_mode = 1", *anchors,
+            props = [f'[node name="{nid}" type="OptionButton" parent="."]', "layout_mode = 1", *anchors,
                      f"selected = {idx}", f"item_count = {len(opts)}"]
             for i, opt in enumerate(opts):
                 props.append(f'popup/item_{i}/text = {json.dumps(opt, ensure_ascii=False)}')
@@ -1192,7 +1231,10 @@ def _write_godot_controller(c: dict, nodes: list, folder: Path, name: str) -> Pa
     binds = c.get("bindings") or []
     focus = c.get("focus_order") or []
     inputs = [n for n in nodes if n["kind"] == "input"]
-    if not (ix or data or binds or focus or inputs):
+    sliders = [n for n in nodes if n["kind"] == "slider"]
+    toggles = [n for n in nodes if n["kind"] == "toggle"]
+    dropdowns = [n for n in nodes if n["kind"] == "dropdown"]
+    if not (ix or data or binds or focus or inputs or sliders or toggles or dropdowns):
         return None
     node_ids = {n["id"]: _ident_node(n["id"]) for n in nodes}
     lines = [
@@ -1236,6 +1278,30 @@ def _write_godot_controller(c: dict, nodes: list, folder: Path, name: str) -> Pa
             f"\tif inp_{nid} is LineEdit:",
             f'\t\tinp_{nid}.text_changed.connect(func(v): set_data({{"{bkey}": v}}))',
         ]
+    for n in sliders:
+        nid = _ident_node(n["id"])
+        bkey = n["el"].get("bind") or n["id"]
+        lines += [
+            f'\tvar sl_{nid} := get_node_or_null("{nid}")',
+            f"\tif sl_{nid} is Range:",
+            f'\t\tsl_{nid}.value_changed.connect(func(v): set_data({{"{bkey}": v}}))',
+        ]
+    for n in toggles:
+        nid = _ident_node(n["id"])
+        bkey = n["el"].get("bind") or n["id"]
+        lines += [
+            f'\tvar tg_{nid} := get_node_or_null("{nid}")',
+            f"\tif tg_{nid} is BaseButton:",
+            f'\t\ttg_{nid}.toggled.connect(func(v): set_data({{"{bkey}": v}}))',
+        ]
+    for n in dropdowns:
+        nid = _ident_node(n["id"])
+        bkey = n["el"].get("bind") or n["id"]
+        lines += [
+            f'\tvar dd_{nid} := get_node_or_null("{nid}")',
+            f"\tif dd_{nid} is OptionButton:",
+            f'\t\tdd_{nid}.item_selected.connect(func(i): set_data({{"{bkey}": dd_{nid}.get_item_text(i)}}))',
+        ]
     lines += ["\tset_data(data)", ""]
     lines += [
         "func set_data(patch: Dictionary) -> void:",
@@ -1276,7 +1342,10 @@ def _write_unity_controller(c: dict, nodes: list, folder: Path, name: str) -> Pa
     binds = c.get("bindings") or []
     focus = c.get("focus_order") or []
     inputs = [n for n in nodes if n["kind"] == "input"]
-    if not (ix or data or binds or focus or inputs):
+    sliders = [n for n in nodes if n["kind"] == "slider"]
+    toggles = [n for n in nodes if n["kind"] == "toggle"]
+    dropdowns = [n for n in nodes if n["kind"] == "dropdown"]
+    if not (ix or data or binds or focus or inputs or sliders or toggles or dropdowns):
         return None
     cls = _pascal_id(name) + "Controller"
     lines = [

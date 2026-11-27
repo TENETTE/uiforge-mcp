@@ -209,9 +209,14 @@ def _vector_element(doc: _Doc, r: Renderer, el: dict, st: dict) -> bool:
     lines = [(_placed(el, [pts], g.box)[0], closed, width, cap) for pts, closed, width, cap in g.lines]
     if lines and not shapes:
         rbox = geo.bbox_of([p for p, _, _, _ in lines])
+    outline_subs = [(_placed(el, [pts], g.box)[0], closed) for pts, closed in g.outline if len(pts) >= 2]
+    if outline_subs and not shapes and not lines:
+        rbox = geo.bbox_of([p for p, _ in outline_subs])
     paint_ref = g.paint_box or rbox
     out: list[str] = []
     d = _points_d(shapes)
+    stroke_d = " ".join(_open_d(pts, closed) for pts, closed in outline_subs) if outline_subs else d
+    has_open = any(not closed for _, closed in outline_subs)
     if el["type"] in LINE_TYPES:
         paint = _paint(doc, fill_list[0], paint_ref, colors)
         if paint is None or len(fill_list) > 1:
@@ -229,14 +234,18 @@ def _vector_element(doc: _Doc, r: Renderer, el: dict, st: dict) -> bool:
         under, over = [], []
         clip_id = None
         for s in strokes:
+            if not stroke_d:
+                continue
             paint = _paint(doc, s["paint"], paint_ref, colors)
             if paint is None:
                 return False
-            width = s["width"] * (1 if s["align"] == "center" else 2)
+            align = s["align"] if d else "center"
+            width = s["width"] * (1 if align == "center" else 2)
             dash = f' stroke-dasharray="{" ".join(_num(v) for v in s["dash"])}"' if s["dash"] else ""
             join = s["join"] or ("miter" if g.kind == "poly" else "round")
-            attrs = (f'd="{d}" fill="none" stroke="{paint[0]}" stroke-width="{_num(width)}" stroke-linejoin="{join}"'
-                     f' stroke-miterlimit="{_num(s["miter_limit"])}"{dash}'
+            cap_attr = ' stroke-linecap="round"' if has_open else ""
+            attrs = (f'd="{stroke_d}" fill="none" stroke="{paint[0]}" stroke-width="{_num(width)}" stroke-linejoin="{join}"'
+                     f'{cap_attr} stroke-miterlimit="{_num(s["miter_limit"])}"{dash}'
                      + (f' stroke-opacity="{_num(paint[1])}"' if paint[1] < 1 else ""))
             if s["sides"]:
                 sid = doc.uid("s")
@@ -244,9 +253,9 @@ def _vector_element(doc: _Doc, r: Renderer, el: dict, st: dict) -> bool:
                                  for p in _placed(el, _side_strips(g.rect, s["sides"], s["d0"], s["d1"]), g.box))
                 doc.defs.append(f'<clipPath id="{sid}">{strips}</clipPath>')
                 attrs += f' clip-path="url(#{sid})"'
-            if s["align"] == "outside":
+            if align == "outside":
                 under.append(f"<path {attrs}/>")
-            elif s["align"] == "inside":
+            elif align == "inside":
                 if clip_id is None:
                     clip_id = doc.uid("c")
                     doc.defs.append(f'<clipPath id="{clip_id}"><path d="{d}" fill-rule="{rule}"/></clipPath>')
@@ -254,13 +263,14 @@ def _vector_element(doc: _Doc, r: Renderer, el: dict, st: dict) -> bool:
             else:
                 over.append(f"<path {attrs}/>")
         out += under
-        for one in fill_list:
-            paint = _paint(doc, one, paint_ref, colors)
-            if paint is None:
-                return False
-            if paint[0] != "none":
-                out.append(f'<path d="{d}" fill="{paint[0]}" fill-rule="{rule}"'
-                           + (f' fill-opacity="{_num(paint[1])}"' if paint[1] < 1 else "") + "/>")
+        if d:
+            for one in fill_list:
+                paint = _paint(doc, one, paint_ref, colors)
+                if paint is None:
+                    return False
+                if paint[0] != "none":
+                    out.append(f'<path d="{d}" fill="{paint[0]}" fill-rule="{rule}"'
+                               + (f' fill-opacity="{_num(paint[1])}"' if paint[1] < 1 else "") + "/>")
         out += over
     attrs = f' id="{escape(el["id"], quote=True)}"'
     if filt:

@@ -313,9 +313,9 @@ def _text_html(ctx: _Ctx, el: dict, st: dict) -> tuple[str, dict] | None:
     if layout.decoration != "none":
         css["text-decoration"] = "underline" if layout.decoration == "underline" else "line-through"
     if layout.features:
-        css["font-feature-settings"] = ", ".join(f'"{k}" {v}' for k, v in layout.features.items())
+        css["font-feature-settings"] = ", ".join(f"'{k}' {v}" for k, v in layout.features.items())
     if layout.axes:
-        css["font-variation-settings"] = ", ".join(f'"{k}" {_n(v)}' for k, v in layout.axes)
+        css["font-variation-settings"] = ", ".join(f"'{k}' {_n(v)}" for k, v in layout.axes)
     if el.get("max_lines"):
         css.update({"display": "-webkit-box", "-webkit-box-orient": "vertical",
                     "-webkit-line-clamp": str(int(el["max_lines"])), "overflow": "hidden"})
@@ -477,22 +477,34 @@ def _element(ctx: _Ctx, el: dict, svg_doc) -> tuple[str, dict, str] | None:
         val = float(el.get("value", 50.0))
         step = float(el.get("step", 1.0))
         fill_col = ctx.color(el.get("fill_color", "#38bdf8"))
-        css = {**_box_css(x, y, w, h), "accent-color": fill_col, "cursor": "pointer", "margin": "0"}
-        attrs = [f'type="range"', f'min="{_n(lo)}"', f'max="{_n(hi)}"', f'step="{_n(step)}"', f'value="{_n(val)}"']
+        track_col = ctx.color(el.get("track_color", "#1e293b"))
+        css = {**_box_css(x, y, w, h), "accent-color": fill_col, "--fill-col": fill_col,
+               "--track-col": track_col, "cursor": "pointer", "margin": "0"}
+        attrs = ['type="range"', f'min="{_n(lo)}"', f'max="{_n(hi)}"', f'step="{_n(step)}"', f'value="{_n(val)}"']
         if el.get("bind"):
             attrs.append(f'data-bind="{html.escape(str(el["bind"]), quote=True)}"')
-        return " ".join(attrs), css, "input"
+        return " ".join(attrs), css, "slider"
     if t == "toggle":
         x, y = float(el.get("x", 0)), float(el.get("y", 0))
         w, h = max(16.0, float(el.get("width", 52))), max(16.0, float(el.get("height", 28)))
+        variant = str(el.get("variant", "switch")).lower()
         on_col = ctx.color(el.get("on_color", "#22c55e"))
-        css = {**_box_css(x, y, w, h), "accent-color": on_col, "cursor": "pointer", "margin": "0"}
+        off_col = ctx.color(el.get("off_color", "#334155"))
+        thumb_col = ctx.color(el.get("thumb_color", "#ffffff"))
+        if variant == "checkbox":
+            box_s = min(w, h)
+            css = {**_box_css(x, y + (h - box_s) * 0.5, box_s, box_s), "accent-color": on_col, "cursor": "pointer", "margin": "0"}
+            kind = "input"
+        else:
+            css = {**_box_css(x, y, w, h), "--on-col": on_col, "--off-col": off_col, "--thumb-col": thumb_col,
+                   "cursor": "pointer", "margin": "0"}
+            kind = "switch"
         attrs = ['type="checkbox"']
         if el.get("checked"):
             attrs.append("checked")
         if el.get("bind"):
             attrs.append(f'data-bind="{html.escape(str(el["bind"]), quote=True)}"')
-        return " ".join(attrs), css, "input"
+        return " ".join(attrs), css, kind
     if t == "dropdown":
         from .widgets import widget_colors_summary
         wc = widget_colors_summary(el, ctx.colors)
@@ -540,9 +552,153 @@ def _svg(ctx: _Ctx, el: dict, st: dict, svg_doc) -> tuple[str, dict, str] | None
     body = "".join(svg_doc.body[mark_body:])
     del svg_doc.body[mark_body:]
     W, H = ctx.r.canvas["width"], ctx.r.canvas["height"]
+    box = ctx.r._geom_box(el, st)
+    px, py = ctx.r._pivot(el, box)
     svg = (f'<svg viewBox="0 0 {_n(W)} {_n(H)}" width="{_n(W)}" height="{_n(H)}" aria-hidden="true">'
            + (f"<defs>{defs}</defs>" if defs else "") + body + "</svg>")
-    return svg, {"left": "0", "top": "0", "width": f"{_n(W)}px", "height": f"{_n(H)}px"}, "svg"
+    css = {"left": "0", "top": "0", "width": f"{_n(W)}px", "height": f"{_n(H)}px",
+           "transform-origin": f"{_n(px)}px {_n(py)}px"}
+    return svg, css, "svg"
+
+
+def _widget_chrome(ctx: _Ctx, el: dict, eid: str, layout: str, W: float, H: float) -> list[str]:
+    """Emit associated HTML <label> and live slider readout elements matching canvas widget rendering."""
+    t = el.get("type")
+    if t not in ("input", "dropdown", "slider", "toggle"):
+        return []
+    out: list[str] = []
+    x, y = float(el.get("x", 0)), float(el.get("y", 0))
+    font = html.escape(str(el.get("font") or "Inter"), quote=True)
+    pin = el.get("pin") or {}
+
+    def _pin_shift(css: dict, lx: float, ly: float, lw: float | None, lh: float) -> None:
+        if layout != "responsive":
+            return
+        if pin.get("x") == "right" and lw is not None:
+            css.pop("left", None)
+            css["right"] = f"{_n(W - (lx + lw))}px"
+        if pin.get("y") == "bottom":
+            css.pop("top", None)
+            css["bottom"] = f"{_n(H - (ly + lh))}px"
+
+    lbl = el.get("label")
+    if t in ("input", "dropdown") and lbl:
+        fsize = float(el.get("size", 15 if t == "input" else 14))
+        lsize = max(11.0, fsize * (0.8 if t == "input" else 0.85))
+        lh = lsize * 1.25
+        lx, ly = x + 2.0, y - 6.0 - lh
+        lcss = {
+            "left": f"{_n(lx)}px", "top": f"{_n(ly)}px",
+            "font-family": f"'{font}',sans-serif", "font-size": f"{_n(lsize)}px",
+            "font-weight": "600", "color": ctx.color(el.get("label_color", "#cbd5e1")),
+            "line-height": "1.2", "white-space": "nowrap", "cursor": "pointer",
+        }
+        _pin_shift(lcss, lx, ly, None, lh)
+        out.append(f'<label class="el w-label" for="{eid}" style="{_css_decl(lcss)}">{html.escape(str(lbl))}</label>')
+    elif t == "slider":
+        w = max(16.0, float(el.get("width", 220)))
+        fsize = float(el.get("size", 13))
+        lsize = max(11.0, fsize)
+        lh = lsize * 1.25
+        ly = y - 5.0 - lh
+        if lbl:
+            lx = x + 2.0
+            lcss = {
+                "left": f"{_n(lx)}px", "top": f"{_n(ly)}px",
+                "font-family": f"'{font}',sans-serif", "font-size": f"{_n(lsize)}px",
+                "font-weight": "600", "color": ctx.color(el.get("text_color", "#cbd5e1")),
+                "line-height": "1.2", "white-space": "nowrap", "cursor": "pointer",
+            }
+            _pin_shift(lcss, lx, ly, None, lh)
+            out.append(f'<label class="el w-label" for="{eid}" style="{_css_decl(lcss)}">{html.escape(str(lbl))}</label>')
+            if el.get("show_value", True):
+                val = float(el.get("value", 50.0))
+                vtxt = f"{int(round(val))}" if abs(val - round(val)) < 1e-4 else f"{val:.1f}"
+                vcss = {
+                    "left": f"{_n(x)}px", "top": f"{_n(ly)}px", "width": f"{_n(max(16.0, w - 2.0))}px",
+                    "text-align": "right", "font-family": f"'{el.get('font') or 'JetBrains Mono'}',monospace",
+                    "font-size": f"{_n(lsize)}px", "font-weight": "600",
+                    "color": ctx.color(el.get("fill_color", "#38bdf8")),
+                    "line-height": "1.2", "white-space": "nowrap", "pointer-events": "none",
+                }
+                _pin_shift(vcss, x, ly, max(16.0, w - 2.0), lh)
+                out.append(f'<span class="el w-val" data-val-for="{eid}" style="{_css_decl(vcss)}">{html.escape(vtxt)}</span>')
+    elif t == "toggle" and lbl:
+        w, h = max(16.0, float(el.get("width", 52))), max(16.0, float(el.get("height", 28)))
+        variant = str(el.get("variant", "switch")).lower()
+        lbl_x = (x + min(w, h) + 10.0) if variant == "checkbox" else (x + w + 10.0)
+        fsize = float(el.get("size", 14))
+        lcss = {
+            "left": f"{_n(lbl_x)}px", "top": f"{_n(y)}px", "height": f"{_n(h)}px",
+            "display": "flex", "align-items": "center",
+            "font-family": f"'{font}',sans-serif", "font-size": f"{_n(fsize)}px",
+            "font-weight": "500", "color": ctx.color(el.get("text_color", "#f8fafc")),
+            "white-space": "nowrap", "cursor": "pointer",
+        }
+        _pin_shift(lcss, lbl_x, y, None, h)
+        out.append(f'<label class="el w-toggle-lbl" for="{eid}" style="{_css_decl(lcss)}">{html.escape(str(lbl))}</label>')
+    return out
+
+
+def _state_fallback_diff(ctx: _Ctx, base_el: dict, new_el: dict, state: str) -> dict[str, str]:
+    """Compute graceful CSS feedback for SVG / cut-corner / raster elements in interactive states."""
+    base_st = resolve_style(base_el.get("style"), ctx.theme)
+    new_st = resolve_style(new_el.get("style"), ctx.theme)
+    diff: dict[str, str] = {}
+    b_op = float(base_st.get("opacity", 1))
+    n_op = float(new_st.get("opacity", 1))
+    if abs(n_op - b_op) > 1e-3:
+        diff["opacity"] = _n(n_op)
+    transforms: list[str] = []
+    dx = float(new_el.get("x", 0) or 0) - float(base_el.get("x", 0) or 0)
+    dy = float(new_el.get("y", 0) or 0) - float(base_el.get("y", 0) or 0)
+    if abs(dx) > 1e-3 or abs(dy) > 1e-3:
+        transforms.append(f"translate({_n(dx)}px,{_n(dy)}px)")
+    bsx, bsy = _scales(base_el)
+    nsx, nsy = _scales(new_el)
+    if abs(nsx - bsx) > 1e-3 or abs(nsy - bsy) > 1e-3:
+        transforms.append(f"scale({_n(nsx / (bsx or 1))},{_n(nsy / (bsy or 1))})")
+    drot = float(new_el.get("rotation", 0) or 0) - float(base_el.get("rotation", 0) or 0)
+    if abs(drot) > 1e-3:
+        transforms.append(f"rotate({_n(drot)}deg)")
+    filters: list[str] = []
+    if new_st.get("glow") and new_st.get("glow") != base_st.get("glow"):
+        g = new_st["glow"]
+        g = g[0] if isinstance(g, list) and g else g
+        if isinstance(g, dict):
+            col = ctx.color(g.get("color", "#ffffff@0.8"))
+            blur = float(g.get("blur", 10))
+            filters.append(f"drop-shadow(0 0 {_n(blur)}px {col})")
+    visual_changed = any(new_st.get(k) != base_st.get(k) for k in ("fill", "stroke", "material", "pbr", "shadow", "inner_glow"))
+    if visual_changed:
+        st_l = state.lower()
+        if st_l in ("pressed", "active"):
+            filters.append("brightness(0.92)")
+            if not transforms:
+                transforms.append("scale(0.98)")
+        elif st_l == "disabled":
+            filters.append("saturate(0.35) brightness(0.75)")
+            diff.setdefault("opacity", "0.55")
+        elif st_l == "focused":
+            scol = "#38bdf8"
+            ns = new_st.get("stroke")
+            if isinstance(ns, dict) and ns.get("color"):
+                scol = ctx.color(ns["color"])
+            elif isinstance(ns, str):
+                scol = ctx.color(ns)
+            filters.append(f"drop-shadow(0 0 6px {scol})")
+        else:
+            filters.append("brightness(1.14)")
+            if not new_st.get("glow"):
+                ns = new_st.get("stroke")
+                scol = ns.get("color") if isinstance(ns, dict) else (ns if isinstance(ns, str) else None)
+                if scol:
+                    filters.append(f"drop-shadow(0 0 8px {ctx.color(scol)})")
+    if transforms:
+        diff["transform"] = " ".join(transforms)
+    if filters:
+        diff["filter"] = " ".join(filters)
+    return diff
 
 
 def _picture(ctx: _Ctx, el: dict, big, beneath: list[str], include_background: bool) -> tuple[str, dict] | None:
@@ -564,7 +720,11 @@ def _picture(ctx: _Ctx, el: dict, big, beneath: list[str], include_background: b
     img.save(assets / name, optimize=True)
     ctx.raster.append(el["id"])
     s = ctx.scale
-    return f"assets/{name}", _box_css(px0 / s, py0 / s, img.width / s, img.height / s)
+    css = _box_css(px0 / s, py0 / s, img.width / s, img.height / s)
+    box = ctx.r._geom_box(el, st)
+    px, py = ctx.r._pivot(el, box)
+    css["transform-origin"] = f"{_n(px - px0 / s)}px {_n(py - py0 / s)}px"
+    return f"assets/{name}", css
 
 
 def _anchor(css: dict, el: dict, W: float, H: float) -> None:
@@ -603,11 +763,13 @@ def _css_decl(css: dict, important: bool = False) -> str:
     return ";".join(f"{k}:{v}{'!important' if important else ''}" for k, v in css.items())
 
 
-def _keyframes(ctx: _Ctx, canvas: dict, name: str, anim: dict, ids: set[str]) -> tuple[str, dict[str, str]]:
+def _keyframes(ctx: _Ctx, canvas: dict, name: str, anim: dict, ids: set[str],
+               baked_rot: dict[str, float] | None = None) -> tuple[str, dict[str, str]]:
     """CSS @keyframes for move / rotate / scale / fade tracks; returns (css, {element id: animation decl})."""
     tracks = anim.get("tracks", [])
     if not tracks:
         return "", {}
+    baked = baked_rot or {}
     duration = float(anim.get("duration", 1))
     steps = max(2, min(60, int(duration * 20) + 1))
     colors = ctx.colors
@@ -624,12 +786,13 @@ def _keyframes(ctx: _Ctx, canvas: dict, name: str, anim: dict, ids: set[str]) ->
         b = base[eid]
         bx, by = (float(b["points"][0][0]), float(b["points"][0][1])) if b.get("points") else \
             ((float(b["cx"]), float(b["cy"])) if "cx" in b else (float(b.get("x", 0)), float(b.get("y", 0))))
+        base_rot = baked.get(eid, 0.0)
         lines = []
         for i, f in enumerate(frames):
             fx, fy = (float(f["points"][0][0]), float(f["points"][0][1])) if f.get("points") else \
                 ((float(f["cx"]), float(f["cy"])) if "cx" in f else (float(f.get("x", 0)), float(f.get("y", 0))))
             sx, sy = _scales(f)
-            rot = float(f.get("rotation", 0) or 0)
+            rot = float(f.get("rotation", 0) or 0) - base_rot
             op = float(resolve_style(f.get("style"), ctx.theme).get("opacity", 1))
             lines.append(f"{_n(100 * i / (steps - 1))}%{{transform:translate({_n(fx - bx)}px,{_n(fy - by)}px) "
                          f"rotate({_n(rot)}deg) scale({_n(sx)},{_n(sy)});opacity:{_n(op)}}}")
@@ -673,6 +836,13 @@ def build(store, canvases: list[dict], out: Path, layout: str, language: str | N
         played = {rule["animation"] for rule in ix if rule.get("animation")}
         used_states = {rule["state"] for rule in ix if rule.get("state")}
         clickable = {rule["id"] for rule in ix if rule["trigger"] in ("click", "press", "release")}
+        baked_rot: dict[str, float] = {}
+        dynamic_ids = (
+            {b["target"] for b in (c.get("bindings") or [])}
+            | {t["target"] for a in (c.get("animations") or {}).values() for t in (a.get("tracks") or [])}
+            | {rule["id"] for rule in ix if not str(rule["id"]).startswith("group:")}
+            | set(links.keys())
+        )
         for lay, elements in r.stack():
             props = r.layer_props(lay) if lay else None
             if props and not props["visible"]:
@@ -680,6 +850,11 @@ def build(store, canvases: list[dict], out: Path, layout: str, language: str | N
             if props and (props["style"] or props["clip"]):
                 ids = {e["id"] for e in elements}
                 beneath.extend(ids)
+                dyn_hit = sorted((ids & dynamic_ids) | {e["id"] for e in elements if e.get("type") in ("input", "scroll", "slider", "toggle", "dropdown")})
+                if dyn_hit:
+                    report["notes"].add(
+                        f"{c['id']}: layer '{props['name']}' was rasterized (layer style/clip), so live bindings/interactions on {', '.join(dyn_hit)} will not update individually on the web"
+                    )
                 img = big.render(include_background=False, only=ids)
                 bbox = img.getchannel("A").getbbox()
                 if bbox:
@@ -730,7 +905,10 @@ def build(store, canvases: list[dict], out: Path, layout: str, language: str | N
                         _anchor(css, el, W, H)
                     if el.get("fixed"):
                         css["position"] = "fixed"
-                    body.append(f'<img class="el" id="{eid}" alt="" src="{src}" style="{_css_decl(css)};{vt}"{extra_attrs}>')
+                    brot = float(el.get("rotation", 0) or 0)
+                    baked_rot[el["id"]] = brot
+                    rot_attr = f' data-base-rot="{_n(brot)}"' if brot else ""
+                    body.append(f'<img class="el" id="{eid}" alt="" src="{src}" style="{_css_decl(css)};{vt}"{rot_attr}{extra_attrs}>')
                     continue
                 inner, css, kind = got
                 if layout == "responsive":
@@ -741,12 +919,23 @@ def build(store, canvases: list[dict], out: Path, layout: str, language: str | N
                 if kind == "img":
                     body.append(f'<img class="el" id="{eid}" alt="" src="{inner}" style="{decl}"{extra_attrs}>')
                 elif kind == "svg":
-                    body.append(f'<div class="el vec" id="{eid}" style="{decl}"{extra_attrs}>{inner}</div>')
+                    brot = float(el.get("rotation", 0) or 0)
+                    baked_rot[el["id"]] = brot
+                    rot_attr = f' data-base-rot="{_n(brot)}"' if brot else ""
+                    body.append(f'<div class="el vec" id="{eid}" style="{decl}"{rot_attr}{extra_attrs}>{inner}</div>')
                 elif kind == "input":
+                    body.extend(_widget_chrome(ctx, el, eid, layout, W, H))
                     body.append(f'<input class="el input" id="{eid}" {inner} style="{decl}"{extra_attrs}>')
+                elif kind == "slider":
+                    body.extend(_widget_chrome(ctx, el, eid, layout, W, H))
+                    body.append(f'<input class="el input w-slider" id="{eid}" {inner} style="{decl}"{extra_attrs}>')
+                elif kind == "switch":
+                    body.append(f'<input class="el input toggle-switch" id="{eid}" {inner} style="{decl}"{extra_attrs}>')
+                    body.extend(_widget_chrome(ctx, el, eid, layout, W, H))
                 elif kind == "scroll":
                     body.append(f'<div class="el scroll" id="{eid}" style="{decl}"{extra_attrs}>{inner}</div>')
                 elif kind == "select":
+                    body.extend(_widget_chrome(ctx, el, eid, layout, W, H))
                     b_attr, opt_body = inner.split("||", 1)
                     body.append(f'<select class="el select" id="{eid}"{b_attr} style="{decl}"{extra_attrs}>{opt_body}</select>')
                 else:
@@ -768,11 +957,14 @@ def build(store, canvases: list[dict], out: Path, layout: str, language: str | N
                     continue
                 a, b = _element(ctx, base_el, svgexport._Doc()), _element(pctx, new_el, svgexport._Doc())
                 if a is None or b is None or a[2] in ("svg", "img"):
-                    report["notes"].add(f"{c['id']}: the {state} look of '{eid}' is not reproduced on the web")
-                    continue
-                diff = {k: v for k, v in b[1].items() if a[1].get(k) != v}
-                if not diff:
-                    continue
+                    diff = _state_fallback_diff(ctx, base_el, new_el, state)
+                    if not diff:
+                        report["notes"].add(f"{c['id']}: the {state} look of '{eid}' is not reproduced on the web")
+                        continue
+                else:
+                    diff = {k: v for k, v in b[1].items() if a[1].get(k) != v}
+                    if not diff:
+                        continue
                 if pseudo:
                     sel = (f".g-{_ident(base_el['group'])}{pseudo} #{_ident(eid)}" if base_el.get("group")
                            else f"#{_ident(eid)}{pseudo}")
@@ -780,7 +972,7 @@ def build(store, canvases: list[dict], out: Path, layout: str, language: str | N
                 if state in used_states:
                     page_css.append(f".page.s-{_ident(state)} #{_ident(eid)}{{{_css_decl(diff, True)};transition:all .15s ease}}")
         for name, anim in (c.get("animations") or {}).items():
-            rules, decls = _keyframes(ctx, c, name, anim, {e["id"] for e in c["elements"]})
+            rules, decls = _keyframes(ctx, c, name, anim, {e["id"] for e in c["elements"]}, baked_rot)
             if rules:
                 page_css.append(rules)
                 for eid, decl in decls.items():
@@ -907,6 +1099,11 @@ body.fit .page{transform-origin:center center}
 .vec svg *{pointer-events:visiblePainted}
 .vec{pointer-events:none}
 .g{display:contents}
+.w-label,.w-val,.w-toggle-lbl{user-select:none}
+.toggle-switch{appearance:none;-webkit-appearance:none;border-radius:999px;background:var(--off-col,#334155);border:1px solid rgba(255,255,255,.15);transition:background .18s ease}
+.toggle-switch::after{content:"";position:absolute;top:12%;left:3px;height:76%;aspect-ratio:1/1;border-radius:50%;background:var(--thumb-col,#fff);box-shadow:0 1px 4px rgba(0,0,0,.35);transition:left .18s ease,transform .18s ease}
+.toggle-switch:checked{background:var(--on-col,#22c55e)}
+.toggle-switch:checked::after{left:calc(100% - 3px);transform:translateX(-100%)}
 [data-href]{cursor:pointer}
 [data-href]:focus-visible{outline:2px solid #fff;outline-offset:2px}
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);display:grid;place-items:center;z-index:9999}
@@ -928,12 +1125,25 @@ RUNTIME_JS = """function uiforgeApplyData(root, cfg, patch) {
     try {
       var v = (new Function('d', 'return (' + b.js + ');'))(d);
       if (b.prop === 'width' || b.prop === 'height') el.style[b.prop] = Math.max(0, Number(v)) + 'px';
+      else if (b.prop === 'x') el.style.left = Number(v) + 'px';
+      else if (b.prop === 'y') el.style.top = Number(v) + 'px';
+      else if (b.prop === 'rotation') el.style.transform = 'rotate(' + (Number(v) - Number(el.dataset.baseRot || 0)) + 'deg)';
       else if (b.prop === 'opacity') el.style.opacity = String(Math.max(0, Math.min(1, Number(v))));
       else if (b.prop === 'visible') el.style.display = v ? '' : 'none';
       else if (b.prop === 'text') el.textContent = String(v);
       else if (b.prop === 'style.fill' || b.prop === 'fill') el.style.background = String(v);
       else if (b.prop === 'style.color' || b.prop === 'color') el.style.color = String(v);
     } catch (e) {}
+  });
+  root.querySelectorAll('[data-bind]').forEach(function (inp) {
+    var k = inp.dataset.bind;
+    if (!(k in d)) return;
+    if (inp.type === 'checkbox') inp.checked = !!d[k];
+    else if (inp !== document.activeElement) inp.value = String(d[k]);
+    if (inp.id) {
+      var valEl = root.querySelector('[data-val-for="' + inp.id + '"]');
+      if (valEl) { var n = Number(d[k]); valEl.textContent = isNaN(n) ? String(d[k]) : (Math.abs(n - Math.round(n)) < 1e-4 ? String(Math.round(n)) : n.toFixed(1)); }
+    }
   });
   return d;
 }
@@ -983,6 +1193,10 @@ function uiforgeAttach(root, cfg, go, onSfx) {
   on('pointerdown', 'press'); on('pointerup', 'release'); on('click', 'click');
   function syncBoundInput(e) {
     var el = e.target;
+    if (el && el.id && el.type === 'range') {
+      var valEl = root.querySelector('[data-val-for="' + el.id + '"]');
+      if (valEl) { var n = Number(el.value); valEl.textContent = Math.abs(n - Math.round(n)) < 1e-4 ? String(Math.round(n)) : n.toFixed(1); }
+    }
     if (el && el.dataset && el.dataset.bind) {
       cfg.data = Object.assign({}, cfg.data || {});
       var v = el.type === 'checkbox' ? !!el.checked : (el.type === 'range' || el.type === 'number' ? Number(el.value) : el.value);
@@ -1068,6 +1282,7 @@ _VOID = {"img", "br", "hr", "input", "source", "meta", "link"}
 _JSX_ATTR = {"class": "className", "for": "htmlFor", "tabindex": "tabIndex", "srcset": "srcSet",
              "crossorigin": "crossOrigin", "readonly": "readOnly", "maxlength": "maxLength",
              "contenteditable": "contentEditable", "spellcheck": "spellCheck"}
+_JSX_NUM_ATTR = {"tabindex", "maxlength"}
 
 
 def _style_object(css: str) -> str:
@@ -1160,7 +1375,7 @@ class _Jsx(HTMLParser):
             elif name == "style":
                 res.append(f"style={_style_object(value or '')}")
             elif name == "class" and extra_tw:
-                base = (value or "").replace("el", "el absolute m-0") if self.tailwind else (value or "")
+                base = re.sub(r"\bel\b", "el absolute m-0", value or "") if self.tailwind else (value or "")
                 res.append(f"className={{{json.dumps((base + ' ' + ' '.join(extra_tw)).strip(), ensure_ascii=False)}}}")
             elif tag == "img" and name == "src" and value and value.startswith("assets/"):
                 var = self.images.setdefault(value, f"img{len(self.images)}")
@@ -1175,7 +1390,12 @@ class _Jsx(HTMLParser):
                 continue
             else:
                 key = _JSX_ATTR.get(name, name)
-                res.append(key if value is None else f"{key}={{{json.dumps(value, ensure_ascii=False)}}}")
+                if value is None:
+                    res.append(key)
+                elif name in _JSX_NUM_ATTR and re.fullmatch(r"-?\d+", value):
+                    res.append(f"{key}={{{int(value)}}}")
+                else:
+                    res.append(f"{key}={{{json.dumps(value, ensure_ascii=False)}}}")
         if extra_tw and not has_class:
             res.append(f"className={{{json.dumps(' '.join(extra_tw), ensure_ascii=False)}}}")
         return (" " + " ".join(res)) if res else ""
@@ -1254,7 +1474,7 @@ def build_react(store, canvases: list[dict], out: Path, language: str | None, in
         nav_cb = "(href: string, mode?: string, to?: string)" if typescript else "(href, mode, to)"
         lines += ["", sig, ref_decl,
                   f"  useEffect(() => uiforgeAttach(ref.current, IX, {nav_cb} => {{",
-                  "    if (onNavigate) return onNavigate(to || href, mode);",
+                  "    if (onNavigate) return onNavigate(to || href, mode || 'navigate');",
                   "    if (mode === 'url') window.open(href, '_blank', 'noopener');",
                   "  }, onSfx), [onNavigate, onSfx]);",
                   "  useEffect(() => { if (ref.current && data) uiforgeApplyData(ref.current, IX, data); }, [data]);",
@@ -1274,6 +1494,38 @@ def build_react(store, canvases: list[dict], out: Path, language: str | None, in
     runtime_esm = RUNTIME_JS.replace("function uiforgeApplyData", "export function uiforgeApplyData").replace(
         "function uiforgeAttach", "export function uiforgeAttach")
     (out / "uiforge-runtime.js").write_text(runtime_esm, encoding="utf-8")
+    if typescript:
+        (out / "uiforge-runtime.d.ts").write_text(
+            "export interface UIForgeRuntimeConfig {\n"
+            "  rules?: Array<Record<string, any>>;\n"
+            "  anims?: Record<string, { duration: number; loop: boolean }>;\n"
+            "  focus?: string[];\n"
+            "  data?: Record<string, any>;\n"
+            "  bindings?: Array<{ id: string; prop: string; js: string }>;\n"
+            "  templates?: Record<string, string>;\n"
+            "}\n"
+            "export function uiforgeApplyData(\n"
+            "  root: HTMLElement | null,\n"
+            "  cfg?: UIForgeRuntimeConfig,\n"
+            "  patch?: Record<string, any>,\n"
+            "): Record<string, any>;\n"
+            "export function uiforgeAttach(\n"
+            "  root: HTMLElement | null,\n"
+            "  cfg?: UIForgeRuntimeConfig,\n"
+            "  go?: (href: string, mode?: string, to?: string) => void,\n"
+            "  onSfx?: (name: string, id?: string) => void,\n"
+            "): () => void;\n",
+            encoding="utf-8",
+        )
+        (out / "uiforge-assets.d.ts").write_text(
+            "declare module '*.css';\n"
+            "declare module '*.png' { const src: string; export default src; }\n"
+            "declare module '*.webp' { const src: string; export default src; }\n"
+            "declare module '*.jpg' { const src: string; export default src; }\n"
+            "declare module '*.jpeg' { const src: string; export default src; }\n"
+            "declare module '*.svg' { const src: string; export default src; }\n",
+            encoding="utf-8",
+        )
     idx_ext = "ts" if typescript else "js"
     (out / f"index.{idx_ext}").write_text(
         "".join(f"export {{ default as {Path(cmp).stem} }} from './{Path(cmp).stem}';\n" for cmp in components),

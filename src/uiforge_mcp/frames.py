@@ -295,7 +295,8 @@ def frame_operations(x: float, y: float, width: float, height: float, preset: st
 
     elif p == "scifi_hud":
         acc = accent or "#22d3ee"
-        cut = max(14.0, min(26.0, min(w, h) * 0.115))
+        cut = float(round(max(14.0, min(26.0, min(w, h) * 0.115))))
+        arm = float(round(max(16.0, min(28.0, min(w, h) * 0.14))))
         add("rect", "body", x=x, y=y, width=w, height=h, radius=cut, corner="cut",
             style={"fill": {"type": "linear", "angle": 160, "stops": [[0, "#101b2e@0.93"], [1, "#060b14@0.96"]]},
                    "backdrop_blur": 14,
@@ -304,37 +305,49 @@ def frame_operations(x: float, y: float, width: float, height: float, preset: st
                    "shadow": {"color": "#000000@0.6", "blur": 26, "dy": 10, "knockout": True}})
         add("rect", "sub_bezel", x=x + 6, y=y + 6, width=w - 12, height=h - 12, radius=max(6.0, cut - 4), corner="cut",
             style={"fill": None, "stroke": {"color": f"{acc}@0.22", "width": 1.0, "align": "inside"}})
-        add("rect", "topbar", x=x + cut + 6, y=y + 2, width=max(28.0, w * 0.28), height=3.5, radius=1.5,
+        add("rect", "topbar", x=round(x + cut + 6), y=round(y + 2), width=round(max(28.0, w * 0.28)), height=4, radius=2,
             style={"fill": acc, "glow": {"color": f"{acc}@0.8", "blur": 10}})
         if orn in ("auto", "brackets", "notches"):
-            arm = max(16.0, min(28.0, min(w, h) * 0.14))
             th = 3.2
             for ci, (bx, by, dx, dy) in enumerate(((x - 2, y - 2, 1, 1), (x + w + 2, y - 2, -1, 1),
                                                    (x - 2, y + h + 2, 1, -1), (x + w + 2, y + h + 2, -1, -1))):
                 add("path", f"bracket_{ci}", d=_bracket_path(bx, by, dx, dy, arm, th),
                     style={"fill": acc, "glow": {"color": f"{acc}@0.65", "blur": 8}})
             n_ticks = max(4, min(14, int((w - cut * 2 - 40) // 14)))
-            tx0 = x + w - cut - 14 - n_ticks * 10
+            tx0 = round(x + w - cut - 14 - n_ticks * 10)
             for ti in range(n_ticks):
-                th_t = 5.5 if ti % 4 == 0 else 3.0
-                add("rect", f"tick_{ti}", x=tx0 + ti * 10, y=y + h - 8 - th_t, width=2, height=th_t,
+                th_t = 6 if ti % 4 == 0 else 3
+                add("rect", f"tick_{ti}", x=tx0 + ti * 10, y=round(y + h - 8 - th_t), width=2, height=th_t,
                     style={"fill": f"{acc}@0.55" if ti % 4 else acc})
             for di in range(3):
-                add("ellipse", f"led_{di}", cx=x + w - cut - 8 - di * 10, cy=y + 12, rx=2.2, ry=2.2,
+                add("ellipse", f"led_{di}", cx=round(x + w - cut - 8 - di * 10), cy=round(y + 12), rx=2.2, ry=2.2,
                     style={"fill": acc if di == 0 else f"{acc}@0.35",
                            "glow": {"color": f"{acc}@0.8", "blur": 5} if di == 0 else None})
         inner = [round(x + 20, 2), round(y + (44 if title else 20), 2),
                  round(w - 40, 2), round(h - (66 if title else 40), 2)]
         if title:
-            add("line", "hdr_rule", points=[[x + 18, y + 34], [x + w - 18, y + 34]],
+            title_x = round(x + (max(24.0, arm + 6.0) if orn in ("auto", "brackets", "notches") else 22.0))
+            title_col = acc
+            try:
+                from .colors import parse_color
+                tr, tg, tb, _ = parse_color(acc)
+                lum = (0.2126 * tr + 0.7152 * tg + 0.0722 * tb) / 255.0
+                if lum < 0.35:
+                    mr = int(round(tr * 0.4 + 248 * 0.6))
+                    mg = int(round(tg * 0.4 + 250 * 0.6))
+                    mb = int(round(tb * 0.4 + 252 * 0.6))
+                    title_col = f"#{mr:02x}{mg:02x}{mb:02x}"
+            except Exception:
+                pass
+            add("line", "hdr_rule", points=[[round(x + 18), round(y + 34)], [round(x + w - 18), round(y + 34)]],
                 width=1, color=f"{acc}@0.28")
-            add("text", "title", text=title.upper(), x=x + 22, y=y + 21, anchor="middle-left",
-                size=14, weight=700, font="Rajdhani", letter_spacing=2.6, color=acc)
+            add("text", "title", text=title.upper(), x=title_x, y=round(y + 21), anchor="middle-left",
+                size=14, weight=700, font="Rajdhani", letter_spacing=2.6, color=title_col)
 
     elif p == "cyber_tech":
         acc = accent or "#f43f5e"
         acc2 = "#22d3ee"
-        cut = max(12.0, min(24.0, min(w, h) * 0.105))
+        cut = float(round(max(12.0, min(24.0, min(w, h) * 0.105))))
         add("rect", "chassis", x=x, y=y, width=w, height=h, radius=cut, corner="cut",
             style={"material": material or "carbon_twill",
                    "stroke": {"color": f"{acc2}@0.58", "width": 1.6, "align": "inside"},
@@ -343,9 +356,9 @@ def frame_operations(x: float, y: float, width: float, height: float, preset: st
             style={"fill": {"type": "linear", "angle": 165, "stops": [[0, "#101727@0.94"], [1, "#070b14@0.97"]]},
                    "stroke": {"color": "#ffffff@0.14", "width": 1, "align": "inside"},
                    "inner_shadow": {"color": "#000000@0.88", "blur": 14, "dy": 4}})
-        add("rect", "rail_l", x=x + 2, y=y + cut + 6, width=4.5, height=max(16.0, h - cut * 2 - 12), radius=2,
+        add("rect", "rail_l", x=round(x + 2), y=round(y + cut + 6), width=4, height=round(max(16.0, h - cut * 2 - 12)), radius=2,
             style={"fill": acc, "glow": {"color": f"{acc}@0.85", "blur": 12}})
-        add("rect", "rail_r", x=x + w - 6.5, y=y + cut + 6, width=4.5, height=max(16.0, h - cut * 2 - 12), radius=2,
+        add("rect", "rail_r", x=round(x + w - 6), y=round(y + cut + 6), width=4, height=round(max(16.0, h - cut * 2 - 12)), radius=2,
             style={"fill": acc2, "glow": {"color": f"{acc2}@0.85", "blur": 12}})
         if orn in ("auto", "notches", "rivets", "brackets"):
             for ci, (cx, cy) in enumerate(((x + cut + 8, y + 6), (x + w - cut - 8, y + 6),
@@ -358,9 +371,9 @@ def frame_operations(x: float, y: float, width: float, height: float, preset: st
         inner = [round(x + 22, 2), round(y + (42 if title else 20), 2),
                  round(w - 44, 2), round(h - (62 if title else 40), 2)]
         if title:
-            add("rect", "title_tag", x=x + 18, y=y + 14, width=6, height=18, radius=1.5,
+            add("rect", "title_tag", x=round(x + 18), y=round(y + 14), width=6, height=18, radius=2,
                 style={"fill": acc, "glow": {"color": f"{acc}@0.7", "blur": 6}})
-            add("text", "title", text=title.upper(), x=x + 30, y=y + 23, anchor="middle-left",
+            add("text", "title", text=title.upper(), x=round(x + 34), y=round(y + 23), anchor="middle-left",
                 size=15, weight=700, font="Barlow Condensed", italic=True, letter_spacing=2.2, color="#f8fafc")
 
     elif p == "glass_card":
@@ -410,19 +423,20 @@ def frame_operations(x: float, y: float, width: float, height: float, preset: st
         acc = accent or "#e6b038"
         add("rect", "bezel", x=x, y=y, width=w, height=h, radius=16, smoothing=0.5,
             style={"material": mat, "shadow": {"color": "#000000@0.58", "blur": 28, "dy": 13}})
-        add("rect", "inlay", x=x + 4.5, y=y + 4.5, width=w - 9, height=h - 9, radius=12.5, smoothing=0.5,
+        add("rect", "inlay", x=round(x + 5), y=round(y + 5), width=round(w - 10), height=round(h - 10), radius=12, smoothing=0.5,
             style={"fill": {"type": "linear", "angle": 145, "stops": [[0, "#151923"], [1, "#0a0c12"]]},
                    "stroke": {"color": "#ffffff@0.08", "width": 1, "align": "inside"},
                    "inner_shadow": {"color": "#000000@0.75", "blur": 12, "dy": 3}})
         if orn in ("auto", "brackets", "notches"):
-            add("rect", "accent_rule", x=x + 22, y=y + 4.5, width=min(72.0, w * 0.26), height=2.5, radius=1.2,
+            add("rect", "accent_rule", x=round(x + 22), y=round(y + 5), width=round(min(72.0, w * 0.26)), height=3, radius=1.5,
                 style={"fill": acc, "glow": {"color": f"{acc}@0.45", "blur": 6}})
-            add("rect", "bot_rule", x=x + w - 22 - min(44.0, w * 0.16), y=y + h - 7,
-                width=min(44.0, w * 0.16), height=2, radius=1, style={"fill": f"{acc}@0.65"})
+            bot_w = round(min(44.0, w * 0.16))
+            add("rect", "bot_rule", x=round(x + w - 22 - bot_w), y=round(y + h - 7),
+                width=bot_w, height=2, radius=1, style={"fill": f"{acc}@0.65"})
         inner = [round(x + 20, 2), round(y + (44 if title else 20), 2),
                  round(w - 40, 2), round(h - (64 if title else 40), 2)]
         if title:
-            add("text", "title", text=title, x=x + 22, y=y + 26, anchor="middle-left",
+            add("text", "title", text=title, x=round(x + 22), y=round(y + 26), anchor="middle-left",
                 size=15, weight=700, font="Inter", letter_spacing=1.2, color="#f8fafc")
 
     else:
