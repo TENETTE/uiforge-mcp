@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.17.0 - 2026-11-27
+
+- **Zero-Math Flex, Grid & Split Layout Engine (`add_split`, `add_grid`, upgraded `add_stack`):** expanded core engine to **108 operations**:
+  - `add_split`: divides any screen or frame into proportional named regions supporting `px`, `%` and `fr` tracks (`sizes=["27%", "1fr", "27%"]`, `names=["left", "center", "right"]`), persisting named region boxes for `"in"` placement and executing per-region `children` directly.
+  - `add_grid`: 2D responsive grid container supporting `cols`, `col_span`, `row_gap`/`col_gap`, `equal_rows`, and automatic 22 px widget label headroom.
+  - Upgraded `add_stack`: added `justify` (`start` | `center` | `end` | `space-between` | `space-around`), Flex `"height": "fill"` / `"width": "fill"` / `"flex": 1` (e.g. `add_scroll` automatically filling remaining frame height), and `{"op": "spacer"}` children.
+- **High-Level Game UI Composite Suite (`add_gauge`, `add_slot`, `add_tabs`, `add_stat_card`):** single-call, theme-inheriting, WCAG AA (`>= 4.5:1`) out-of-the-box builders:
+  - `add_gauge`: complete radial / semi / segmented AAA dial gauge (beveled face, track, redline, numbered ticks, conic value arc, needle, spun `radial_metal` hub, digital readout & automatic `end_angle` + `rotation` live bindings).
+  - `add_slot`: ability / inventory / equipment hardpoint slot with 6 rarity palettes (`common`..`exotic`), `horizontal`/`square` layouts, keycap/badge, optional cooldown overlay + binding, and element-scoped `selected` state toggle.
+  - `add_tabs`: navigation tab strip (`cut` | `pill` | `underline`) with active highlight and isolated per-tab links.
+  - `add_stat_card`: telemetry KPI card and auto-sized hug badge pill (`compact=true`).
+- **Working Prototype Interactions, Shared State & Expression Helpers (`binding.py`, `tools_delivery.py`, `webexport.py`):**
+  - Added `format_num(n, decimals)`, `concat(...)`, `upper(s)`, and `lower(s)` across Python, Web/React JS, and Godot 4 (`_fmt_num` GDScript helper).
+  - Added `set_data` and `reset_data` actions to `set_interaction` (live in Web, React, and Godot `_controller.gd`), plus automatic cross-screen `sessionStorage` shared state (`shared_state=True`).
+- **Project-Level Delivery, Single-File HTML, Vite Starter & One-Call QA (`export_project`, `qa_screen`):**
+  - `export_project`: exports multi-screen projects in one call with deduplicated `fonts/`, shared `tokens/`, and ready routers (`UIManager.gd` for Godot 4, `UiScreenRouter.cs` for Unity, Vite `App.tsx` for React, or linked/single-file Web).
+  - `export_web(..., single_file=True)`: bundles all screens, CSS, JS, fonts, and images into one self-contained shareable `index.html`.
+  - `export_react(..., scaffold=True)`: generates a runnable Vite + React 19 + TypeScript project (`package.json`, `vite.config.ts`, `tsconfig.json`, `index.html`, `src/App.tsx`, `src/main.tsx`).
+  - `qa_screen`: one-call full visual + automated QA returning a composite diagnostic sheet (Normal | Extreme Test Data | Deuteranopia | Pseudo-Long +100%) and structured WCAG/overflow pass/fail JSON.
+- **Ergonomics & Round-2 Blind Audit Bugfixes (7 Fixes):**
+  - Compact `batch` summary auto-enabled for >15 ops (surfacing top-level `frames`, `splits`, `warnings`), `_decor` lint noise filtering on system-generated frame trim & bar fills, and `preview_background` separation keeping game HUD PNG/engine exports transparent while showing a mockup backdrop in `preview` & `export_web`.
+  - Isolated `add_button` / `add_progress_bar` groups inside `add_stack(group=...)` + eliminated duplicate `data-href`/`data-ix` navigation; resolved `$token` & `@alpha` literals in exported JS/GDScript binding expressions; kept clipped progress-bar fills live CSS boxes and conic `end_angle`-bound arcs live inline SVG (`data-arc`); split dynamic bound/animated elements out of Godot group PNGs; clamped `export_spec` thin-line redline boxes; fixed `add_button` default WCAG contrast & 12 px keycaps; projected `review_canvas` WCAG sampling through 3D perspective layer homographies; relaxed `set_interaction(remove=True)`; scoped `s-<state>` classes per element; deduplicated inner SVG DOM IDs; skipped no-op non-CSS `@keyframes`; and exported gradient canvas backgrounds as pure CSS instead of multi-MB PNGs.
+- **Full Studio UI & Combined Mode Sync (`ui_assets/`):** added 6 new Create chips (`Dial Gauge`, `Ability Slot`, `Nav Tabs`, `Stat Card`, `2×2 Grid`, `3-Col Split`), `Full QA` (`qa_screen`) button in Audit tab, `Single-File HTML` / `React Vite Starter` / `Godot Multi-Screen` Export Center cards, and searchable **108 operations**.
+
 ## 0.16.0 - 2026-11-27
 
 - **Composite High-Level Widgets (`components.py`, `add_button`, `add_progress_bar`, `add_stack`):** expanded core engine to **100 operations** with single-call editable composite builders:

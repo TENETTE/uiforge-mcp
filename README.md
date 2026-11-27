@@ -87,7 +87,7 @@ All three modes share the **exact same MCP-independent core engine** (`core.py` 
 
 - **Deterministic Vector + Cook-Torrance GGX PBR:** 39 built-in materials, custom `.hdr`/`.exr` IBL, live PBR parameter tuning & custom material saving, HarfBuzz BiDi/Indic typography, and 3D curved visor perspective.
 - **Built-in Production Studio UI:** 3 instant starter templates, 8-point resize handles, magnetic snap guides, `Shift+Click` multi-select, inline text edit, `Ctrl+K` Command Palette, Dark/Light themes, Color-Blindness & Pseudo-Loc simulator, Multi-Device Matrix, CSS/Tailwind/shadcn token import, and WCAG contrast audit.
-- **100 Core Operations + 142 MIT Vector Icons + 9 AAA Frames:** Native `input`, `scroll`, `slider`, `toggle`, and `dropdown` widgets, composite `add_button` / `add_progress_bar` / `add_stack`, container-relative `in: "<frame>.inner_box"` layout, `import_screenshot` v2, and pixel `visual_diff`.
+- **108 Core Operations + 142 MIT Vector Icons + 9 AAA Frames:** Native `input`, `scroll`, `slider`, `toggle`, and `dropdown` widgets, Game UI composites (`add_button`, `add_progress_bar`, `add_gauge`, `add_slot`, `add_tabs`, `add_stat_card`), zero-math Flex/Grid/Split layout (`add_stack`, `add_grid`, `add_split`), one-call `qa_screen`, multi-screen `export_project`, `import_screenshot` v2, and pixel `visual_diff`.
 
 <table>
   <tr>
@@ -112,7 +112,7 @@ All three modes share the **exact same MCP-independent core engine** (`core.py` 
   </tr>
 </table>
 
-> **See more:** [Full Showcase Gallery (`docs/SHOWCASES.md`)](docs/SHOWCASES.md) — Studio launcher, responsive mode, PBR normal/ORM texture maps, racing HUD, animations, and all 100 operations.
+> **See more:** [Full Showcase Gallery (`docs/SHOWCASES.md`)](docs/SHOWCASES.md) — Studio launcher, responsive mode, PBR normal/ORM texture maps, racing HUD, animations, and all 108 operations.
 
 ---
 

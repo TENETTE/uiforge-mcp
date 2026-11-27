@@ -4,7 +4,7 @@ This matrix documents official API verification performed via live documentation
 
 ---
 
-## 1. UIForge Runtime Modes (v0.16.0)
+## 1. UIForge Runtime Modes (v0.17.0)
 
 | Mode | Command | Runtime Requirements | Verification Status |
 | --- | --- | --- | --- |

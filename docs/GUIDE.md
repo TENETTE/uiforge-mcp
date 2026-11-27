@@ -6,7 +6,7 @@ Kısa tanıtım ve görseller için [README.tr.md](../README.tr.md) (English: [R
 
 ## 1. Üç Çalışma Modu ve Ortak Çekirdek
 
-UIForge v0.16.0 itibarıyla tek bir **MCP'den bağımsız çekirdek motor** (`core.py`, `store.py`, `render.py`, `pbr.py`, `widgets.py`, `components.py`, `export.py`, `desktop_export.py`, `tools_delivery.py`) üzerinde üç çalışma modu sunar:
+UIForge v0.17.0 itibarıyla tek bir **MCP'den bağımsız çekirdek motor** (`core.py`, `store.py`, `render.py`, `pbr.py`, `widgets.py`, `components.py`, `export.py`, `desktop_export.py`, `tools_delivery.py`) üzerinde üç çalışma modu sunar:
 
 | Mod | Komut | Açıklama |
 | --- | --- | --- |
@@ -64,21 +64,21 @@ UIForge v0.16.0 itibarıyla tek bir **MCP'den bağımsız çekirdek motor** (`co
 
 ---
 
-## 5. Araç Kataloğu (100 Modele Açık + 2 Uygulama İçi Araç)
+## 5. Araç Kataloğu (108 Modele Açık + 2 Uygulama İçi Araç)
 
 | Grup | Araçlar |
 | --- | --- |
 | **Canvas (9)** | `create_canvas`, `list_canvases`, `get_canvas`, `update_canvas`, `duplicate_canvas`, `delete_canvas`, `fit_canvas`, `resize_canvas`, `canvas_version` |
 | **Katman (4)** | `create_layer`, `update_layer`, `delete_layer`, `set_layer` |
-| **Çizim, Çerçeve, İkon & Bileşen (22)** | `add_rect`, `add_ellipse`, `add_line`, `add_polygon`, `add_path`, `add_arc`, `add_ticks`, `add_text`, `add_image`, `add_instance`, `add_svg`, `add_frame`, `add_icon`, `add_input`, `add_scroll`, `add_slider`, `add_toggle`, `add_dropdown`, `add_button`, `add_progress_bar`, `add_stack`, `import_screenshot` |
+| **Çizim, Çerçeve, İkon, Kompozit & Layout (28)** | `add_rect`, `add_ellipse`, `add_line`, `add_polygon`, `add_path`, `add_arc`, `add_ticks`, `add_text`, `add_image`, `add_instance`, `add_svg`, `add_frame`, `add_icon`, `add_input`, `add_scroll`, `add_slider`, `add_toggle`, `add_dropdown`, `add_button`, `add_progress_bar`, `add_gauge`, `add_slot`, `add_tabs`, `add_stat_card`, `add_stack`, `add_grid`, `add_split`, `import_screenshot` |
 | **Düzenleme ve Yerleşim (18)** | `update_element`, `delete_elements`, `duplicate_element`, `boolean_elements`, `path_ops`, `restyle`, `find_elements`, `vectorize_image`, `move_elements`, `reorder_element`, `align_elements`, `arrange_elements`, `scatter`, `copy_elements`, `set_pin`, `batch`, `undo`, `redo` |
 | **Veri, Durum ve Dil (6)** | `set_binding`, `set_state`, `delete_state`, `generate_from_template`, `set_strings`, `get_strings` |
-| **Denetim, Canlı Stüdyo & MCP App (6)** | `live_preview`, `open_studio`, `review_canvas`, `inspect_pixels`, `view_image`, `preview_nine_slice` |
+| **Denetim, QA, Canlı Stüdyo & MCP App (7)** | `live_preview`, `open_studio`, `review_canvas`, `qa_screen`, `inspect_pixels`, `view_image`, `preview_nine_slice` |
 | **Animasyon (7)** | `create_animation`, `set_keyframes`, `delete_keyframes`, `get_animations`, `delete_animation`, `preview_animation`, `export_animation` |
 | **Tema ve Bilgi (6)** | `set_theme`, `get_theme`, `make_palette`, `list_fonts`, `measure_text`, `guide` |
 | **Önizleme ve Keşif (4)** | `preview`, `preview_resolutions`, `contact_sheet`, `make_variations` |
 | **Dışa Aktarma (12)** | `export_png`, `export_svg`, `export_pdf`, `export_web`, `export_react`, `export_asset`, `export_pbr_maps`, `export_layers`, `export_psd`, `export_atlas`, `export_bitmap_font`, `write_engine_helpers` |
-| **Teslim ve Motorlar (6)** | `export_spec`, `export_theme`, `set_link`, `set_interaction`, `export_prototype`, `export_screen` |
+| **Teslim ve Motorlar (7)** | `export_spec`, `export_theme`, `set_link`, `set_interaction`, `export_prototype`, `export_screen`, `export_project` |
 
 - **Uygulama içi SEP-1865 araçları (`visibility: ["app"]`):** `studio_app_state`, `studio_app_render`.
 - **MCP Kaynakları:** `uiforge://cheatsheet`, `uiforge://materials`, `uiforge://icons`, `uiforge://workspace`, `ui://uiforge/studio.html`, `uiforge://guide/{topic}`.

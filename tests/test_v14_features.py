@@ -32,7 +32,7 @@ def ws(tmp_path):
 
 
 def test_version_single_source_and_binding_dos_guard(ws):
-    assert __version__ == "0.16.0"
+    assert __version__ == "0.17.0"
     assert eval_expr("2 ** 8", {}) == 256.0
     with pytest.raises(ValueError, match="exponent|safety"):
         eval_expr("9 ** 9 ** 9", {})
